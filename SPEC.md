@@ -99,10 +99,12 @@ via the §6a verdict). Could be one table with a state field, or two — see ope
   - **`suggested`** = surfaced by the artist-watch (6b) / backfill (6c), *not* yet in my
     Spotify library. Lives in the Releases worklist (§8d). From here: **Save** → `saved`
     (writes to Spotify) · **Want** → `wanted` (also saves; skips `saved`) · **reject** →
-    `dismissed`. The Album table doubles as 6b's **seen-ledger**, so discovery must
-    de-dup against the *whole* table (by release-group / Spotify id) — a release already
-    saved/owned isn't re-suggested. (A *reissue* is a different release-group, so it can
-    still appear even if I own the original — arguably correct; tune later.)
+    `dismissed`.
+  - **De-dup is essential** (everywhere new albums enter, not just 6b). The Album table
+    doubles as the **seen-ledger**: discovery and every ingest de-dup against the *whole*
+    table by release-group / Spotify id, so nothing already saved/wanted/owned/dismissed
+    is re-created or re-suggested. No special reissue handling — a reissue is simply a
+    distinct release-group and treated as its own album.
   - **`acquiring`** = bought/ordered but not yet landed in beets. Keeps ordered albums
     out of the Acquire worklist (§8d) so they stop nagging. `ordered_at` timestamps it.
   - **`owned` is *derived* from reconcile, not set by hand.** Reconcile promotes
