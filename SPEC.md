@@ -66,6 +66,9 @@ Design principles:
         files land in beets inbox → import → RECONCILE flips it to owned. Loop closed.
 ```
 
+(The manual "land" step — get files into beets — can be automated for the torrent/
+seedbox case; see the §12 Transmission auto-land extension.)
+
 The magic is that **reconcile runs continuously**. The day a FLAC of a wanted album
 lands in beets — however it got there — the want auto-resolves. Nothing to remember.
 
@@ -477,3 +480,69 @@ blink→nix conversion.
 carrying the load → confirms the caching / barcode-first design matters. Fat
 unresolvable tail → decide *now* between an LLM Tier-3 (§5a) vs a manual-match UI, in a
 script rather than after building the whole tool.
+
+## 12. Extension (post-MVP): Transmission → auto-land pipeline
+
+> **Status: sketch, explicitly not MVP.** This automates the one manual step left in the
+> loop (§3): getting downloaded files *into* beets. Today I download to the seedbox by
+> hand, then rsync + `beet import` by hand. This closes that gap.
+
+**What it does:** poll Transmission for newly-completed downloads, match each against the
+want-list, and offer a one-click **Import** that pulls the files over, runs a beets
+import, and tidies the local staging — after which reconcile (§5) flips the want to
+`owned` on its own.
+
+**Flow:**
+1. **Poll Transmission RPC** (hourly/daily) — `torrent-get` for completed torrents
+   (`percentDone == 1`), with name, hash, `downloadDir`, file list. (`transmission-rpc`
+   Python lib; note the RPC's `X-Transmission-Session-Id` 409-handshake.)
+2. **Diff against a seen-set** in Postgres → only genuinely new completions.
+3. **Match torrent → want.** Messy scene naming vs the want-list — the *same* imperfect
+   problem as §5, so: fuzzy/LLM-adjudicated **suggestion**, never an automatic action.
+   Prime §5a LLM-adjudicator territory; must be allowed to abstain → "no confident match".
+4. **Offer an Import button** per matched candidate (human confirms the match).
+5. **On click, the import task:**
+   - **Transfer** the torrent's files off the seedbox — **copy, not move** (see seeding
+     rule below): `rsync` over SSH into the beets **inbox**.
+   - **Import** via the existing beets CLI seam (§5): `beet import` moves inbox → library
+     (the `record-library` `move: yes` workflow, §10).
+   - **Tidy** the *local* staging copy afterwards. Nothing on the seedbox is touched.
+6. **Reconcile closes the loop** — the new release-group appears in beets, §5 marks the
+   want `owned`. The import task itself sets no ownership state.
+
+**Hard rules / design calls:**
+- **Never disturb seeding.** Private-tracker ratio depends on continued seeding, so the
+  seedbox files and the torrent are **never moved or deleted** — we only ever *copy* off.
+  "Tidy up" is strictly the local inbox staging, post-import.
+- **Detection is automatic; the import action is human-gated.** Matching is imperfect, so
+  a click confirms before any files move or import runs.
+- **Post-import sanity check.** beets auto-tagging can match to the *wrong* release. After
+  import, verify the imported release-group matches the want's; if not, flag it rather
+  than let reconcile silently mark a mismatch as owned.
+- **Idempotent + recoverable.** Track per-torrent import state (matched / importing /
+  done / failed) so a torrent is never imported twice and transfer/import failures can
+  retry. Mind disk space in the inbox.
+- **Reuses existing seams:** beets CLI (import), reconcile (owned-marking), the want-list.
+  Little new surface beyond Transmission + file transfer.
+
+**Config additions (extends the §8a contract):**
+| Requirement | Config |
+|---|---|
+| Transmission RPC | rpc url, username, password |
+| Seedbox file transfer | SSH host/port/user/key, remote download base path, local inbox path (or: an sshfs/NFS mount, in which case transfer is a local copy and no per-import SSH is needed) |
+| Import behaviour | beets import flags / non-interactive mode (reuses the §5 beets command) |
+
+**Access note (answering "needs SSH too?"):** yes — Transmission RPC gives *control and
+metadata only*, not file bytes. File retrieval is a separate channel: rsync-over-SSH, or
+a pre-existing seedbox mount. Two distinct credentials (RPC + SSH), both config-driven.
+
+**Safety:** this feature *downloads files and runs imports* — both gated behind an
+explicit user click, and all credentials come from config, never from torrent names or
+any other observed content.
+
+**Open questions:**
+- Match reliability, and whether to *require* a confirmed MB-tag before enabling Import.
+- beets non-interactive import mode + autotag confidence threshold (quiet vs. review).
+- Multi-album / non-music / mixed torrents; how to handle partial matches.
+- A sibling "inbox watcher" for non-torrent acquisitions (Bandcamp zips) could reuse the
+  transfer→import→tidy tail — but that's a separate extension, not this one.
