@@ -254,6 +254,16 @@ and surface their new albums as candidate wants.
   union. Expect some noise from the followed side — acceptable.
 - Mechanism: periodically poll each watched artist's albums, diff against what's
   already known, surface anything new. Same idea as `artistwatch.py`, wider seed set.
+- **Surfaced as the "Releases" worklist (§8d)**, at the front of the funnel. Per-item
+  actions:
+  - **Save** → save the album to my Spotify library, entering the normal `saved` → Decide
+    (§6a) flow. Keeps `saved` meaning "in my Spotify library".
+  - **Want** → *also saves*, then jumps straight to `wanted`, skipping the verdict (I
+    already know I want it). A `wanted` album is therefore always also saved.
+  - **Dismiss** → not interested, don't resurface (so the worklist empties).
+- **First Spotify write.** Save/Want call `PUT /me/albums`, which needs the
+  **`user-library-modify`** scope — a new scope, and the app's first mutation of Spotify
+  state (everything else is read-only). Still user-initiated per item, never automatic.
 - Not in v1 (see §9) — this is increment two.
 
 ### 6c. "More of this artist's catalogue" — the backfill  *(the thing you half-remembered)*
@@ -317,7 +327,7 @@ to the code.
 |---|---|---|
 | PostgreSQL backend | host, port, database, user, password (or a single `DATABASE_URL`) | The app runs its own migrations on the given database. |
 | Beets CLI access | beets command (default `beet`), optional beets config path | The command may be `beet`, `docker exec … beet`, `ssh … beet`, etc. (§5). |
-| Spotify API | client id/secret, **redirect URI** (public HTTPS, registered in the Spotify dashboard), token store | Authorization Code flow via `tekore`; see §8c for the redirect-URI rules and 6-month re-auth. |
+| Spotify API | client id/secret, **redirect URI** (public HTTPS, registered in the Spotify dashboard), token store | Authorization Code flow via `tekore`; see §8c for redirect-URI rules and 6-month re-auth. Read-only scopes for v1; **`user-library-modify`** added when §6b lands (Save/Want writes to the Spotify library). |
 | Tunables | 6a thresholds, poll intervals, Bandcamp/base URLs, re-auth warning lead time | Sensible defaults; all overridable. |
 
 If those are satisfied, the app doesn't care whether it's in Docker, a VM, bare metal,
@@ -387,44 +397,52 @@ UX expression of the whole mission (stop music leaking away). Around the worklis
 few browse/reference views and a persistent status.
 
 **Home / dashboard** — at-a-glance "what needs me": a count/badge per worklist (e.g.
-*"3 to judge · 12 to buy · 2 to import"*) plus the Spotify connection status. The entry
-point into the queues.
+*"2 new · 3 to judge · 12 to buy · 2 to import"*) plus the Spotify connection status. The
+entry point into the queues. The worklists read left-to-right as the **funnel**: new
+releases → decide → acquire → import.
 
-**Worklists (pending actions):**
+**Worklists (pending actions), in funnel order:**
 
-1. **Decide** — the §6a verdict queue. Albums in `saved` where a 6a trigger has *fired*
+1. **Releases** — the §6b new-release watch (new albums from watched artists). At the
+   *front* of the funnel: it feeds saves rather than draining them. Item: artwork,
+   artist/album, which watched artist, release date. Actions: **Save** → saved to my
+   Spotify library, enters the Decide flow · **Want** → *also saves*, then straight to
+   `wanted` (skips the verdict) · **Dismiss** → don't resurface. (Save/Want are the app's
+   first Spotify *writes* — `user-library-modify` scope, §6b.) **Post-v1** — arrives with
+   the §6b increment.
+2. **Decide** — the §6a verdict queue. Albums in `saved` where a 6a trigger has *fired*
    (listened-enough or forgotten) with no verdict yet. **Shows only what's ready to
    judge** — the wider saved backlog that hasn't tripped a trigger stays out, by design
    (don't nag prematurely). Item: artwork, artist/album, *why it surfaced* ("played 5
    tracks" / "saved 24 days ago, never played"), an open-in-Spotify link. Actions:
    **Keep** → `wanted` · **Drop** → `dismissed` · **Snooze** (not heard it yet).
-2. **Acquire** — `wanted`, not `owned`, not flagged `acquiring`. Item: artwork,
+3. **Acquire** — `wanted`, not `owned`, not flagged `acquiring`. Item: artwork,
    artist/album, **Buy on Bandcamp** (§7) + fallback links + paste-a-URL, and a **Mark as
    ordered** toggle (sets `acquiring`, §4) so a bought-but-not-yet-imported album drops
    out until reconcile flips it `owned`.
-3. **Import** — **extension-only (§12/§13); absent in v1.** Detected downloads
+4. **Import** — **extension-only (§12/§13); absent in v1.** Detected downloads
    (Transmission completions / watch-dir drops) awaiting the Import click. Item: source,
    matched want (or "no match → import as new owned"), **Import** button. In v1 landing is
    fully manual and reconcile flips `owned` with no queue at all.
 
 **Browse / reference (not action queues):**
 
-4. **Library / all** — the full table, filterable by state / artist / provenance / date.
+5. **Library / all** — the full table, filterable by state / artist / provenance / date.
    The "everything" behind the worklists.
-5. **Owned / recently landed** — what's owned (linked to beets) + the log of wants that
+6. **Owned / recently landed** — what's owned (linked to beets) + the log of wants that
    resolved. The library visibly growing — the point of the whole thing.
-6. **Dismissed** — dropped albums, for the occasional un-dismiss.
+7. **Dismissed** — dropped albums, for the occasional un-dismiss.
 
 **Persistent status:**
 
-7. **Spotify connection** (§8c) — a persistent header state: connected / "reconnect in N
+8. **Spotify connection** (§8c) — a persistent header state: connected / "reconnect in N
    days" / **Reconnect now**. Critical: if this lapses, *every* worklist silently stops
    filling. Shown on the dashboard and as a banner as re-auth nears/needed.
-8. **Settings** — thresholds, poll intervals, reconnect. Minimal.
+9. **Settings** — thresholds, poll intervals, reconnect. Minimal.
 
 **v1 cut:** dashboard + **Decide** + **Acquire** + **Library/all** + **Owned** + the
-Spotify status/banner. The **Import** queue arrives with the §12/§13 extensions.
-Dismissed and Settings are thin.
+Spotify status/banner. The **Releases** queue arrives with §6b and the **Import** queue
+with the §12/§13 extensions. Dismissed and Settings are thin.
 
 ## 9. Decisions & v1 scope
 
@@ -442,7 +460,7 @@ Dismissed and Settings are thin.
 | Spotify auth | Authorization Code (+ client secret). Refresh tokens now expire at **6 months** → web re-auth flow + proactive warning are **v1-critical**; store `spotify_authorized_at` (§8c). |
 | Redirect URI | Config-driven public HTTPS callback, registered per-deployment in the Spotify dashboard; loopback `127.0.0.1` (not `localhost`) for local dev (§8c). |
 | Stack | Standalone Python backend + JS SPA frontend (§8). |
-| UI model | A **set of worklists** (Decide / Acquire / Import) over the state lifecycle, plus browse + a Spotify-status banner (§8d). Import queue is extension-only. Add an `acquiring` flag so bought items stop nagging (§4). |
+| UI model | A **set of worklists** in funnel order — Releases (§6b) / Decide / Acquire / Import — over the state lifecycle, plus browse + a Spotify-status banner (§8d). Releases and Import are post-v1. Add an `acquiring` flag so bought items stop nagging (§4). |
 | Storage | **PostgreSQL**, connection from config (host/port/db/user/pass). No local SQLite of its own. |
 | Deployment | **Agnostic** — app only requires a Postgres backend + a beets command, both from config (§8a). My blink+partridge hosting is a reference deployment (§8b), not a requirement. |
 | Acquisition | Manual; assisted by one-click Bandcamp search-URL per want (§7). Links, never buys. |
