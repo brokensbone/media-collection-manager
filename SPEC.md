@@ -92,17 +92,29 @@ via the §6a verdict). Could be one table with a state field, or two — see ope
 - **Provenance:** how it entered — spotify-save / artist-watch (6b) / backfill (6c) /
   manual.
 - **State (the curation + ownership lifecycle):**
-  `saved` → *(6a verdict)* → `wanted` → *(mark as ordered)* → `acquiring` → `owned`, plus
-  `dismissed` (dropped at verdict, don't resurface). One linear field tells the whole
-  story. Notes:
+  `suggested` → *(Save)* `saved` → *(6a verdict)* `wanted` → *(mark as ordered)*
+  `acquiring` → `owned`, plus `dismissed`. One linear field tells the whole story.
+  **Entry state depends on provenance:** a Spotify save enters at `saved` (already in my
+  library); a 6b/6c discovery enters at `suggested` (a candidate I haven't saved). Notes:
+  - **`suggested`** = surfaced by the artist-watch (6b) / backfill (6c), *not* yet in my
+    Spotify library. Lives in the Releases worklist (§8d). From here: **Save** → `saved`
+    (writes to Spotify) · **Want** → `wanted` (also saves; skips `saved`) · **reject** →
+    `dismissed`. The Album table doubles as 6b's **seen-ledger**, so discovery must
+    de-dup against the *whole* table (by release-group / Spotify id) — a release already
+    saved/owned isn't re-suggested. (A *reissue* is a different release-group, so it can
+    still appear even if I own the original — arguably correct; tune later.)
   - **`acquiring`** = bought/ordered but not yet landed in beets. Keeps ordered albums
     out of the Acquire worklist (§8d) so they stop nagging. `ordered_at` timestamps it.
   - **`owned` is *derived* from reconcile, not set by hand.** Reconcile promotes
     `wanted` *or* `acquiring` → `owned` when it finds a match. `acquiring` is skippable:
     importing something you never marked as ordered goes `wanted` → `owned` directly.
+  - **`dismissed`** = terminal "don't resurface", reachable from `suggested` (rejected a
+    suggestion — reissue/single) *or* from `saved`/`wanted` (dropped at verdict / changed
+    mind). No separate "rejected" state — **provenance** distinguishes the two reasons,
+    and the Dismissed view can filter on it.
   - **Reversible:** cancelling an order is `acquiring` → `wanted`.
-  - (Chosen as a fourth *state* over an orthogonal flag: a single linear field is fewer
-    things to look at, and reversibility doesn't distinguish the two.)
+  - (`acquiring` chosen as a state, not a flag: a single linear field is fewer things to
+    look at, and reversibility doesn't distinguish the two.)
 - **Verdict timing fields:** saved-at, verdict-at (null = still awaiting judgement).
   Drives the 6a "surface saves older than N days with no verdict" query.
 - **Ownership link:** to the beets album when matched, else null. Recomputed on every
@@ -408,13 +420,13 @@ releases → decide → acquire → import.
 
 **Worklists (pending actions), in funnel order:**
 
-1. **Releases** — the §6b new-release watch (new albums from watched artists). At the
-   *front* of the funnel: it feeds saves rather than draining them. Item: artwork,
-   artist/album, which watched artist, release date. Actions: **Save** → saved to my
-   Spotify library, enters the Decide flow · **Want** → *also saves*, then straight to
-   `wanted` (skips the verdict) · **Dismiss** → don't resurface. (Save/Want are the app's
-   first Spotify *writes* — `user-library-modify` scope, §6b.) **Post-v1** — arrives with
-   the §6b increment.
+1. **Releases** — the §6b new-release watch: albums in the **`suggested`** state (found by
+   the artist-watch, not yet in my library). At the *front* of the funnel: it feeds saves
+   rather than draining them. Item: artwork, artist/album, which watched artist, release
+   date. Actions: **Save** → `saved` (writes to my Spotify library), enters the Decide
+   flow · **Want** → `wanted` (*also saves*, skips the verdict) · **Dismiss** →
+   `dismissed`, don't resurface. (Save/Want are the app's first Spotify *writes* —
+   `user-library-modify` scope, §6b.) **Post-v1** — arrives with the §6b increment.
 2. **Decide** — the §6a verdict queue. Albums in `saved` where a 6a trigger has *fired*
    (listened-enough or forgotten) with no verdict yet. **Shows only what's ready to
    judge** — the wider saved backlog that hasn't tripped a trigger stays out, by design
@@ -455,7 +467,7 @@ with the §12/§13 extensions. Dismissed and Settings are thin.
 
 | Area | Decision |
 |---|----------|
-| Model | One `Album` table with a state field (`saved→wanted→acquiring→owned`/`dismissed`) — not two tables. |
+| Model | One `Album` table with a state field (`suggested→saved→wanted→acquiring→owned`/`dismissed`) — not two tables. |
 | Reconcile | **Beets CLI** behind a config-driven seam (command + config path), not direct SQLite (raw SQLite locked constantly). One `beet list -a -f '$mb_releasegroupid'` dump → in-memory diff (§5). |
 | Identity | MusicBrainz release-group as the spine; 3-tier resolution (barcode → ISRC-cluster → fuzzy). Resolve once at ingest, store the id; reconcile is a deterministic join thereafter (§5). |
 | LLM matching | Keep Tiers 1–2 deterministic. LLM only as a Tier-3 adjudicator that may abstain → human inbox, run as a batch off the hot path. Build-or-skip gated by the §11 spike (§5a). |
@@ -466,7 +478,7 @@ with the §12/§13 extensions. Dismissed and Settings are thin.
 | Redirect URI | Config-driven public HTTPS callback, registered per-deployment in the Spotify dashboard; loopback `127.0.0.1` (not `localhost`) for local dev (§8c). |
 | Stack | Standalone Python backend + JS SPA frontend (§8). |
 | UI model | A **set of worklists** in funnel order — Releases (§6b) / Decide / Acquire / Import — over the state lifecycle, plus browse + a Spotify-status banner (§8d). Releases and Import are post-v1. |
-| State machine | `saved → wanted → acquiring → owned` (+ `dismissed`). `acquiring` is a state (bought, not yet landed), not a flag — one linear field. `owned` derived by reconcile from `wanted`/`acquiring`; `acquiring` skippable and reversible (§4). |
+| State machine | `suggested → saved → wanted → acquiring → owned` (+ `dismissed`). Entry state by provenance: Spotify saves enter at `saved`, 6b/6c discoveries at `suggested`. `owned` derived by reconcile from `wanted`/`acquiring`; `dismissed` reachable from `suggested` (rejected suggestion) or `saved`/`wanted` (verdict drop), disambiguated by provenance (§4). |
 | Storage | **PostgreSQL**, connection from config (host/port/db/user/pass). No local SQLite of its own. |
 | Deployment | **Agnostic** — app only requires a Postgres backend + a beets command, both from config (§8a). My blink+partridge hosting is a reference deployment (§8b), not a requirement. |
 | Acquisition | Manual; assisted by one-click Bandcamp search-URL per want (§7). Links, never buys. |
