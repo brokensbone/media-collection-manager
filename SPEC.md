@@ -92,16 +92,21 @@ via the §6a verdict). Could be one table with a state field, or two — see ope
 - **Provenance:** how it entered — spotify-save / artist-watch (6b) / backfill (6c) /
   manual.
 - **State (the curation + ownership lifecycle):**
-  `saved` → *(6a verdict)* → `wanted` → `owned`, plus `dismissed` (dropped at verdict,
-  don't resurface). `owned` is *derived* from reconcile, not set by hand.
+  `saved` → *(6a verdict)* → `wanted` → *(mark as ordered)* → `acquiring` → `owned`, plus
+  `dismissed` (dropped at verdict, don't resurface). One linear field tells the whole
+  story. Notes:
+  - **`acquiring`** = bought/ordered but not yet landed in beets. Keeps ordered albums
+    out of the Acquire worklist (§8d) so they stop nagging. `ordered_at` timestamps it.
+  - **`owned` is *derived* from reconcile, not set by hand.** Reconcile promotes
+    `wanted` *or* `acquiring` → `owned` when it finds a match. `acquiring` is skippable:
+    importing something you never marked as ordered goes `wanted` → `owned` directly.
+  - **Reversible:** cancelling an order is `acquiring` → `wanted`.
+  - (Chosen as a fourth *state* over an orthogonal flag: a single linear field is fewer
+    things to look at, and reversibility doesn't distinguish the two.)
 - **Verdict timing fields:** saved-at, verdict-at (null = still awaiting judgement).
   Drives the 6a "surface saves older than N days with no verdict" query.
 - **Ownership link:** to the beets album when matched, else null. Recomputed on every
   reconcile (§5).
-- **`acquiring` flag / `ordered_at`:** set when I've bought/ordered a `wanted` album but
-  it hasn't landed in beets yet. Drops it out of the "Acquire" worklist (§8d) so it stops
-  nagging, until reconcile flips it `owned`. A flag, not a new state — keeps the
-  `saved→wanted→owned` machine intact.
 - **Acquisition hints (optional):** candidate source links (Bandcamp, etc.), added
   manually or scraped read-only. Never acted on automatically.
 
@@ -416,10 +421,10 @@ releases → decide → acquire → import.
    (don't nag prematurely). Item: artwork, artist/album, *why it surfaced* ("played 5
    tracks" / "saved 24 days ago, never played"), an open-in-Spotify link. Actions:
    **Keep** → `wanted` · **Drop** → `dismissed` · **Snooze** (not heard it yet).
-3. **Acquire** — `wanted`, not `owned`, not flagged `acquiring`. Item: artwork,
-   artist/album, **Buy on Bandcamp** (§7) + fallback links + paste-a-URL, and a **Mark as
-   ordered** toggle (sets `acquiring`, §4) so a bought-but-not-yet-imported album drops
-   out until reconcile flips it `owned`.
+3. **Acquire** — albums in `wanted`. Item: artwork, artist/album, **Buy on Bandcamp**
+   (§7) + fallback links + paste-a-URL, and a **Mark as ordered** action that moves it to
+   `acquiring` (§4) — dropping it out of this queue until reconcile flips it `owned`.
+   (Cancel-order returns it to `wanted`.)
 4. **Import** — **extension-only (§12/§13); absent in v1.** Detected downloads
    (Transmission completions / watch-dir drops) awaiting the Import click. Item: source,
    matched want (or "no match → import as new owned"), **Import** button. In v1 landing is
@@ -450,7 +455,7 @@ with the §12/§13 extensions. Dismissed and Settings are thin.
 
 | Area | Decision |
 |---|----------|
-| Model | One `Album` table with a state field (`saved→wanted→owned`/`dismissed`) — not two tables. |
+| Model | One `Album` table with a state field (`saved→wanted→acquiring→owned`/`dismissed`) — not two tables. |
 | Reconcile | **Beets CLI** behind a config-driven seam (command + config path), not direct SQLite (raw SQLite locked constantly). One `beet list -a -f '$mb_releasegroupid'` dump → in-memory diff (§5). |
 | Identity | MusicBrainz release-group as the spine; 3-tier resolution (barcode → ISRC-cluster → fuzzy). Resolve once at ingest, store the id; reconcile is a deterministic join thereafter (§5). |
 | LLM matching | Keep Tiers 1–2 deterministic. LLM only as a Tier-3 adjudicator that may abstain → human inbox, run as a batch off the hot path. Build-or-skip gated by the §11 spike (§5a). |
@@ -460,7 +465,8 @@ with the §12/§13 extensions. Dismissed and Settings are thin.
 | Spotify auth | Authorization Code (+ client secret). Refresh tokens now expire at **6 months** → web re-auth flow + proactive warning are **v1-critical**; store `spotify_authorized_at` (§8c). |
 | Redirect URI | Config-driven public HTTPS callback, registered per-deployment in the Spotify dashboard; loopback `127.0.0.1` (not `localhost`) for local dev (§8c). |
 | Stack | Standalone Python backend + JS SPA frontend (§8). |
-| UI model | A **set of worklists** in funnel order — Releases (§6b) / Decide / Acquire / Import — over the state lifecycle, plus browse + a Spotify-status banner (§8d). Releases and Import are post-v1. Add an `acquiring` flag so bought items stop nagging (§4). |
+| UI model | A **set of worklists** in funnel order — Releases (§6b) / Decide / Acquire / Import — over the state lifecycle, plus browse + a Spotify-status banner (§8d). Releases and Import are post-v1. |
+| State machine | `saved → wanted → acquiring → owned` (+ `dismissed`). `acquiring` is a state (bought, not yet landed), not a flag — one linear field. `owned` derived by reconcile from `wanted`/`acquiring`; `acquiring` skippable and reversible (§4). |
 | Storage | **PostgreSQL**, connection from config (host/port/db/user/pass). No local SQLite of its own. |
 | Deployment | **Agnostic** — app only requires a Postgres backend + a beets command, both from config (§8a). My blink+partridge hosting is a reference deployment (§8b), not a requirement. |
 | Acquisition | Manual; assisted by one-click Bandcamp search-URL per want (§7). Links, never buys. |
