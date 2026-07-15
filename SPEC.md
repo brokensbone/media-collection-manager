@@ -354,12 +354,11 @@ Hard line (unchanged): the tool **links, never buys**. No stored payment, no aut
 ## 8. Interface & stack
 
 **DECIDED: standalone Python backend + JS SPA frontend.** Python sits closest to beets
-(CLI) and Spotify (`tekore`); the SPA gives a snappy triage UX (artwork grids, quick
-keep/drop). Backend exposes a JSON API the SPA consumes.
+(CLI) and the HTTP APIs; the SPA gives a snappy triage UX (artwork grids, quick
+keep/drop). Backend exposes a JSON API the SPA consumes. Concrete stack in §15.
 
-- Likely shape (not yet fixed): Python API (FastAPI or similar) + a small SPA (framework
-  TBD). State (wants + play-history) in **PostgreSQL**; beets reached via the CLI seam
-  (§5). No local SQLite of its own.
+- Shape: FastAPI backend + a React SPA (§15). State (wants + play-history + art) in
+  **PostgreSQL**; beets reached via the CLI seam (§5). No local SQLite of its own.
 - Scheduled jobs (poll saves, poll recently-played, later poll watched artists,
   reconcile) via the app's own scheduler/cron — not tied to any host's scheduler.
 - Core views: the active want-list (not-yet-owned, each with a Buy-on-Bandcamp link),
@@ -378,7 +377,7 @@ to the code.
 |---|---|---|
 | PostgreSQL backend | host, port, database, user, password (or a single `DATABASE_URL`) | The app runs its own migrations on the given database. |
 | Beets CLI access | beets command (default `beet`), optional beets config path | The command may be `beet`, `docker exec … beet`, `ssh … beet`, etc. (§5). |
-| Spotify API | client id/secret, **redirect URI** (public HTTPS, registered in the Spotify dashboard), token store, **overridable base URL** | Authorization Code flow via `tekore`; see §8c for redirect-URI rules and 6-month re-auth. Read-only scopes for v1; **`user-library-modify`** added when §6b lands. Base URL overridable so E2E can point at a stub (§14) — likewise MB/CAA. |
+| Spotify API | client id/secret, **redirect URI** (public HTTPS, registered in the Spotify dashboard), token store, **overridable base URL** | Authorization Code flow via a thin httpx adapter (§15); see §8c for redirect-URI rules and 6-month re-auth. Read-only scopes for v1; **`user-library-modify`** added when §6b lands. Base URL overridable so E2E can point at a stub (§14) — likewise MB/CAA. |
 | Tunables | 6a thresholds, poll intervals, Bandcamp/base URLs, re-auth warning lead time | Sensible defaults; all overridable. |
 
 If those are satisfied, the app doesn't care whether it's in Docker, a VM, bare metal,
@@ -416,8 +415,9 @@ silent 6-monthly expiry would quietly break *everything*. So a re-auth flow is
 
 Design:
 - **Flow:** Authorization Code **with client secret** (we have a server-side backend;
-  PKCE not needed). `tekore` handles the exchange + refresh; we persist the tokens +
-  `spotify_authorized_at` (§4) since refresh tokens expose no issuance time.
+  PKCE not needed). Our thin httpx adapter (§15) handles the token exchange + refresh; we
+  persist the tokens + `spotify_authorized_at` (§4) since refresh tokens expose no
+  issuance time.
 - **The web UI makes re-auth painless** (we're building one anyway): show a persistent
   "Spotify: connected / reconnect" status. On `invalid_grant`, **pause the polling jobs**
   and surface a prominent **"Reconnect Spotify"** button that runs authorize → callback →
@@ -550,7 +550,7 @@ keep/drop/snooze.
 | 6b seed set | Union of kept-album artists **and** followed artists. (Not in v1.) |
 | Spotify auth | Authorization Code (+ client secret). Refresh tokens now expire at **6 months** → web re-auth flow + proactive warning are **v1-critical**; store `spotify_authorized_at` (§8c). |
 | Redirect URI | Config-driven public HTTPS callback, registered per-deployment in the Spotify dashboard; loopback `127.0.0.1` (not `localhost`) for local dev (§8c). |
-| Stack | Standalone Python backend + JS SPA frontend (§8). |
+| Stack | FastAPI + SQLAlchemy 2.0/Alembic + httpx (thin Spotify adapter) + APScheduler + uv; React + TS + Vite + TanStack Query; single Docker image. Full table in §15. |
 | UI model | A **set of worklists** in funnel order — Releases (§6b) / Decide / Acquire / Import — over the state lifecycle, plus browse + a Spotify-status banner (§8d). Releases and Import are post-v1. |
 | UI aesthetic | **Sharp, dense, quiet** — square corners, flat (1px rules, no shadows), near-monochrome + one accent, sans-for-text/mono-for-data, keyboard-first. Theme-aware (both), ~48px thumbnails, no CSS framework, design tokens (§8e). |
 | State machine | `suggested → saved → wanted → acquiring → owned` (+ `dismissed`). Entry state by provenance: Spotify saves enter at `saved`, 6b/6c discoveries at `suggested`. `owned` derived by reconcile from `wanted`/`acquiring`; `dismissed` reachable from `suggested` (rejected suggestion) or `saved`/`wanted` (verdict drop), disambiguated by provenance (§4). |
@@ -578,8 +578,8 @@ core, or the whole thing silently dies within 6 months.
    connection + beets command (§8a); schema/migrations for `album` + `play_history`;
    a startup healthcheck that proves it can reach both Postgres and beets. Deployment
    (compose/host wiring) is separate and swappable — the reference setup is §8b.
-2. **Spotify auth (incl. re-auth) + saves ingest** — `tekore` Authorization Code flow;
-   registered redirect URI; token + `spotify_authorized_at` persistence; the
+2. **Spotify auth (incl. re-auth) + saves ingest** — httpx-adapter Authorization Code flow
+   (§15); registered redirect URI; token + `spotify_authorized_at` persistence; the
    `invalid_grant` → pause-jobs → "Reconnect Spotify" web flow (§8c). Then poll saved
    albums → `album` rows in `saved` state. Do the re-auth handling here, not later — it's
    cheap once the OAuth flow exists and it's the difference between "works" and "dies in
@@ -846,3 +846,41 @@ load-bearing, not optional.
   gate — prioritise the **state machine, 6a triggers, and reconcile** (the correctness-
   critical, false-positive-prone core; cf. the §11 spike, which validates matching on real
   data while these tests lock the logic).
+
+## 15. Tech stack
+
+Concrete choices. External systems stay behind ports (§14), so any of these is swappable
+without touching the core.
+
+### Backend (Python)
+| Concern | Choice | Notes |
+|---|---|---|
+| Runtime | **Python 3.12+** | |
+| Web framework | **FastAPI** + **Pydantic v2** | async; OpenAPI schema → typed frontend client |
+| Config | **pydantic-settings** | env-var driven, matches the §8a contract |
+| HTTP client | **httpx** (async) | + **respx** in tests |
+| Spotify | **thin httpx adapter** (own code) | configurable base URL for E2E stubs (§14); full control of the 6-month re-auth (§8c). Not tekore. |
+| MusicBrainz / Cover Art Archive | httpx, configurable base URL | rate-limit + `User-Agent` handled in the adapter (§11) |
+| beets | subprocess over the `beet` CLI seam (§5) | command + config path from config |
+| DB | **PostgreSQL** via **SQLAlchemy 2.0** (typed) + **psycopg3** | |
+| Migrations | **Alembic** | migrations are tested (§14) |
+| Scheduler | **APScheduler** in-process | jobs *also* exposed as CLI commands → cron-able + unit-testable; not tied to a host scheduler |
+| Packaging | **uv** + lockfile | |
+| Quality | **Ruff** (lint+format) + **mypy** | |
+
+### Frontend
+| Concern | Choice | Notes |
+|---|---|---|
+| Framework | **React** + **TypeScript** | best fit for the testing/codegen tooling |
+| Build | **Vite** | pairs with Vitest |
+| Styling | hand-rolled **CSS / CSS-modules** + design tokens | §8e aesthetic; no CSS framework |
+| Server state | **TanStack Query** | caching/refetch for the worklists |
+| API client | **generated from FastAPI's OpenAPI** (e.g. openapi-typescript) | front/back types stay in sync |
+| Tests | **Vitest + Testing Library**; Playwright (optional) | §14 |
+
+### Packaging & deploy
+- **Single multi-stage Docker image**: Node stage builds the SPA → Python runtime serves
+  the JSON API *and* the built static assets; **beets installed in the image** (the §5
+  mount-vs-sidecar question is about the *library*, not the binary). Behind Traefik on the
+  `blink` stack (§8b).
+- **Monorepo**: `backend/` + `frontend/` in this repo; one image out.
