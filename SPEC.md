@@ -463,6 +463,41 @@ releases → decide → acquire → import.
 Spotify status/banner. The **Releases** queue arrives with §6b and the **Import** queue
 with the §12/§13 extensions. Dismissed and Settings are thin.
 
+### 8e. UI aesthetic & interaction
+
+**Direction: sharp, dense, quiet — as fuss-free as possible.** The reference frame is
+*Linear / a spreadsheet / a terminal*, **not Bootstrap or Material**. The app is worklists
+(lists of data), so the look serves fast scanning and action, not decoration.
+
+Principles:
+- **Density first** — compact rows, tight-but-legible spacing; content dominates the screen.
+- **Sharp** — `border-radius: 0` throughout. Square buttons, inputs, thumbnails. No pills,
+  no bulges.
+- **Flat** — structure from **1px rules + whitespace**, not shadows, elevation, or
+  gradients.
+- **Restrained colour** — near-monochrome base + **one accent**, used sparingly for primary
+  actions and the active/selected row. State shown by a small dot / text label + column
+  position, **never a chunky coloured badge**.
+- **Type does the work** — a tight scale; **grotesque sans for text**, **monospace for
+  data**, **tabular figures** so numeric columns align.
+- **Lists are the surface** — every worklist is a dense table (`thumb · artist – album ·
+  context · inline actions`), rendered by **one shared row component** across all views.
+- **Fast & quiet** — instant interactions, minimal/no animation; **keyboard-first triage**
+  (navigate + keep/drop/dismiss without the mouse). This is the real "fuss-free".
+- **Chrome-light** — a thin top strip (worklist counts + Spotify status), no fat nav bar.
+
+Decisions:
+- **Theme: both, theme-aware.** Follow the OS with a manual toggle. Implement via **design
+  tokens** (CSS custom properties) so light/dark is a variable swap, not duplicated CSS.
+- **Type: sans for text, mono for data.** Grotesque sans (system-ui / Inter) for labels &
+  titles; monospace for IDs, counts, dates; tabular figures for aligned columns.
+- **Artwork: small square thumbnails, ~48px** (a touch bigger than 40 — recognisable
+  without hurting density; flex ~48–56px). Square (sharp), one per row.
+
+Implementation note: a small **design-token layer** (colours, spacing, type scale) drives
+both themes and keeps the SPA consistent. **No CSS framework** (Bootstrap/Material would
+fight this aesthetic) — hand-rolled CSS or a headless/unstyled component approach fits.
+
 ## 9. Decisions & v1 scope
 
 **Settled decisions:**
@@ -480,6 +515,7 @@ with the §12/§13 extensions. Dismissed and Settings are thin.
 | Redirect URI | Config-driven public HTTPS callback, registered per-deployment in the Spotify dashboard; loopback `127.0.0.1` (not `localhost`) for local dev (§8c). |
 | Stack | Standalone Python backend + JS SPA frontend (§8). |
 | UI model | A **set of worklists** in funnel order — Releases (§6b) / Decide / Acquire / Import — over the state lifecycle, plus browse + a Spotify-status banner (§8d). Releases and Import are post-v1. |
+| UI aesthetic | **Sharp, dense, quiet** — square corners, flat (1px rules, no shadows), near-monochrome + one accent, sans-for-text/mono-for-data, keyboard-first. Theme-aware (both), ~48px thumbnails, no CSS framework, design tokens (§8e). |
 | State machine | `suggested → saved → wanted → acquiring → owned` (+ `dismissed`). Entry state by provenance: Spotify saves enter at `saved`, 6b/6c discoveries at `suggested`. `owned` derived by reconcile from `wanted`/`acquiring`; `dismissed` reachable from `suggested` (rejected suggestion) or `saved`/`wanted` (verdict drop), disambiguated by provenance (§4). |
 | Storage | **PostgreSQL**, connection from config (host/port/db/user/pass). No local SQLite of its own. |
 | Deployment | **Agnostic** — app only requires a Postgres backend + a beets command, both from config (§8a). My blink+partridge hosting is a reference deployment (§8b), not a requirement. |
