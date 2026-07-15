@@ -2,6 +2,9 @@
 
 > Status: **spec / v1 direction agreed**. Core decisions are settled (see §9). This is
 > now close to a plannable document. Deep implementation detail still TBD.
+>
+> **Delivery plan:** [ROADMAP.md](ROADMAP.md) turns this spec into sequential,
+> green-light-able deliverables, each with a concrete "done" gate.
 
 ## 1. The problem (one sentence)
 
