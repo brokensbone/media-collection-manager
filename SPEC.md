@@ -378,7 +378,7 @@ to the code.
 |---|---|---|
 | PostgreSQL backend | host, port, database, user, password (or a single `DATABASE_URL`) | The app runs its own migrations on the given database. |
 | Beets CLI access | beets command (default `beet`), optional beets config path | The command may be `beet`, `docker exec … beet`, `ssh … beet`, etc. (§5). |
-| Spotify API | client id/secret, **redirect URI** (public HTTPS, registered in the Spotify dashboard), token store | Authorization Code flow via `tekore`; see §8c for redirect-URI rules and 6-month re-auth. Read-only scopes for v1; **`user-library-modify`** added when §6b lands (Save/Want writes to the Spotify library). |
+| Spotify API | client id/secret, **redirect URI** (public HTTPS, registered in the Spotify dashboard), token store, **overridable base URL** | Authorization Code flow via `tekore`; see §8c for redirect-URI rules and 6-month re-auth. Read-only scopes for v1; **`user-library-modify`** added when §6b lands. Base URL overridable so E2E can point at a stub (§14) — likewise MB/CAA. |
 | Tunables | 6a thresholds, poll intervals, Bandcamp/base URLs, re-auth warning lead time | Sensible defaults; all overridable. |
 
 If those are satisfied, the app doesn't care whether it's in Docker, a VM, bare metal,
@@ -558,6 +558,7 @@ keep/drop/snooze.
 | Cover art | **Owned/retained blobs in Postgres**, in a dedicated `album_art` table (splittable to its own schema/DB later). Self-served (`/art/<album-id>`) with ETag/immutable caching; a front cache only if slow. Not hotlinked. Sourced from Spotify / Cover Art Archive / beets (§4b). |
 | Deployment | **Agnostic** — app only requires a Postgres backend + a beets command, both from config (§8a). My blink+partridge hosting is a reference deployment (§8b), not a requirement. |
 | Acquisition | Manual; assisted by one-click Bandcamp search-URL per want (§7). Links, never buys. |
+| Testing | Ports-and-adapters + pure core + injectable clock + configurable base URLs → unit-test the bulk; real-Postgres integration (testcontainers); Docker E2E (app+postgres, fake-Spotify stub) for the full flow (§14). |
 
 **v1 scope (the "thin" cut):**
 Spotify OAuth **with a working re-auth flow** (§8c) → saves ingest → reconcile against
@@ -779,3 +780,69 @@ filenames and tags are treated as data, never as instructions.
 - Auto-import vs. confirm for *confidently-tagged* drops — since embedded tags make
   matching strong, a high-confidence drop could skip the button. Probably still confirm
   in v1 of the extension; revisit once match quality is known.
+
+## 14. Testing strategy
+
+Goal: **unit-test as much as possible**, plus a small number of high-value **E2E** tests
+that run the real app + Postgres in Docker with external services stubbed. How much is
+unit-testable is decided by architecture, so the design-for-testability rules below are
+load-bearing, not optional.
+
+### Design for testability (bake in from day one)
+- **Ports & adapters.** Spotify, MusicBrainz, Cover Art Archive, beets, Postgres,
+  Transmission, SSH, **and the clock** all sit behind interfaces; the core logic (state
+  machine, 6a triggers, reconcile matching, dedupe, 6b diff) is **pure functions/services
+  over data**. → the bulk is unit-testable with *no mocks*, and edges are swappable for E2E.
+- **Configurable base URLs** for Spotify/MB/CAA (already config, §8a) — so E2E redirects
+  them to a local stub. **Don't hardwire `api.spotify.com`.**
+- **Injectable clock.** 6a triggers and the reauth countdown are time-based — they take an
+  injected `now`, never the system clock, so tests are deterministic.
+
+### Unit tests (the bulk) — pure logic, table-driven
+- state-machine transitions incl. skip/reverse/`dismissed` edges;
+- 6a triggers (listened/forgotten) over fabricated play-history + injected clock + thresholds;
+- reconcile matching: ISRC clustering, release-group selection, owned-set diff (over fixtures);
+- dedupe (release-group / Spotify id), 6b new-vs-seen diff;
+- Bandcamp URL builder, art-source selection;
+- adapter **parsers**: map recorded Spotify/MB/CAA responses and `beet list` output to our
+  models (feed captured payloads, assert mapping) — no network.
+
+### Integration tests (middle)
+- **Repositories against a real Postgres** (testcontainers): run migrations, exercise repo
+  methods, assert. Don't mock the DB — SQL + migrations are where the bugs are.
+- **beets adapter against a tiny seeded `library.db` fixture** (a couple of albums with
+  `mb_releasegroupid`) so the CLI query + parse survive real `beet` output.
+
+### E2E (few, high-value)
+- **docker compose: app + postgres**, plus a **fake-Spotify HTTP stub** serving
+  `/me/albums`, `/albums/{id}`, recently-played, following, and the **OAuth token
+  endpoint**; the app hits it via the configurable base URL. MB/CAA stubbed or recorded.
+  beets shipped as a **seeded fixture `library.db`** in the app container.
+- Drive the full flow, assert end to end: OAuth → ingest saves → reconcile → one album
+  resolves **`owned`** (it's in the beets fixture), another stays `wanted`/`saved`;
+  worklists/API reflect it. Include the **re-auth path** (stub returns `invalid_grant` →
+  app flags reconnect, pauses jobs).
+- Prefer a **real stub server** over monkeypatching the client, so E2E exercises the real
+  HTTP + parsing layers, not just the happy-path mapping.
+
+### Frontend
+- Component/unit (Vitest + Testing Library): the shared album-row, worklist rendering,
+  keyboard triage (`j`/`k`/`y`/`x`/`s`).
+- Optional but recommended: a **Playwright** browser-E2E driving the real SPA against the
+  dockerized backend + fake Spotify — the triage UX end to end.
+
+### Extensions
+- Transmission (§12): stub the RPC + a local dir standing in for the seedbox; assert
+  detect → match → import → reconcile → `owned`, **and the seeding-safety rule** (seedbox
+  originals untouched — copy never move/delete).
+- watch-dir (§13): drop a fixture zip in the watched dir; assert unpack → match → import →
+  `owned`, plus the **no-match import** path.
+
+### CI & stack
+- **Unit + integration on every push** (fast; testcontainers Postgres). **E2E (compose) as
+  a separate job.** GitHub Actions (repo is on GitHub).
+- Suggested stack: **pytest + testcontainers + httpx + respx/VCR** (backend); **Vitest +
+  Testing Library + Playwright** (frontend). Track coverage, but treat % as a guide, not a
+  gate — prioritise the **state machine, 6a triggers, and reconcile** (the correctness-
+  critical, false-positive-prone core; cf. the §11 spike, which validates matching on real
+  data while these tests lock the logic).
