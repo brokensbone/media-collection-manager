@@ -24,8 +24,14 @@ tool's job is to stop discovery leaking away, not to generate more of it.
   ownership; I do the buying/downloading. (Explicit decision, not a limitation to
   fix later. It sidesteps the old system's brittle auto-match-then-download risk.)
 
-Design principle: **thin brain over beets.** Don't reinvent identity resolution or
-storage that beets already does well.
+Design principles:
+- **Thin brain over beets.** Don't reinvent identity resolution or storage that beets
+  already does well.
+- **Deployment-agnostic.** The app knows only two things about its environment, both
+  from config: it needs a **PostgreSQL backend** (host/port/db/user/password) and a way
+  to **run the beets CLI** (a configurable command/path). It has no knowledge of *where*
+  it runs. My own hosting (blink + partridge) is a *reference deployment* (§8b), not a
+  requirement — anyone with a Postgres and a beets install can run it.
 
 ## 3. The loop this closes
 
@@ -68,8 +74,9 @@ lands in beets — however it got there — the want auto-resolves. Nothing to r
 Album-centric (this is the one thing the old system got right and confirmed works).
 Track-level is a possible later refinement, not the MVP unit.
 
-Persisted in **PostgreSQL on `partridge`** (§8) — the tool holds no local SQLite of its
-own. The only SQLite in the picture is beets', reached solely via the beets CLI (§5).
+Persisted in **PostgreSQL** (connection from config, §8a) — the tool holds no local
+SQLite of its own. The only SQLite in the picture is beets', reached solely via the
+beets CLI (§5).
 
 Two conceptual layers matter here: a raw **save** (low-signal, from the Spotify
 firehose) is distinct from a curated **want** (something I've decided I want to own,
@@ -142,10 +149,21 @@ raw SQLite anywhere.
   **once per album at ingest** and the result is stored. Ownership reconcile is then a
   pure deterministic join on the stored id, run continuously and cheaply. Keep the
   expensive/fuzzy step off the hot path.
-- **Requires:** the app container has the `beet` binary + read access to the beets
-  config and library db. (Open item: confirm where the beets library physically lives on
-  the server and how the container reaches it — mount vs a dedicated beets container the
-  app shells into.)
+- **Beets access is config-driven, behind a small interface.** The app depends on an
+  abstract "beets query" seam, not on beets living in any particular place. v1 needs
+  essentially **one operation** — "list all owned release-group ids" — which keeps the
+  seam tiny and easy to reimplement.
+  - **Config knobs:** a **beets command** (default `beet`) and an optional **beets config
+    path** (`-c` / `BEETSDIR`) telling beets where its library + music live.
+  - The command is deliberately a *string the deployment controls*, so the same code runs
+    beets however the environment provides it:
+    - `beet` — beets installed alongside the app (same host/container).
+    - `docker exec <beets-container> beet` — beets in a sidecar container.
+    - `ssh <host> beet` — beets on another machine.
+  - **Alternatives if shelling out proves awkward** (note, not v1): the beets **`web`
+    plugin** exposes an HTTP API — the seam could instead hold a *beets base URL*; or a
+    periodic **cached export** (dump owned release-group ids to a file the app reads).
+    All three satisfy the same interface. Not direct SQLite — see the locking lesson above.
 
 ### 5a. Would an LLM do the matching better? (consideration)
 
@@ -266,24 +284,43 @@ Hard line (unchanged): the tool **links, never buys**. No stored payment, no aut
 keep/drop). Backend exposes a JSON API the SPA consumes.
 
 - Likely shape (not yet fixed): Python API (FastAPI or similar) + a small SPA (framework
-  TBD). State (wants + play-history) in **PostgreSQL on `partridge`**, reached over the
-  **LAN** (`10.4.1.0/24`) — blink and partridge share the LAN. Beets accessed via the
-  `beet` CLI (§5). No local SQLite of its own.
-- **Deployment (DECIDED, §9):** runs as a service in the **`blink` docker-compose stack**
-  behind Traefik with TLS. **Data persists to Postgres on `partridge`** (new DB + writer
-  role, following the `lab` repo patterns — declare a
-  `services.postgresql.ensureDatabases` entry + a writer role with a generated password).
-  Since the app runs off-host (on blink, not partridge), it connects **over the network,
-  not the unix socket**: add a `pg_hba` rule permitting the writer role from the LAN CIDR
-  `10.4.1.0/24` — exactly as `postgres-readonly.nix` already does (Tailscale range
-  optional as a fallback). Container carries the `beet` binary + read access to the beets
-  library. Scheduled jobs (poll saves, poll recently-played, later poll watched artists,
-  reconcile) via the container's own scheduler/cron.
+  TBD). State (wants + play-history) in **PostgreSQL**; beets reached via the CLI seam
+  (§5). No local SQLite of its own.
+- Scheduled jobs (poll saves, poll recently-played, later poll watched artists,
+  reconcile) via the app's own scheduler/cron — not tied to any host's scheduler.
 - Core views: the active want-list (not-yet-owned, each with a Buy-on-Bandcamp link),
   a triage inbox (6a verdicts + later 6b/6c suggestions to accept → want / dismiss),
   and owned/history.
 - **Later: notifications.** Ping me (Slack? push?) when a want auto-resolves to owned or
   N things are waiting to triage. Not v1.
+
+### 8a. Environment contract (what the app requires) + config
+
+The app is **deployment-agnostic**: it needs exactly two things from its environment,
+both supplied by config (env vars / config file). Nothing else about the host is known
+to the code.
+
+| Requirement | Config | Notes |
+|---|---|---|
+| PostgreSQL backend | host, port, database, user, password (or a single `DATABASE_URL`) | The app runs its own migrations on the given database. |
+| Beets CLI access | beets command (default `beet`), optional beets config path | The command may be `beet`, `docker exec … beet`, `ssh … beet`, etc. (§5). |
+| Spotify API | client id/secret, OAuth redirect, cached token path | Standard `tekore` OAuth. |
+| Tunables | 6a thresholds, poll intervals, Bandcamp/base URLs | Sensible defaults; all overridable. |
+
+If those are satisfied, the app doesn't care whether it's in Docker, a VM, bare metal,
+one host or three.
+
+### 8b. Reference deployment (my setup — illustrative, not required)
+
+How *I* intend to satisfy the §8a contract. None of this is baked into the app.
+- App runs as a container in the **`blink`** docker-compose stack, behind Traefik/TLS.
+- Postgres is the existing instance on **`partridge`**; I create a dedicated DB + writer
+  role there (following the `lab` repo `scheduler-db.nix` pattern) and point the app's
+  `DATABASE_URL` at it. blink↔partridge share the **LAN (`10.4.1.0/24`)**, so a `pg_hba`
+  rule for that CIDR (as `postgres-readonly.nix` already does) is the connection path;
+  Tailscale is an optional fallback.
+- Beets: the container carries `beet` + read access to the beets library (mount vs
+  sidecar TBD — the §5 open item), so the beets command is plain `beet`.
 
 ## 9. Decisions & v1 scope
 
@@ -292,15 +329,15 @@ keep/drop). Backend exposes a JSON API the SPA consumes.
 | Area | Decision |
 |---|----------|
 | Model | One `Album` table with a state field (`saved→wanted→owned`/`dismissed`) — not two tables. |
-| Reconcile | **Beets CLI**, not direct SQLite (raw SQLite locked constantly in the old system). One `beet list -a -f '$mb_releasegroupid'` dump → in-memory diff (§5). |
+| Reconcile | **Beets CLI** behind a config-driven seam (command + config path), not direct SQLite (raw SQLite locked constantly). One `beet list -a -f '$mb_releasegroupid'` dump → in-memory diff (§5). |
 | Identity | MusicBrainz release-group as the spine; 3-tier resolution (barcode → ISRC-cluster → fuzzy). Resolve once at ingest, store the id; reconcile is a deterministic join thereafter (§5). |
 | LLM matching | Keep Tiers 1–2 deterministic. LLM only as a Tier-3 adjudicator that may abstain → human inbox, run as a batch off the hot path. Build-or-skip gated by the §11 spike (§5a). |
 | Play history | Poll `recently-played` from install; **no** GDPR backfill (accept cold-start, §4a/§6a). |
 | 6a thresholds | listened = ≥4 tracks or ≥3 days; forgotten = ≥21 days & <2 plays. Config-tunable. |
 | 6b seed set | Union of kept-album artists **and** followed artists. (Not in v1.) |
 | Stack | Standalone Python backend + JS SPA frontend (§8). |
-| Storage | **PostgreSQL on `partridge`** (new DB + writer role, `lab` scheduler-db.nix pattern), reached over **LAN `10.4.1.0/24`** (pg_hba rule as in postgres-readonly.nix). No local SQLite of its own. |
-| Deploy | Service in the **`blink`** compose stack, behind Traefik; container carries `beet` + read access to the beets library. |
+| Storage | **PostgreSQL**, connection from config (host/port/db/user/pass). No local SQLite of its own. |
+| Deployment | **Agnostic** — app only requires a Postgres backend + a beets command, both from config (§8a). My blink+partridge hosting is a reference deployment (§8b), not a requirement. |
 | Acquisition | Manual; assisted by one-click Bandcamp search-URL per want (§7). Links, never buys. |
 
 **v1 scope (the "thin" cut):**
@@ -314,10 +351,10 @@ notifications, GDPR history backfill, any Bandcamp scraping beyond the search UR
 
 ## 9a. Suggested build order (for the eventual plan)
 
-1. **Skeleton + deploy path** — Python service; Postgres DB + writer role on `partridge`
-   (schema: `album` + `play_history`); compose service in `blink` behind Traefik;
-   `beet` CLI reachable from the container. Prove it boots and can reach both Postgres
-   and beets.
+1. **Skeleton + environment contract** — Python service reading config for its Postgres
+   connection + beets command (§8a); schema/migrations for `album` + `play_history`;
+   a startup healthcheck that proves it can reach both Postgres and beets. Deployment
+   (compose/host wiring) is separate and swappable — the reference setup is §8b.
 2. **Spotify auth + saves ingest** — `tekore` OAuth, poll saved albums → `album` rows
    in `saved` state.
 3. **Reconcile** — ISRC→MB→release-group resolution + the `beet list` dump-and-diff;
