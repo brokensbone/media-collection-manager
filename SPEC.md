@@ -530,6 +530,11 @@ Implementation note: a small **design-token layer** (colours, spacing, type scal
 both themes and keeps the SPA consistent. **No CSS framework** (Bootstrap/Material would
 fight this aesthetic) — hand-rolled CSS or a headless/unstyled component approach fits.
 
+**Reference mockup:** [`mockups/decide-worklist.html`](mockups/decide-worklist.html) — a
+self-contained, theme-aware mock of the Decide worklist in this aesthetic (approved
+direction). Open it in a browser; toggle theme top-right, `j`/`k` to move, `y`/`x`/`s` to
+keep/drop/snooze.
+
 ## 9. Decisions & v1 scope
 
 **Settled decisions:**

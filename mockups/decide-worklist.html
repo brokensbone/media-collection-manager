@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>wantlist — Decide worklist (mockup)</title>
+<style>
+:root{
+  --surface-2:#ffffff;--surface-1:#f5f6f7;--surface-0:#f9fafb;
+  --text-primary:#16181c;--text-secondary:#5c6470;--text-muted:#8b93a0;
+  --border:#e4e6ea;--border-strong:#cfd3d9;
+  --accent:#1f6feb;--border-accent:#a8c7f5;--success:#1a7f4b;
+  --fill-control:#edeff2;
+  --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --surface-2:#14171b;--surface-1:#1b1f24;--surface-0:#0d0f12;
+  --text-primary:#e6e8eb;--text-secondary:#a2aab4;--text-muted:#6f7883;
+  --border:#262b31;--border-strong:#363c44;
+  --accent:#4c8dff;--border-accent:#2f4f7a;--success:#3ecf8e;
+  --fill-control:#22272d;
+}}
+:root[data-theme="light"]{
+  --surface-2:#ffffff;--surface-1:#f5f6f7;--surface-0:#f9fafb;
+  --text-primary:#16181c;--text-secondary:#5c6470;--text-muted:#8b93a0;
+  --border:#e4e6ea;--border-strong:#cfd3d9;
+  --accent:#1f6feb;--border-accent:#a8c7f5;--success:#1a7f4b;--fill-control:#edeff2;
+}
+:root[data-theme="dark"]{
+  --surface-2:#14171b;--surface-1:#1b1f24;--surface-0:#0d0f12;
+  --text-primary:#e6e8eb;--text-secondary:#a2aab4;--text-muted:#6f7883;
+  --border:#262b31;--border-strong:#363c44;
+  --accent:#4c8dff;--border-accent:#2f4f7a;--success:#3ecf8e;--fill-control:#22272d;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--surface-0);color:var(--text-primary);font-family:var(--font-sans);padding:24px}
+.app{max-width:900px;margin:0 auto;border:1px solid var(--border);background:var(--surface-2)}
+.ic{display:inline-flex;line-height:0}
+.ic svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.bar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
+.brand{font-family:var(--font-mono);font-size:12px;color:var(--text-muted);letter-spacing:.03em}
+.nav{display:flex;gap:16px;font-size:12px}
+.nav span{color:var(--text-secondary);padding-bottom:2px}
+.nav span.on{color:var(--text-primary);border-bottom:2px solid var(--accent)}
+.nav b{font-family:var(--font-mono);font-weight:500;font-variant-numeric:tabular-nums;margin-left:5px}
+.status{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-secondary)}
+.sq{width:7px;height:7px;display:inline-block}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.tg{border:1px solid var(--border-strong);background:transparent;color:var(--text-secondary);padding:4px 6px;cursor:pointer;border-radius:0;line-height:0}
+.head{display:flex;align-items:baseline;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)}
+.head .t{font-size:15px;font-weight:500}
+.head .s{font-size:12px;color:var(--text-muted)}
+table.g{width:100%;border-collapse:collapse}
+.g th{text-align:left;font-family:var(--font-mono);font-weight:400;font-size:11px;color:var(--text-muted);padding:6px 12px;border-bottom:1px solid var(--border)}
+.g td{padding:6px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.g tr.sel td{background:var(--surface-1)}
+.g tr.sel td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
+.cover{width:48px;height:48px;background:var(--fill-control);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:13px;color:var(--text-secondary)}
+.al{font-size:14px;font-weight:500;line-height:1.3}
+.ar{font-size:12px;color:var(--text-secondary)}
+.why{display:flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);white-space:nowrap}
+.d{width:7px;height:7px;flex:none}
+.d.on{background:var(--accent)}
+.d.off{border:1.5px solid var(--text-muted)}
+.date{font-family:var(--font-mono);font-size:12px;color:var(--text-muted);white-space:nowrap}
+.acts{display:flex;gap:6px;justify-content:flex-end}
+.btn{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 8px;border:1px solid var(--border-strong);background:transparent;color:var(--text-secondary);cursor:pointer;border-radius:0;white-space:nowrap;font-family:var(--font-sans)}
+.btn:hover{background:var(--surface-1);color:var(--text-primary)}
+.btn.keep{color:var(--accent);border-color:var(--border-accent)}
+.foot{display:flex;gap:16px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--border);font-family:var(--font-mono);font-size:11px;color:var(--text-muted)}
+.foot b{color:var(--text-secondary);font-weight:500}
+.scroll{overflow-x:auto}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<h1 class="sr-only">wantlist — Decide worklist mockup: a dense table of saved albums awaiting a keep or drop verdict.</h1>
+<div class="app">
+  <div class="bar">
+    <div style="display:flex;align-items:center;gap:16px">
+      <span class="brand">wantlist</span>
+      <nav class="nav">
+        <span>releases<b>2</b></span>
+        <span class="on">decide<b id="dc">7</b></span>
+        <span>acquire<b>12</b></span>
+        <span>import<b>0</b></span>
+      </nav>
+    </div>
+    <div class="status">
+      <span><span class="sq" style="background:var(--success)"></span> spotify</span>
+      <span class="mono" style="color:var(--text-muted)">reauth 148d</span>
+      <button class="tg" id="tg" aria-label="Toggle theme"><span class="ic" id="tgi"></span></button>
+    </div>
+  </div>
+  <div class="head"><span class="t">Decide</span><span class="s"><span id="sc">7</span> ready to judge</span></div>
+  <div class="scroll">
+  <table class="g">
+    <thead><tr><th></th><th>album</th><th>why it surfaced</th><th>saved</th><th></th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  </div>
+  <div class="foot"><span><b>j</b>/<b>k</b> move</span><span><b>y</b> keep</span><span><b>x</b> drop</span><span><b>s</b> snooze</span><span><b>enter</b> open in spotify</span></div>
+</div>
+<script>
+(function(){
+  var ICON={
+    check:'<svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>',
+    x:'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    clock:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    moon:'<svg viewBox="0 0 24 24"><path d="M21 12.8A8 8 0 1 1 11 3a6 6 0 0 0 10 9z"/></svg>',
+    sun:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19"/></svg>'
+  };
+  var DATA=[
+    {c:'FP',al:'Cascade',ar:'Floating Points',on:1,why:'played 8/10 · 5d',date:'2026-06-21'},
+    {c:'YB',al:'Dawn',ar:'Yebba',on:0,why:'saved 24d · 0 plays',date:'2026-06-21'},
+    {c:'VS',al:'Dark Times',ar:'Vince Staples',on:1,why:'played 5/13 · 3d',date:'2026-07-02'},
+    {c:'NS',al:'Endlessness',ar:'Nala Sinephro',on:1,why:'played 4/9 · 6d',date:'2026-06-28'},
+    {c:'BG',al:'Lives Outgrown',ar:'Beth Gibbons',on:0,why:'saved 31d · 1 play',date:'2026-06-14'},
+    {c:'MK',al:'The Sunset Violent',ar:'Mount Kimbie',on:1,why:'played 6/12 · 4d',date:'2026-07-05'},
+    {c:'AL',al:'Bright Future',ar:'Adrianne Lenker',on:0,why:'saved 22d · 0 plays',date:'2026-06-23'}
+  ];
+  var rows=document.getElementById('rows'), sel=0;
+  function esc(s){return s.replace(/[&<>]/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[m];});}
+  function render(){
+    rows.innerHTML=DATA.map(function(r,i){
+      return '<tr'+(i===sel?' class="sel"':'')+'>'
+        +'<td><div class="cover">'+r.c+'</div></td>'
+        +'<td><div class="al">'+esc(r.al)+'</div><div class="ar">'+esc(r.ar)+'</div></td>'
+        +'<td><div class="why"><span class="d '+(r.on?'on':'off')+'"></span>'+r.why+'</div></td>'
+        +'<td class="date">'+r.date+'</td>'
+        +'<td><div class="acts">'
+          +'<button class="btn keep" data-a="0"><span class="ic">'+ICON.check+'</span>Keep</button>'
+          +'<button class="btn" data-a="1"><span class="ic">'+ICON.x+'</span>Drop</button>'
+          +'<button class="btn" data-a="2"><span class="ic">'+ICON.clock+'</span>Snooze</button>'
+        +'</div></td></tr>';
+    }).join('');
+    var n=DATA.length;
+    document.getElementById('dc').textContent=n;
+    document.getElementById('sc').textContent=n;
+    [].forEach.call(rows.querySelectorAll('.btn'),function(b){
+      b.addEventListener('click',function(){act([].indexOf.call(rows.children,b.closest('tr')));});
+    });
+  }
+  function act(i){if(i<0||i>=DATA.length)return;DATA.splice(i,1);if(sel>=DATA.length)sel=DATA.length-1;if(sel<0)sel=0;render();}
+  document.addEventListener('keydown',function(e){
+    var k=e.key.toLowerCase();
+    if(k==='j'||k==='arrowdown'){sel=Math.min(sel+1,DATA.length-1);render();e.preventDefault();}
+    else if(k==='k'||k==='arrowup'){sel=Math.max(sel-1,0);render();e.preventDefault();}
+    else if(k==='y'||k==='x'||k==='s'){act(sel);e.preventDefault();}
+  });
+  var root=document.documentElement, tgi=document.getElementById('tgi');
+  function effective(){var t=root.getAttribute('data-theme');if(t)return t;return window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+  function paintToggle(){tgi.innerHTML=effective()==='dark'?ICON.sun:ICON.moon;}
+  document.getElementById('tg').addEventListener('click',function(){
+    root.setAttribute('data-theme',effective()==='dark'?'light':'dark');paintToggle();
+  });
+  render();paintToggle();
+})();
+</script>
+</body>
+</html>
