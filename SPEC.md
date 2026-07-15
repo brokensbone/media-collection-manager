@@ -97,6 +97,11 @@ via the §6a verdict). Could be one table with a state field, or two — see ope
 - **Acquisition hints (optional):** candidate source links (Bandcamp, etc.), added
   manually or scraped read-only. Never acted on automatically.
 
+**Auth/credentials store** (small, separate): the Spotify refresh + access tokens, access
+expiry, and — critically — **`spotify_authorized_at`**, the timestamp of the last full
+authorization. Needed because refresh tokens now expire at 6 months and carry no
+issuance time of their own (§8c).
+
 ### 4a. Play history (listening data) — a local store the tool builds itself
 
 Spotify has **no play-count API** and no deep-history endpoint. `recently-played`
@@ -304,8 +309,8 @@ to the code.
 |---|---|---|
 | PostgreSQL backend | host, port, database, user, password (or a single `DATABASE_URL`) | The app runs its own migrations on the given database. |
 | Beets CLI access | beets command (default `beet`), optional beets config path | The command may be `beet`, `docker exec … beet`, `ssh … beet`, etc. (§5). |
-| Spotify API | client id/secret, OAuth redirect, cached token path | Standard `tekore` OAuth. |
-| Tunables | 6a thresholds, poll intervals, Bandcamp/base URLs | Sensible defaults; all overridable. |
+| Spotify API | client id/secret, **redirect URI** (public HTTPS, registered in the Spotify dashboard), token store | Authorization Code flow via `tekore`; see §8c for the redirect-URI rules and 6-month re-auth. |
+| Tunables | 6a thresholds, poll intervals, Bandcamp/base URLs, re-auth warning lead time | Sensible defaults; all overridable. |
 
 If those are satisfied, the app doesn't care whether it's in Docker, a VM, bare metal,
 one host or three.
@@ -314,6 +319,8 @@ one host or three.
 
 How *I* intend to satisfy the §8a contract. None of this is baked into the app.
 - App runs as a container in the **`blink`** docker-compose stack, behind Traefik/TLS.
+  Traefik also gives the app its public HTTPS domain — which is what the Spotify redirect
+  URI needs (§8c).
 - Postgres is the existing instance on **`partridge`**; I create a dedicated DB + writer
   role there (following the `lab` repo `scheduler-db.nix` pattern) and point the app's
   `DATABASE_URL` at it. blink↔partridge share the **LAN (`10.4.1.0/24`)**, so a `pg_hba`
@@ -321,6 +328,46 @@ How *I* intend to satisfy the §8a contract. None of this is baked into the app.
   Tailscale is an optional fallback.
 - Beets: the container carries `beet` + read access to the beets library (mount vs
   sidecar TBD — the §5 open item), so the beets command is plain `beet`.
+
+### 8c. Spotify auth & the 6-month re-authorization requirement
+
+**New constraint (verified against Spotify docs, 2026).** Spotify refresh tokens now
+**expire after 6 months** (announced 18 Jun 2026; enforced for existing apps from
+20 Jul 2026; tokens older than 6 months are invalidated on next use). On expiry the token
+endpoint returns **`400 invalid_grant`**; recovery means sending the user through the
+authorization-code flow again. The re-auth is interactive (user signs in) but
+**low-friction — previously approved scopes carry over**, so it's effectively one click,
+no re-consent screen. Applies to user tokens (Authorization Code / PKCE), not
+client-credentials.
+
+**Why this matters here:** spotify-scripts assumed a *permanent* headless refresh token —
+that assumption is now dead. Because this tool is fundamentally background polling, a
+silent 6-monthly expiry would quietly break *everything*. So a re-auth flow is
+**v1-critical, not deferred.**
+
+Design:
+- **Flow:** Authorization Code **with client secret** (we have a server-side backend;
+  PKCE not needed). `tekore` handles the exchange + refresh; we persist the tokens +
+  `spotify_authorized_at` (§4) since refresh tokens expose no issuance time.
+- **The web UI makes re-auth painless** (we're building one anyway): show a persistent
+  "Spotify: connected / reconnect" status. On `invalid_grant`, **pause the polling jobs**
+  and surface a prominent **"Reconnect Spotify"** button that runs authorize → callback →
+  store-new-token.
+- **Proactive, not just reactive:** using `spotify_authorized_at`, warn as the 6-month
+  mark approaches (banner now; a notification later) so re-auth happens *before* jobs
+  fail, not after. `re-auth warning lead time` is a config tunable (§8a).
+
+Callback / redirect URI (the "think about callback URLs" bit):
+- **Redirect-URI rules (Spotify, since Apr 2025):** must be **HTTPS** except loopback;
+  **`localhost` is banned** — use explicit `http://127.0.0.1:<port>` / `http://[::1]:<port>`
+  for local dev.
+- **Production:** a stable public HTTPS callback on the app's own domain, e.g.
+  `https://<app-domain>/auth/spotify/callback`. It's **config** (deployment-agnostic,
+  §8a), but whatever domain a deployment uses **must be registered as a redirect URI in
+  that deployment's Spotify app** (manual dashboard step). Since Spotify client id/secret
+  are per-deployer anyway, each deployment registers its own callback — no shared-domain
+  problem.
+- **Local dev:** `http://127.0.0.1:<port>/auth/spotify/callback`.
 
 ## 9. Decisions & v1 scope
 
@@ -335,19 +382,24 @@ How *I* intend to satisfy the §8a contract. None of this is baked into the app.
 | Play history | Poll `recently-played` from install; **no** GDPR backfill (accept cold-start, §4a/§6a). |
 | 6a thresholds | listened = ≥4 tracks or ≥3 days; forgotten = ≥21 days & <2 plays. Config-tunable. |
 | 6b seed set | Union of kept-album artists **and** followed artists. (Not in v1.) |
+| Spotify auth | Authorization Code (+ client secret). Refresh tokens now expire at **6 months** → web re-auth flow + proactive warning are **v1-critical**; store `spotify_authorized_at` (§8c). |
+| Redirect URI | Config-driven public HTTPS callback, registered per-deployment in the Spotify dashboard; loopback `127.0.0.1` (not `localhost`) for local dev (§8c). |
 | Stack | Standalone Python backend + JS SPA frontend (§8). |
 | Storage | **PostgreSQL**, connection from config (host/port/db/user/pass). No local SQLite of its own. |
 | Deployment | **Agnostic** — app only requires a Postgres backend + a beets command, both from config (§8a). My blink+partridge hosting is a reference deployment (§8b), not a requirement. |
 | Acquisition | Manual; assisted by one-click Bandcamp search-URL per want (§7). Links, never buys. |
 
 **v1 scope (the "thin" cut):**
-Spotify saves ingest → reconcile against beets → web list of *saved-but-not-owned*, each
-with a Buy-on-Bandcamp link → the **6a verdict prompt** (leaning on the time-based
-"forgotten" trigger early, per the cold-start note). Play-history polling ships in v1
-because 6a's "listened" trigger depends on it, even though it starts quiet.
+Spotify OAuth **with a working re-auth flow** (§8c) → saves ingest → reconcile against
+beets → web list of *saved-but-not-owned*, each with a Buy-on-Bandcamp link → the **6a
+verdict prompt** (leaning on the time-based "forgotten" trigger early, per the cold-start
+note). Play-history polling ships in v1 because 6a's "listened" trigger depends on it,
+even though it starts quiet.
 
 **Explicitly deferred to v2+:** 6b new-release watch, 6c catalogue backfill,
 notifications, GDPR history backfill, any Bandcamp scraping beyond the search URL.
+*Not* deferrable: the Spotify re-auth flow — the 6-month token expiry (§8c) makes it
+core, or the whole thing silently dies within 6 months.
 
 ## 9a. Suggested build order (for the eventual plan)
 
@@ -355,8 +407,12 @@ notifications, GDPR history backfill, any Bandcamp scraping beyond the search UR
    connection + beets command (§8a); schema/migrations for `album` + `play_history`;
    a startup healthcheck that proves it can reach both Postgres and beets. Deployment
    (compose/host wiring) is separate and swappable — the reference setup is §8b.
-2. **Spotify auth + saves ingest** — `tekore` OAuth, poll saved albums → `album` rows
-   in `saved` state.
+2. **Spotify auth (incl. re-auth) + saves ingest** — `tekore` Authorization Code flow;
+   registered redirect URI; token + `spotify_authorized_at` persistence; the
+   `invalid_grant` → pause-jobs → "Reconnect Spotify" web flow (§8c). Then poll saved
+   albums → `album` rows in `saved` state. Do the re-auth handling here, not later — it's
+   cheap once the OAuth flow exists and it's the difference between "works" and "dies in
+   6 months".
 3. **Reconcile** — ISRC→MB→release-group resolution + the `beet list` dump-and-diff;
    derive `owned`. The riskiest/most valuable piece (§5) — validate matching quality
    early (a standalone spike against real saved albums is worth it before wiring it in).
@@ -377,6 +433,9 @@ notifications, GDPR history backfill, any Bandcamp scraping beyond the search UR
   - **Anti-pattern to avoid:** it read the beets SQLite db directly with raw concurrent
     connections and **locked constantly**. Hence §5's beets-CLI decision and §8's
     Postgres-for-own-state decision — no raw SQLite contention anywhere.
+  - **Dead assumption:** it relied on a *permanent* Spotify refresh token. Spotify now
+    expires them at 6 months (§8c), so the headless-forever model is gone — a web re-auth
+    flow is mandatory.
 - `record-library`: the **inbox → beets import** workflow is clean and worth keeping as
   the "land" step. This is where acquired files enter and trigger reconcile.
 
