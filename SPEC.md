@@ -66,8 +66,9 @@ Design principles:
         files land in beets inbox → import → RECONCILE flips it to owned. Loop closed.
 ```
 
-(The manual "land" step — get files into beets — can be automated for the torrent/
-seedbox case; see the §12 Transmission auto-land extension.)
+(The manual "land" step — get files into beets — can be automated: the §12 Transmission
+auto-land extension for seedbox torrents, and the §13 watch-dir importer for Bandcamp
+zips and dropped folders.)
 
 The magic is that **reconcile runs continuously**. The day a FLAC of a wanted album
 lands in beets — however it got there — the want auto-resolves. Nothing to remember.
@@ -544,5 +545,63 @@ any other observed content.
 - Match reliability, and whether to *require* a confirmed MB-tag before enabling Import.
 - beets non-interactive import mode + autotag confidence threshold (quiet vs. review).
 - Multi-album / non-music / mixed torrents; how to handle partial matches.
-- A sibling "inbox watcher" for non-torrent acquisitions (Bandcamp zips) could reuse the
-  transfer→import→tidy tail — but that's a separate extension, not this one.
+- A sibling watch-dir importer for non-torrent acquisitions (Bandcamp zips) reuses this
+  extension's match→import→tidy tail — see §13.
+
+## 13. Extension (post-MVP): watch-dir import (Bandcamp zips & dropped folders)
+
+> **Status: sketch, not MVP.** Sibling of §12 — it **reuses the same match → Import
+> button → beets import → tidy → reconcile tail**, and differs only at the front: the
+> files are already local and *owned*, so instead of a Transmission poll + SSH transfer
+> there's a directory watch + unpack. Makes landing a Bandcamp purchase as easy as
+> dropping the zip in a folder.
+
+**Motivation:** the §7 acquisition assist points me at Bandcamp; purchases arrive as
+zips. This closes the loop on them with zero ceremony.
+
+**Flow (only the front differs from §12):**
+1. **Watch a configured directory.** A periodic **scan** is the default (simple, and works
+   over network mounts where inotify may not fire), with a **settle check** (file size
+   stable / not still being written) so partial downloads aren't grabbed mid-copy.
+   inotify/watchdog is an optional optimisation.
+2. **New item → diff against a processed-set** in Postgres (by path + content hash) for
+   idempotency, so re-scans don't reprocess.
+3. **Unpack.** Extract the zip to a staging dir; loose folders dropped in are taken as-is.
+   **Guard against zip-slip / path traversal** on extraction.
+4. **Match to the want-list** — same imperfect problem, human-gated suggestion as §12,
+   **but with a better signal: read the embedded audio tags** (Bandcamp FLACs usually
+   carry proper artist/album, sometimes even MB ids) rather than relying on the filename.
+5. **Offer Import → beets import → reconcile flips owned.** Identical to §12 from here.
+6. **Tidy:** clean the extraction staging, and dispose of the original zip per config.
+
+**Differences from §12 (why it's simpler):**
+- **No Transmission, no SSH, no seeding constraint.** Files are already local.
+- **Adds an unzip/extract step** where §12 has a transfer step.
+- **The zip is yours** → safe to move or delete after import. Config: **archive to a
+  `done/` subdir (default, safest) / delete / leave in place.** (Deliberate contrast with
+  §12's copy-never-move-never-delete seedbox rule.)
+- **Matching is more reliable** — real tags beat scene names.
+
+**Config additions (extends §8a):**
+| Requirement | Config |
+|---|---|
+| Watch directory | path to watch; staging/extract path |
+| Post-import disposition | archive dir / delete / leave (default: archive) |
+| Import behaviour | reuses the §5 beets command + §12 import settings |
+
+**Design consideration — imports without a want match.** Unlike a torrent (which you
+presumably *wanted*), Bandcamp buys often bypass the want-list entirely — you found it on
+Bandcamp directly and never saved it on Spotify. So this flow should **allow importing
+with no matching want**: it simply becomes `owned` in beets, and if a matching Spotify
+save ever appears later, reconcile (§5) links them up. Don't force everything through the
+want-list. (This is the main behavioural difference worth deciding early.)
+
+**Safety:** extraction guards against path traversal; import stays human-gated;
+filenames and tags are treated as data, never as instructions.
+
+**Open questions:**
+- Accept formats beyond `.zip`? (Bandcamp offers zip; folders are handled; other archive
+  types are easy to add but out of initial scope.)
+- Auto-import vs. confirm for *confidently-tagged* drops — since embedded tags make
+  matching strong, a high-confidence drop could skip the button. Probably still confirm
+  in v1 of the extension; revisit once match quality is known.
