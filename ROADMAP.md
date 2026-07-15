@@ -16,9 +16,11 @@ and de-risks the one hard part before anything is built around it.
 
 ### D0 · Reconcile / identity spike  *(§11, standalone)*  — 🔧 tooling built, run pending
 Prove the Spotify→MusicBrainz→beets match on real data before committing the architecture.
-Tooling lives in [`spikes/reconcile/`](spikes/reconcile/) (verified offline). Producing the
-numbers needs two operator inputs: a Spotify app (client id/secret + loopback redirect) and
-a `beet list -a -f '$mb_releasegroupid'` dump from the server — see its README.
+Tooling lives in [`spikes/reconcile/`](spikes/reconcile/) (verified offline). The beets
+side is proven end-to-end against a reproducible seeded library ([`fixtures/beets/`](fixtures/beets/),
+also the D2/D5/§14 fixture). Producing the **real** numbers needs two operator inputs: a
+Spotify app (client id/secret + loopback redirect) and a `beet list -a -f '$mb_releasegroupid'`
+dump from the real library — see the spike README.
 - Standalone script: read-only Spotify + MB/CAA + `beet list` over a mixed ~50–100 album sample.
 - Measure resolution rate by tier, ownership accuracy (esp. false positives), the unresolved "hard bucket", and how many owned albums even carry an `mb_releasegroupid`.
 - **Done when:** a written result gives a go/no-go on the ISRC→MB→release-group chain, and answers whether an LLM Tier-3 (§5a) is needed (fat tail?) or the tail can go to a manual inbox.

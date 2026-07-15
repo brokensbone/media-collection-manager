@@ -814,7 +814,9 @@ load-bearing, not optional.
 - **Repositories against a real Postgres** (testcontainers): run migrations, exercise repo
   methods, assert. Don't mock the DB — SQL + migrations are where the bugs are.
 - **beets adapter against a tiny seeded `library.db` fixture** (a couple of albums with
-  `mb_releasegroupid`) so the CLI query + parse survive real `beet` output.
+  `mb_releasegroupid`) so the CLI query + parse survive real `beet` output. Fixture
+  harness already built: [`fixtures/beets/`](fixtures/beets/) (silent tagged FLACs →
+  `beet import` → `library.db` + owned dump, reproducible via Docker).
 
 ### E2E (few, high-value)
 - **docker compose: app + postgres**, plus a **fake-Spotify HTTP stub** serving

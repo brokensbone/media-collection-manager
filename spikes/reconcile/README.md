@@ -23,6 +23,10 @@ Standalone: read-only Spotify + MusicBrainz + a beets dump. No app, no Postgres.
    measure coverage. Copy `owned_rgids.txt` next to this script.
    *(Or, if beets is on the same machine, skip the file and pass `--beets-cmd beet`.)*
 
+   *For a plumbing test without the real library, generate a synthetic dump with
+   [`../../fixtures/beets/build.sh`](../../fixtures/beets/) and use its
+   `out/owned_rgids.txt` — but note synthetic ownership isn't a real accuracy signal.*
+
 ## Run
 
 ```
