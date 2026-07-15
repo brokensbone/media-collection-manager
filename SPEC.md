@@ -147,32 +147,37 @@ demand — we have to *accumulate* it:
 
 This store is what upgrades 6a from a crude timer into "you've actually heard this."
 
-### 4b. Cover art — a regenerable cache, not primary state
+### 4b. Cover art — fetched once, kept, as Postgres blobs
 
-Art is always re-derivable (Spotify / Cover Art Archive / beets), so treat it as **cache**
-and keep it out of the precious tier.
+**DECIDED: keep and *own* the art** — fetch each image once and retain it, so it survives
+the source later changing or pulling it. It's retained data, not throwaway cache.
 
-- **Don't hotlink** Spotify/CDN image URLs from the browser: they rotate/expire, break
-  offline, leak the browser to Spotify's CDN (privacy), and don't fit "own my data".
-- **Don't store bytes in Postgres** — blobs bloat the DB and its backups and are worse to
-  serve. Postgres holds only a reference / "cached?" marker (the path is derivable from the
-  album id).
-- **Storage: a writable art-cache volume**, served by the app under one uniform route
-  (e.g. `/art/<album-id>`) for *every* state. Because it's re-derivable it **needs no
-  backup** — the property that keeps it out of the precious (Postgres) tier. Added to the
-  §8a contract as the one extra local dependency (Postgres + beets + this cache dir);
-  cache-only, so still consistent with "no precious local state".
+- **Storage: blobs in Postgres**, in a **dedicated `album_art` table** separate from
+  `album` (so the large bytea column never weighs on hot album-row reads, and it can be
+  split to its own schema/DB later without touching the rest). One row per album (× size
+  if we keep more than one). Keeps deployment to a single backend — **no writable cache
+  volume needed** (dropped from the §8a contract): just Postgres + beets.
+- **It's owned data, so it's retained** (and belongs in backups). Because it's separated
+  into its own table, backup size stays *manageable by choice* — back it up on its own
+  cadence, or split it to a dedicated schema/DB when it grows. (This is the deliberate,
+  managed version of the earlier backup-bloat worry.)
+- **Don't hotlink** Spotify/CDN image URLs from the browser regardless: they rotate/expire,
+  break offline, leak the browser to Spotify's CDN (privacy), and defeat the point of
+  owning them. Always self-serve.
+- **Serving:** one uniform route (e.g. `/art/<album-id>`) for every state, backed by a
+  `bytea` read. Art is immutable per album, so set `ETag` + long/`immutable` `Cache-Control`
+  from day one — cheap, and it kills repeat fetches. **If serving ever feels slow, put a
+  cache layer in front** (reverse-proxy/CDN or on-disk) — deferred until needed.
 - **Sources, best-available at fetch time:**
   - not-yet-owned (`suggested`/`saved`/`wanted`/`acquiring`): **Spotify album images**
     (available from ingest — needed for triage) and/or **Cover Art Archive** via the MB
     release-group id (§5), which fits the own-data ethos.
-  - `owned`: art already exists in the **beets** library (embedded + `cover.jpg`); serve
-    from the cache, refreshed from beets if desired. (beets is a *source*, not a second
-    serving path — keep one route.)
+  - `owned`: art also exists in the **beets** library (embedded + `cover.jpg`); a source we
+    can (re)fetch from, not a second serving path — keep the one route.
 - **Fetch async at ingest** (a background job filling missing art — exactly
-  spotify-scripts' `ArtworkTask`), with a placeholder until cached. Cache one medium image
-  (~300px) and let CSS scale to the ~48px list thumbnail (§8e); add a dedicated small
-  thumbnail later only if list payloads feel heavy.
+  spotify-scripts' `ArtworkTask`, now writing to `album_art` instead of a dir), with a
+  placeholder until stored. Keep one medium image (~300px) and let CSS scale to the ~48px
+  list thumbnail (§8e); add a stored small thumbnail later only if list payloads feel heavy.
 
 ## 5. Reconciliation — fixing the old system's weakest link
 
@@ -373,7 +378,6 @@ to the code.
 |---|---|---|
 | PostgreSQL backend | host, port, database, user, password (or a single `DATABASE_URL`) | The app runs its own migrations on the given database. |
 | Beets CLI access | beets command (default `beet`), optional beets config path | The command may be `beet`, `docker exec … beet`, `ssh … beet`, etc. (§5). |
-| Art cache | a writable directory path | Regenerable image cache (§4b) — cache-only, needs no backup. |
 | Spotify API | client id/secret, **redirect URI** (public HTTPS, registered in the Spotify dashboard), token store | Authorization Code flow via `tekore`; see §8c for redirect-URI rules and 6-month re-auth. Read-only scopes for v1; **`user-library-modify`** added when §6b lands (Save/Want writes to the Spotify library). |
 | Tunables | 6a thresholds, poll intervals, Bandcamp/base URLs, re-auth warning lead time | Sensible defaults; all overridable. |
 
@@ -546,7 +550,7 @@ fight this aesthetic) — hand-rolled CSS or a headless/unstyled component appro
 | UI aesthetic | **Sharp, dense, quiet** — square corners, flat (1px rules, no shadows), near-monochrome + one accent, sans-for-text/mono-for-data, keyboard-first. Theme-aware (both), ~48px thumbnails, no CSS framework, design tokens (§8e). |
 | State machine | `suggested → saved → wanted → acquiring → owned` (+ `dismissed`). Entry state by provenance: Spotify saves enter at `saved`, 6b/6c discoveries at `suggested`. `owned` derived by reconcile from `wanted`/`acquiring`; `dismissed` reachable from `suggested` (rejected suggestion) or `saved`/`wanted` (verdict drop), disambiguated by provenance (§4). |
 | Storage | **PostgreSQL**, connection from config (host/port/db/user/pass). No local SQLite of its own. |
-| Cover art | Regenerable **cache on a writable volume**, self-served (`/art/<album-id>`); not in Postgres, not hotlinked. Sourced from Spotify / Cover Art Archive / beets; needs no backup (§4b). |
+| Cover art | **Owned/retained blobs in Postgres**, in a dedicated `album_art` table (splittable to its own schema/DB later). Self-served (`/art/<album-id>`) with ETag/immutable caching; a front cache only if slow. Not hotlinked. Sourced from Spotify / Cover Art Archive / beets (§4b). |
 | Deployment | **Agnostic** — app only requires a Postgres backend + a beets command, both from config (§8a). My blink+partridge hosting is a reference deployment (§8b), not a requirement. |
 | Acquisition | Manual; assisted by one-click Bandcamp search-URL per want (§7). Links, never buys. |
 
@@ -588,9 +592,9 @@ core, or the whole thing silently dies within 6 months.
 - `spotify-scripts`: the **album + ResourceUri + match-graph data model** is sound;
   the **fuzzy matcher is not** (replace per §5). `artistwatch.py`'s new-release logic
   is directly reusable for nudge **6b** (just re-seed it off kept albums, not followed
-  artists). Its `ArtworkTask` (download Spotify album art to an images dir) is directly
-  reusable for the §4b art cache. The custom SQLite job queue is probably more than a
-  personal tool needs —
+  artists). Its `ArtworkTask` (download Spotify album art) is directly reusable for §4b —
+  just write to the `album_art` table instead of an images dir. The custom SQLite job
+  queue is probably more than a personal tool needs —
   reconsider. Ignore `wander.py` / `trackclustering.py` — dead endpoints and out of
   scope now that there's no recommender.
   - **Anti-pattern to avoid:** it read the beets SQLite db directly with raw concurrent
