@@ -868,6 +868,17 @@ without touching the core.
 | Packaging | **uv** + lockfile | |
 | Quality | **Ruff** (lint+format) + **mypy** | |
 
+**Why Python, not Go (considered).** Go was weighed — it would consolidate with `blink`
+and nix-package more cleanly as a single static binary. But the two reasons Python was
+*originally* obvious have gone (we use the beets **CLI** not its library, §5; the
+clustering/data-science work is dead), so this was decided on merits, not inertia: the
+tool orbits beets (which must be in the runtime regardless — Python lets app + beets share
+one image with no sidecar), and the reconcile fuzzy tail (`rapidfuzz`), §13 tag-reading
+(`mutagen`/`mediafile`), a possible §5a LLM step, and spotify-scripts salvage all sit in
+Python's sweet spot. Performance is irrelevant at single-user, I/O-bound scale, and
+homelab-language consolidation was explicitly not a priority. External systems stay behind
+ports (§14), so this isn't a one-way door.
+
 ### Frontend
 | Concern | Choice | Notes |
 |---|---|---|
