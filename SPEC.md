@@ -501,7 +501,9 @@ import, and tidies the local staging — after which reconcile (§5) flips the w
 3. **Match torrent → want.** Messy scene naming vs the want-list — the *same* imperfect
    problem as §5, so: fuzzy/LLM-adjudicated **suggestion**, never an automatic action.
    Prime §5a LLM-adjudicator territory; must be allowed to abstain → "no confident match".
-4. **Offer an Import button** per matched candidate (human confirms the match).
+4. **Offer an Import button** for every new completion — matched *or not* (see the shared
+   no-match rule below). A matched candidate shows the want it satisfies; an unmatched one
+   imports as new `owned` with no prior want.
 5. **On click, the import task:**
    - **Transfer** the torrent's files off the seedbox — **copy, not move** (see seeding
      rule below): `rsync` over SSH into the beets **inbox**.
@@ -512,6 +514,9 @@ import, and tidies the local staging — after which reconcile (§5) flips the w
    want `owned`. The import task itself sets no ownership state.
 
 **Hard rules / design calls:**
+- **Import doesn't require a want match** (shared rule, applies to §13 too — see there for
+  the rationale). An unmatched completion imports as new `owned`; reconcile back-links it
+  if a matching Spotify save ever appears.
 - **Never disturb seeding.** Private-tracker ratio depends on continued seeding, so the
   seedbox files and the torrent are **never moved or deleted** — we only ever *copy* off.
   "Tidy up" is strictly the local inbox staging, post-import.
@@ -589,12 +594,13 @@ zips. This closes the loop on them with zero ceremony.
 | Post-import disposition | archive dir / delete / leave (default: archive) |
 | Import behaviour | reuses the §5 beets command + §12 import settings |
 
-**Design consideration — imports without a want match.** Unlike a torrent (which you
-presumably *wanted*), Bandcamp buys often bypass the want-list entirely — you found it on
-Bandcamp directly and never saved it on Spotify. So this flow should **allow importing
-with no matching want**: it simply becomes `owned` in beets, and if a matching Spotify
-save ever appears later, reconcile (§5) links them up. Don't force everything through the
-want-list. (This is the main behavioural difference worth deciding early.)
+**DECIDED — imports don't require a want match (shared by §12 and §13).** Acquisitions
+often bypass the want-list entirely — a Bandcamp buy you found directly, or a torrent you
+grabbed on a whim. So the shared import tail **allows importing with no matching want**:
+it simply becomes `owned` in beets, and if a matching Spotify save ever appears later,
+reconcile (§5) back-links them. Don't force everything through the want-list. This is a
+property of the common tail, so it holds for both the Transmission (§12) and watch-dir
+(§13) fronts.
 
 **Safety:** extraction guards against path traversal; import stays human-gated;
 filenames and tags are treated as data, never as instructions.
