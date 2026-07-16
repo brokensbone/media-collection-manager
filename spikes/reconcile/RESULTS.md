@@ -45,5 +45,11 @@ different job from what the spike measured.)
 The subtlest failure mode wasn't in the eyeballed set: **edition-mismatch false negatives**
 — an owned album resolving to a *different* release-group than the beets copy (deluxe vs
 standard, §4) → shows `resolved & not-owned` despite being owned → would wrongly appear in
-the buy list. Recommended: scan the 62 `resolved & not-owned` for any you actually own. If
-~none, the join is clean.
+the buy list.
+
+**Mitigation accepted (operator):** rather than trying to auto-detect every edition case,
+this is handled by the **manual link** — link a want to the beets album that satisfies it
+(sticky, needs no MB id; §4/§5, MVP in ROADMAP D7). Same mechanism closes the MB-absent
+tail (buy → import → link). So the edition-mismatch worry is a resolve-by-hand case, not a
+blocker. (Optional: still worth scanning `resolved & not-owned` once for any you own, to
+gauge how often it happens.)
