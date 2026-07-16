@@ -1,35 +1,35 @@
-# README
+# wantlist
 
-## What this is
+A smart want-list over Spotify + beets — captures what you want to own, tells you whether
+you already own it, and nudges you to curate and acquire. See [SPEC.md](SPEC.md) for the
+design and [ROADMAP.md](ROADMAP.md) for the sequential deliverables.
 
-I have made several attempts to better organise my music in the past.
-They are spotify-scripts and record-library.
-Neither have really worked.
-I want to build a new thing. I don't yet know what it is.
+## Layout
 
-## How I listen to music
+- `backend/` — FastAPI service (Python 3.12, uv). Ports/adapters with a pure core (§14).
+- `frontend/` — React + TypeScript SPA (Vite).
+- `fixtures/beets/` — reproducible seeded beets library for tests.
+- `spikes/` — throwaway spikes (D0 reconcile).
 
-Mostly on Spotify right now.
-But I don't like that. I'd rather own music. I'd rather control my data.
-As well as spotify I have a library of (mostly) FLAC files.
-This is managed by beets (which is superb).
-This is listened to either by Navidrome (see house repo) or using mpd.
+## Dev
 
-## How I acquire music
+Backend (from `backend/`):
+```
+uv sync
+uv run pytest        # tests
+uv run ruff check .  # lint
+uv run ruff format . # format
+uv run mypy          # types
+uv run uvicorn wantlist.app:app --reload   # run the API
+```
 
-Mostly downloads. Some of this will be zipped dirs (e.g. from bandcamp).
-Some will be torrents, downloading to a seedbox.
+Frontend (from `frontend/`):
+```
+npm install
+npm test         # tests
+npm run lint     # biome
+npm run typecheck
+npm run dev      # dev server
+```
 
-## Problems I've got
-
-Spotify is great for discovery - new music, quick try, etc.
-But it feels like WORK to then move to buying/downloading the same music.
-So I forget.
-And then my library doesn't grow so I stay on Spotify.
-The problem gets worse.
-
-## Attempts to solve this.
-
-Spotify-scripts was crude but attempted to organise around the concept of an album.
-It tried to facilitate mapping Spotify IDs to Musicbrainz IDs to actual files on disk.
-It sort of worked.
+CI (`.github/workflows/ci.yml`) runs all of the above on every push and PR.
