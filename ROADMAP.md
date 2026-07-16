@@ -32,7 +32,7 @@ Monorepo shell and the test/quality harness that everything else rides on.
 - GitHub Actions running lint + typecheck + both (trivial) test suites.
 - **Done when:** `uv run pytest` and `vitest` both run green, lint + typecheck pass, and CI is green on push. *("test suite runs")*
 
-### D2 · Service skeleton + DB migrations + health
+### D2 · Service skeleton + DB migrations + health  — ✅ done (pending CI)
 The app boots and can reach its two dependencies, with schema in place.
 - Alembic migrations create `album`, `play_history`, `album_art`, auth/token tables (§4).
 - Startup/health endpoint verifies Postgres connectivity and that the `beet` command runs.
