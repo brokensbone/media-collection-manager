@@ -135,7 +135,9 @@ via the §6a verdict). Could be one table with a state field, or two — see ope
 **Auth/credentials store** (small, separate): the Spotify refresh + access tokens, access
 expiry, and — critically — **`spotify_authorized_at`**, the timestamp of the last full
 authorization. Needed because refresh tokens now expire at 6 months and carry no
-issuance time of their own (§8c).
+issuance time of their own (§8c). **Stored plaintext in Postgres** (single `spotify_auth`
+row) — a deliberate choice for a single-user LAN deployment; encryption-at-rest was
+considered and declined. (`client_id`/`client_secret` live in config, not the DB.)
 
 ### 4a. Play history (listening data) — a local store the tool builds itself
 

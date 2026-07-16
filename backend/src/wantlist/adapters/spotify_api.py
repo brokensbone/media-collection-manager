@@ -1,0 +1,48 @@
+from collections.abc import Iterable, Iterator
+from datetime import datetime
+from typing import Any
+
+import httpx
+
+from ..ports.spotify_api import SavedAlbum
+
+
+class HttpxSpotifyApiClient:
+    """Reads the Spotify Web API over httpx. Base URL injected so E2E can stub it (§14)."""
+
+    def __init__(self, api_url: str, art_target_px: int) -> None:
+        self._api_url = api_url.rstrip("/")
+        self._art_target_px = art_target_px
+
+    def saved_albums(self, access_token: str) -> Iterable[SavedAlbum]:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        url: str | None = f"{self._api_url}/me/albums?limit=50"
+        while url:
+            resp = httpx.get(url, headers=headers, timeout=30)
+            resp.raise_for_status()
+            page = resp.json()
+            yield from self._parse_page(page)
+            url = page.get("next")
+
+    def _parse_page(self, page: dict[str, Any]) -> Iterator[SavedAlbum]:
+        for item in page["items"]:
+            album = item["album"]
+            yield SavedAlbum(
+                spotify_id=album["id"],
+                artist=", ".join(a["name"] for a in album["artists"]),
+                title=album["name"],
+                upc=album.get("external_ids", {}).get("upc"),
+                added_at=_parse_dt(item.get("added_at")),
+                art_url=self._best_image(album.get("images", [])),
+            )
+
+    def _best_image(self, images: list[dict[str, Any]]) -> str | None:
+        sized = [i for i in images if i.get("url") and i.get("width")]
+        if not sized:
+            return images[0]["url"] if images else None
+        best = min(sized, key=lambda i: abs(int(i["width"]) - self._art_target_px))
+        return str(best["url"])
+
+
+def _parse_dt(value: str | None) -> datetime | None:
+    return datetime.fromisoformat(value) if value else None

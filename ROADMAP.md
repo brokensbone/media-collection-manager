@@ -49,7 +49,7 @@ The thin httpx adapter and the whole OAuth lifecycle, including the 6-month reco
 - Minimal web "Connect / Reconnect Spotify" + status (reauth countdown).
 - **Done when:** OAuth completes against real Spotify *and* the stub; refresh works; `invalid_grant` surfaces reconnect; status shows connected + days-to-reauth. *("can connect to Spotify, and reconnect")*
 
-### D4 · Saves ingest + dedupe + art  *(§4, §4b)*
+### D4 · Saves ingest + dedupe + art  *(§4, §4b)*  — ✅ done (pending CI)
 Pull the firehose in, once each, with covers.
 - Poll saved albums → `album` rows in `saved`; dedupe by release-group / Spotify id; record provenance. APScheduler job + a CLI command form.
 - Async art fetch → `album_art` blob; served at `/art/<id>` with ETag.

@@ -27,3 +27,7 @@ class Settings(BaseSettings):
 
     # Where to send the browser after a successful callback.
     frontend_url: str = "/"
+
+    # Ingest (§4/§4b): poll interval and the cover-art size to keep.
+    saves_poll_seconds: int = 3600
+    art_target_px: int = 300
