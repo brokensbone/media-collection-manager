@@ -112,6 +112,16 @@ class SeenRelease(Base):
     seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class NotificationState(Base):
+    """Single-row dedup flags so alerts (§8d) fire once per episode, not every poll."""
+
+    __tablename__ = "notification_state"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reauth_notified: Mapped[bool] = mapped_column(default=False)
+    triage_notified: Mapped[bool] = mapped_column(default=False)
+
+
 class SpotifyAuth(Base):
     """Single-row token store incl. authorized_at for the 6-month re-auth (SPEC §8c)."""
 

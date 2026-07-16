@@ -3,7 +3,10 @@ import logging
 from .config import Settings
 from .db import make_engine, make_session_factory
 from .factories import (
+    build_alerts_service,
     build_artist_watch_service,
+    build_auth_service,
+    build_decide_service,
     build_ingest_service,
     build_ownership_reconciler,
     build_play_history_service,
@@ -35,6 +38,7 @@ def reconcile_once(settings: Settings | None = None) -> None:
     session_factory = make_session_factory(make_engine(settings.database_url))
     resolution = build_resolution_service(settings, session_factory).resolve_unresolved()
     reconciled = build_ownership_reconciler(settings, session_factory).reconcile()
+    build_alerts_service(settings, session_factory).owned(reconciled.newly_owned)
     log.info(
         "reconcile: resolved=%s unresolved=%s paused=%s newly_owned=%s",
         resolution.resolved,
@@ -65,9 +69,22 @@ def watch_artists_once(settings: Settings | None = None) -> None:
     )
 
 
+def alerts_once(settings: Settings | None = None) -> None:
+    """Fire operator alerts for re-auth-due and a triage backlog (§8d)."""
+    settings = settings or Settings()
+    session_factory = make_session_factory(make_engine(settings.database_url))
+    reauth_due = build_auth_service(settings, session_factory).status().reauth_due
+    decide_count = len(build_decide_service(settings, session_factory).queue())
+    build_alerts_service(settings, session_factory).check(
+        reauth_due=reauth_due, decide_count=decide_count
+    )
+    log.info("alerts: reauth_due=%s decide_count=%s", reauth_due, decide_count)
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     ingest_once()
     reconcile_once()
     poll_plays_once()
     watch_artists_once()
+    alerts_once()

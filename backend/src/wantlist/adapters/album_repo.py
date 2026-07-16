@@ -6,7 +6,16 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, sessionmaker
 
 from ..domain.verdict import PlayStat
-from ..models import Album, AlbumArt, AlbumState, LinkSource, PlayHistory, Provenance, SeenRelease
+from ..models import (
+    Album,
+    AlbumArt,
+    AlbumState,
+    LinkSource,
+    NotificationState,
+    PlayHistory,
+    Provenance,
+    SeenRelease,
+)
 from ..ports.spotify_api import Play
 
 
@@ -384,6 +393,27 @@ class AlbumRepo:
                 .where(Album.id == album_id, Album.state == AlbumState.suggested)
                 .values(**values)
             )
+            session.commit()
+
+    # --- notification dedup flags (§8d) ----------------------------------------------
+
+    def notification_flags(self) -> tuple[bool, bool]:
+        with self._sf() as session:
+            row = session.get(NotificationState, 1)
+            return (row.reauth_notified, row.triage_notified) if row else (False, False)
+
+    def set_notification_flags(
+        self, *, reauth_notified: bool | None = None, triage_notified: bool | None = None
+    ) -> None:
+        with self._sf() as session:
+            row = session.get(NotificationState, 1)
+            if row is None:
+                row = NotificationState(id=1)
+                session.add(row)
+            if reauth_notified is not None:
+                row.reauth_notified = reauth_notified
+            if triage_notified is not None:
+                row.triage_notified = triage_notified
             session.commit()
 
     def count_by_state(self) -> dict[str, int]:

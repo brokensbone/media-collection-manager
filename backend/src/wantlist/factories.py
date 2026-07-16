@@ -5,12 +5,15 @@ from .adapters.art_fetcher import fetch_image
 from .adapters.beets import BeetsClient
 from .adapters.clock import SystemClock
 from .adapters.mb_resolver import HttpxMusicBrainzResolver
+from .adapters.notifier import WebhookNotifier
 from .adapters.spotify_api import HttpxSpotifyApiClient
 from .adapters.spotify_auth import HttpxSpotifyAuthClient
 from .adapters.token_store import TokenStore
+from .alerts import AlertsService
 from .artist_watch import ArtistWatchService
 from .auth_service import AuthService
 from .config import Settings
+from .decide import DecideService
 from .ingest import IngestService
 from .play_history import PlayHistoryService
 from .reconcile import OwnershipReconciler
@@ -89,6 +92,29 @@ def build_artist_watch_service(
         api=HttpxSpotifyApiClient(settings.spotify_api_url, settings.art_target_px),
         repo=AlbumRepo(session_factory),
         tokens=build_auth_service(settings, session_factory),
+    )
+
+
+def build_decide_service(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> DecideService:
+    return DecideService(
+        repo=AlbumRepo(session_factory),
+        clock=SystemClock(),
+        forgotten_days=settings.verdict_forgotten_days,
+        snooze_days=settings.verdict_snooze_days,
+        listened_tracks=settings.verdict_listened_tracks,
+        listened_days=settings.verdict_listened_days,
+    )
+
+
+def build_alerts_service(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> AlertsService:
+    return AlertsService(
+        notifier=WebhookNotifier(settings.notification_webhook_url),
+        repo=AlbumRepo(session_factory),
+        triage_threshold=settings.notify_triage_threshold,
     )
 
 
