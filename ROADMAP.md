@@ -43,7 +43,7 @@ The app boots and can reach its two dependencies, with schema in place.
 
 ## P1 — MVP core loop
 
-### D3 · Spotify auth + re-auth  *(§8c, §15)*
+### D3 · Spotify auth + re-auth  *(§8c, §15)*  — ✅ done (pending CI)
 The thin httpx adapter and the whole OAuth lifecycle, including the 6-month reconnect.
 - Auth-code flow (client secret), token + `spotify_authorized_at` persistence, refresh, `invalid_grant` → pause-jobs → reconnect; configurable base URL; fake-Spotify stub for tests.
 - Minimal web "Connect / Reconnect Spotify" + status (reauth countdown).
