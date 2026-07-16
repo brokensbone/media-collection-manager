@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, sessionmaker
 
 from ..domain.verdict import PlayStat
-from ..models import Album, AlbumArt, AlbumState, LinkSource, PlayHistory, Provenance
+from ..models import Album, AlbumArt, AlbumState, LinkSource, PlayHistory, Provenance, SeenRelease
 from ..ports.spotify_api import Play
 
 
@@ -332,6 +332,31 @@ class AlbumRepo:
                 .order_by(Album.artist, Album.title)
             )
             return [SuggestedRow(r[0], r[1], r[2], r[3]) for r in rows]
+
+    def seen_album_ids(self) -> set[str]:
+        with self._sf() as session:
+            return set(session.scalars(select(SeenRelease.spotify_album_id)))
+
+    def artist_has_baseline(self, artist_id: str) -> bool:
+        with self._sf() as session:
+            return (
+                session.scalar(
+                    select(SeenRelease.spotify_album_id).where(SeenRelease.artist_id == artist_id)
+                )
+                is not None
+            )
+
+    def mark_seen(self, pairs: list[tuple[str, str]]) -> None:
+        """Record (album id, artist id) as accounted-for by the watch; ignore duplicates."""
+        if not pairs:
+            return
+        with self._sf() as session:
+            session.execute(
+                pg_insert(SeenRelease)
+                .values([{"spotify_album_id": a, "artist_id": art} for a, art in pairs])
+                .on_conflict_do_nothing(index_elements=["spotify_album_id"])
+            )
+            session.commit()
 
     def spotify_id_of(self, album_id: int) -> str | None:
         with self._sf() as session:
