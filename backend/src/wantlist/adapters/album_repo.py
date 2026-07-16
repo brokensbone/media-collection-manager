@@ -27,6 +27,15 @@ class AlbumSummary:
     has_art: bool
 
 
+@dataclass
+class DecideRow:
+    id: int
+    artist: str
+    title: str
+    saved_at: datetime
+    has_art: bool
+
+
 class AlbumRepo:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._sf = session_factory
@@ -128,6 +137,44 @@ class AlbumRepo:
                 update(Album)
                 .where(Album.id.in_(album_ids))
                 .values(state=AlbumState.owned, owned_link_source=LinkSource.auto)
+            )
+            session.commit()
+
+    # --- verdict / Decide (§6a) ------------------------------------------------------
+
+    def decide_queue(self, cutoff: datetime, now: datetime) -> list[DecideRow]:
+        """Saved albums ready to judge: awaiting a verdict, saved before the cutoff (the
+        'forgotten' trigger), and not currently snoozed. Oldest first."""
+        with self._sf() as session:
+            has_art = exists().where(AlbumArt.album_id == Album.id)
+            rows = session.execute(
+                select(Album.id, Album.artist, Album.title, Album.saved_at, has_art)
+                .where(
+                    Album.state == AlbumState.saved,
+                    Album.saved_at.is_not(None),
+                    Album.saved_at <= cutoff,
+                    (Album.snoozed_until.is_(None)) | (Album.snoozed_until <= now),
+                )
+                .order_by(Album.saved_at)
+            )
+            return [DecideRow(r[0], r[1], r[2], r[3], r[4]) for r in rows]
+
+    def set_verdict(self, album_id: int, state: AlbumState, verdict_at: datetime) -> None:
+        """Keep/drop: only a `saved` album can receive a verdict."""
+        with self._sf() as session:
+            session.execute(
+                update(Album)
+                .where(Album.id == album_id, Album.state == AlbumState.saved)
+                .values(state=state, verdict_at=verdict_at)
+            )
+            session.commit()
+
+    def snooze(self, album_id: int, snoozed_until: datetime) -> None:
+        with self._sf() as session:
+            session.execute(
+                update(Album)
+                .where(Album.id == album_id, Album.state == AlbumState.saved)
+                .values(snoozed_until=snoozed_until)
             )
             session.commit()
 

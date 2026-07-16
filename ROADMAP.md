@@ -62,7 +62,7 @@ The risky core, now wired in — plus the first real read-only screen.
 - Ownership link carries a **source** (`auto` from reconcile vs `manual` sticky link, §4) — reconcile computes auto-ownership and never clobbers a manual link. (The manual *action* is D7; this deliverable just makes the model respect one.)
 - **Done when:** against saved albums + a seeded beets fixture, reconcile marks the owned ones `owned` and leaves the rest — matching D0's approach; a manual link is respected and survives a reconcile pass; matching logic unit-tested; integration test hits the beets fixture; accuracy on the fixture recorded. *("ownership derived correctly against beets")*
 
-### D6 · Verdict + Decide worklist  *(§6a, §8d)*
+### D6 · Verdict + Decide worklist  *(§6a, §8d)*  — ✅ done (pending CI)
 The curation gate — shipping first with the time-based trigger that works from day one.
 - State transitions `saved → wanted` / `dismissed`, plus Snooze; the **"forgotten"** trigger (saved ≥ T days, ~no plays). Decide worklist UI in the §8e aesthetic (per the [mockup](mockups/decide-worklist.html)); keyboard triage.
 - **Done when:** stale saves surface in Decide with the right "why"; keep→`wanted`, drop→`dismissed`, snooze all work via UI + API; state-machine unit tests pass. *("can triage saved → wanted/dismissed")*

@@ -3,11 +3,14 @@ from fastapi.responses import JSONResponse
 
 from . import health
 from .adapters.album_repo import AlbumRepo
+from .adapters.clock import SystemClock
 from .config import Settings
 from .db import make_engine, make_session_factory
+from .decide import DecideService
 from .factories import build_auth_service
 from .routers import art as art_router
 from .routers import auth as auth_router
+from .routers import decide as decide_router
 from .routers import library as library_router
 
 
@@ -21,9 +24,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.auth_service = build_auth_service(settings, session_factory)
     app.state.album_repo = AlbumRepo(session_factory)
+    app.state.decide_service = DecideService(
+        repo=AlbumRepo(session_factory),
+        clock=SystemClock(),
+        forgotten_days=settings.verdict_forgotten_days,
+        snooze_days=settings.verdict_snooze_days,
+    )
     app.include_router(auth_router.router)
     app.include_router(art_router.router)
     app.include_router(library_router.router)
+    app.include_router(decide_router.router)
 
     @app.get("/health")
     def health_endpoint(request: Request) -> JSONResponse:
