@@ -7,8 +7,8 @@ from wantlist.ports.spotify_api import SavedAlbum
 from .fakes import StubSpotifyApiClient, StubTokens, fake_fetch_image
 
 ALBUMS = [
-    SavedAlbum("a1", "Artist", "One", None, None, "http://art/1"),
-    SavedAlbum("a2", "Artist", "Two", None, None, None),
+    SavedAlbum("a1", "Artist", "art-1", "One", None, None, "http://art/1"),
+    SavedAlbum("a2", "Artist", "art-1", "Two", None, None, None),
 ]
 
 

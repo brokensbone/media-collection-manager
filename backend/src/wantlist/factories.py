@@ -8,11 +8,13 @@ from .adapters.mb_resolver import HttpxMusicBrainzResolver
 from .adapters.spotify_api import HttpxSpotifyApiClient
 from .adapters.spotify_auth import HttpxSpotifyAuthClient
 from .adapters.token_store import TokenStore
+from .artist_watch import ArtistWatchService
 from .auth_service import AuthService
 from .config import Settings
 from .ingest import IngestService
 from .play_history import PlayHistoryService
 from .reconcile import OwnershipReconciler
+from .releases import ReleasesService
 from .resolution import ResolutionService
 
 
@@ -77,4 +79,25 @@ def build_play_history_service(
         api=HttpxSpotifyApiClient(settings.spotify_api_url, settings.art_target_px),
         repo=AlbumRepo(session_factory),
         tokens=build_auth_service(settings, session_factory),
+    )
+
+
+def build_artist_watch_service(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> ArtistWatchService:
+    return ArtistWatchService(
+        api=HttpxSpotifyApiClient(settings.spotify_api_url, settings.art_target_px),
+        repo=AlbumRepo(session_factory),
+        tokens=build_auth_service(settings, session_factory),
+    )
+
+
+def build_releases_service(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> ReleasesService:
+    return ReleasesService(
+        api=HttpxSpotifyApiClient(settings.spotify_api_url, settings.art_target_px),
+        repo=AlbumRepo(session_factory),
+        tokens=build_auth_service(settings, session_factory),
+        clock=SystemClock(),
     )

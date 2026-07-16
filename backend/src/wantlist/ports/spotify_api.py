@@ -8,6 +8,7 @@ from typing import Protocol
 class SavedAlbum:
     spotify_id: str
     artist: str
+    artist_id: str | None
     title: str
     upc: str | None
     added_at: datetime | None
@@ -29,3 +30,9 @@ class SpotifyApiClient(Protocol):
     def album_isrcs(self, access_token: str, album_id: str) -> list[str]: ...
 
     def recently_played(self, access_token: str) -> list[Play]: ...
+
+    def followed_artist_ids(self, access_token: str) -> list[str]: ...
+
+    def artist_albums(self, access_token: str, artist_id: str) -> list[SavedAlbum]: ...
+
+    def save_album(self, access_token: str, spotify_album_id: str) -> None: ...

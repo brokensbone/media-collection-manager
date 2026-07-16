@@ -40,6 +40,37 @@ class HttpxSpotifyApiClient:
                     isrcs.append(isrc)
         return isrcs
 
+    def followed_artist_ids(self, access_token: str) -> list[str]:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        url: str | None = f"{self._api_url}/me/following?type=artist&limit=50"
+        ids: list[str] = []
+        while url:
+            page = self._get_json(url, headers).get("artists", {})
+            ids.extend(a["id"] for a in page.get("items", []) if a.get("id"))
+            url = page.get("next")
+        return ids
+
+    def artist_albums(self, access_token: str, artist_id: str) -> list[SavedAlbum]:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        url: str | None = (
+            f"{self._api_url}/artists/{artist_id}/albums?include_groups=album&limit=50"
+        )
+        albums: list[SavedAlbum] = []
+        while url:
+            page = self._get_json(url, headers)
+            albums.extend(self._to_saved(a, added_at=None) for a in page.get("items", []))
+            url = page.get("next")
+        return albums
+
+    def save_album(self, access_token: str, spotify_album_id: str) -> None:
+        resp = httpx.put(
+            f"{self._api_url}/me/albums",
+            headers={"Authorization": f"Bearer {access_token}"},
+            params={"ids": spotify_album_id},
+            timeout=30,
+        )
+        resp.raise_for_status()
+
     def recently_played(self, access_token: str) -> list[Play]:
         """The last ~50 plays (SPEC §4a). No deep history exists; we accumulate over time."""
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -66,15 +97,19 @@ class HttpxSpotifyApiClient:
 
     def _parse_page(self, page: dict[str, Any]) -> Iterator[SavedAlbum]:
         for item in page["items"]:
-            album = item["album"]
-            yield SavedAlbum(
-                spotify_id=album["id"],
-                artist=", ".join(a["name"] for a in album["artists"]),
-                title=album["name"],
-                upc=album.get("external_ids", {}).get("upc"),
-                added_at=_parse_dt(item.get("added_at")),
-                art_url=self._best_image(album.get("images", [])),
-            )
+            yield self._to_saved(item["album"], added_at=_parse_dt(item.get("added_at")))
+
+    def _to_saved(self, album: dict[str, Any], added_at: datetime | None) -> SavedAlbum:
+        artists = album.get("artists", [])
+        return SavedAlbum(
+            spotify_id=album["id"],
+            artist=", ".join(a["name"] for a in artists),
+            artist_id=artists[0]["id"] if artists and artists[0].get("id") else None,
+            title=album["name"],
+            upc=album.get("external_ids", {}).get("upc"),
+            added_at=added_at,
+            art_url=self._best_image(album.get("images", [])),
+        )
 
     def _best_image(self, images: list[dict[str, Any]]) -> str | None:
         sized = [i for i in images if i.get("url") and i.get("width")]

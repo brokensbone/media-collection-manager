@@ -97,7 +97,7 @@ Make it real. (Independent of dev — can land as soon as the blink→nix conver
 
 ## P3 — Post-MVP increments
 
-### D11 · Releases worklist + artist-watch + Spotify writes  *(§6b)*
+### D11 · Releases worklist + artist-watch + Spotify writes  *(§6b)*  — ✅ done (pending CI)
 - `suggested` state; artist-watch seeded from kept + followed artists; Releases worklist with **Save** / **Want** / **Dismiss**; first Spotify **writes** (`PUT /me/albums`, `user-library-modify`).
 - **Done when:** new releases from watched artists appear as `suggested`; Save writes to Spotify and enters the flow; Want → `wanted`; dedupe holds; tests pass. *("new releases surface; Save/Want work")*
 

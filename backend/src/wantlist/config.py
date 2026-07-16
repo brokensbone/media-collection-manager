@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     spotify_client_id: str = ""
     spotify_client_secret: str = ""
     spotify_redirect_uri: str = "http://127.0.0.1:8000/auth/spotify/callback"
-    spotify_scopes: str = "user-library-read"  # §6b adds user-library-modify
+    spotify_scopes: str = "user-library-read user-library-modify"  # modify: Save/Want (§6b)
     spotify_accounts_url: str = "https://accounts.spotify.com"
     spotify_api_url: str = "https://api.spotify.com/v1"
 
@@ -40,6 +40,9 @@ class Settings(BaseSettings):
 
     # Play-history polling (§4a).
     recently_played_poll_seconds: int = 1800
+
+    # Artist-watch / new releases (§6b).
+    artist_watch_poll_seconds: int = 86400
 
     # MusicBrainz resolution (§5, §11). Base URL overridable for tests/E2E (§14).
     musicbrainz_url: str = "https://musicbrainz.org/ws/2"

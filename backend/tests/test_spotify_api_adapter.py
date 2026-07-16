@@ -19,7 +19,7 @@ def test_saved_albums_paginates_and_parses() -> None:
                         "album": {
                             "id": "a1",
                             "name": "Alb One",
-                            "artists": [{"name": "Artist X"}],
+                            "artists": [{"name": "Artist X", "id": "artX"}],
                             "external_ids": {"upc": "111"},
                             "images": [
                                 {"url": "big", "width": 640},
@@ -57,6 +57,7 @@ def test_saved_albums_paginates_and_parses() -> None:
 
     assert [a.spotify_id for a in albums] == ["a1", "a2"]
     assert albums[0].artist == "Artist X"
+    assert albums[0].artist_id == "artX"
     assert albums[0].upc == "111"
     assert albums[0].art_url == "mid"  # closest to the 300px target
     assert albums[0].added_at is not None

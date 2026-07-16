@@ -48,6 +48,14 @@ class AcquireRow:
     has_art: bool
 
 
+@dataclass
+class SuggestedRow:
+    id: int
+    artist: str
+    title: str
+    has_art: bool
+
+
 class AlbumRepo:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._sf = session_factory
@@ -62,6 +70,7 @@ class AlbumRepo:
         *,
         spotify_id: str,
         artist: str,
+        artist_id: str | None,
         title: str,
         upc: str | None,
         added_at: datetime | None,
@@ -72,6 +81,7 @@ class AlbumRepo:
                 Album(
                     spotify_id=spotify_id,
                     artist=artist,
+                    artist_id=artist_id,
                     title=title,
                     upc=upc,
                     art_url=art_url,
@@ -81,6 +91,38 @@ class AlbumRepo:
                 )
             )
             session.commit()
+
+    def add_suggested_album(
+        self,
+        *,
+        spotify_id: str,
+        artist: str,
+        artist_id: str | None,
+        title: str,
+        art_url: str | None,
+    ) -> None:
+        with self._sf() as session:
+            session.add(
+                Album(
+                    spotify_id=spotify_id,
+                    artist=artist,
+                    artist_id=artist_id,
+                    title=title,
+                    art_url=art_url,
+                    state=AlbumState.suggested,
+                    provenance=Provenance.artist_watch,
+                )
+            )
+            session.commit()
+
+    def kept_artist_ids(self) -> set[str]:
+        """Artist ids of albums that survived a keep-verdict — the 6b watch seed (§6b)."""
+        kept = (AlbumState.wanted, AlbumState.acquiring, AlbumState.owned)
+        with self._sf() as session:
+            rows = session.scalars(
+                select(Album.artist_id).where(Album.artist_id.is_not(None), Album.state.in_(kept))
+            )
+            return {r for r in rows if r is not None}
 
     def albums_missing_art(self) -> list[tuple[int, str]]:
         """Albums that have a source URL but no stored blob yet."""
@@ -276,6 +318,46 @@ class AlbumRepo:
                     owned_link_source=LinkSource.manual,
                     owned_beets_id=beets_id,
                 )
+            )
+            session.commit()
+
+    # --- releases / artist-watch (§6b) -----------------------------------------------
+
+    def suggested_queue(self) -> list[SuggestedRow]:
+        with self._sf() as session:
+            has_art = exists().where(AlbumArt.album_id == Album.id)
+            rows = session.execute(
+                select(Album.id, Album.artist, Album.title, has_art)
+                .where(Album.state == AlbumState.suggested)
+                .order_by(Album.artist, Album.title)
+            )
+            return [SuggestedRow(r[0], r[1], r[2], r[3]) for r in rows]
+
+    def spotify_id_of(self, album_id: int) -> str | None:
+        with self._sf() as session:
+            return session.execute(
+                select(Album.spotify_id).where(Album.id == album_id)
+            ).scalar_one_or_none()
+
+    def transition_suggested(
+        self,
+        album_id: int,
+        state: AlbumState,
+        *,
+        saved_at: datetime | None,
+        verdict_at: datetime | None,
+    ) -> None:
+        """Move a `suggested` album onward (Save/Want/Dismiss, §6b)."""
+        values: dict[str, object] = {"state": state}
+        if saved_at is not None:
+            values["saved_at"] = saved_at
+        if verdict_at is not None:
+            values["verdict_at"] = verdict_at
+        with self._sf() as session:
+            session.execute(
+                update(Album)
+                .where(Album.id == album_id, Album.state == AlbumState.suggested)
+                .values(**values)
             )
             session.commit()
 

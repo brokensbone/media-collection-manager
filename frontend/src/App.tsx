@@ -3,6 +3,7 @@ import { Acquire } from './Acquire'
 import { Dashboard } from './Dashboard'
 import { Decide } from './Decide'
 import { Library } from './Library'
+import { Releases } from './Releases'
 import { SpotifyStatus } from './SpotifyStatus'
 
 export default function App() {
@@ -13,6 +14,8 @@ export default function App() {
         <SpotifyStatus />
       </header>
       <Dashboard />
+      <h2>Releases</h2>
+      <Releases />
       <h2>Decide</h2>
       <Decide />
       <h2>Acquire</h2>
