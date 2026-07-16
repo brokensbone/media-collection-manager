@@ -111,7 +111,7 @@ surfacing turned out to be unwanted. So D12 corrects the watch to **baseline-the
 - **Done:** first watch of an artist surfaces nothing (baselines); a subsequent genuinely-new
   release surfaces as `suggested`; already-tracked albums are never re-surfaced. *("only new, never history")*
 
-### D13 · Notifications  *(§8d)*
+### D13 · Notifications  *(§8d)*  — ✅ done (pending CI)
 - Push/Slack on: a want auto-resolving to `owned`, N items waiting to triage, and re-auth approaching.
 - **Done when:** a notification fires on each chosen trigger. *("gets pinged")*
 

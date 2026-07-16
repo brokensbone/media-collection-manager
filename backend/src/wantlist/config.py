@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     # Artist-watch / new releases (§6b).
     artist_watch_poll_seconds: int = 86400
 
+    # Notifications (§8d, D13). Empty webhook = disabled; Slack-compatible {"text": ...}.
+    notification_webhook_url: str = ""
+    notify_triage_threshold: int = 10
+    alerts_poll_seconds: int = 3600
+
     # MusicBrainz resolution (§5, §11). Base URL overridable for tests/E2E (§14).
     musicbrainz_url: str = "https://musicbrainz.org/ws/2"
     musicbrainz_user_agent: str = "wantlist/0.1 ( https://github.com/EdwardSalkeld )"

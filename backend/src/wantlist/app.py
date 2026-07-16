@@ -7,8 +7,7 @@ from .adapters.album_repo import AlbumRepo
 from .adapters.clock import SystemClock
 from .config import Settings
 from .db import make_engine, make_session_factory
-from .decide import DecideService
-from .factories import build_auth_service, build_releases_service
+from .factories import build_auth_service, build_decide_service, build_releases_service
 from .routers import acquire as acquire_router
 from .routers import art as art_router
 from .routers import auth as auth_router
@@ -28,14 +27,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.auth_service = build_auth_service(settings, session_factory)
     app.state.album_repo = AlbumRepo(session_factory)
-    app.state.decide_service = DecideService(
-        repo=AlbumRepo(session_factory),
-        clock=SystemClock(),
-        forgotten_days=settings.verdict_forgotten_days,
-        snooze_days=settings.verdict_snooze_days,
-        listened_tracks=settings.verdict_listened_tracks,
-        listened_days=settings.verdict_listened_days,
-    )
+    app.state.decide_service = build_decide_service(settings, session_factory)
     app.state.acquire_service = AcquireService(repo=AlbumRepo(session_factory), clock=SystemClock())
     app.state.releases_service = build_releases_service(settings, session_factory)
     app.include_router(auth_router.router)
