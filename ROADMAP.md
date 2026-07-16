@@ -67,11 +67,11 @@ The curation gate — shipping first with the time-based trigger that works from
 - State transitions `saved → wanted` / `dismissed`, plus Snooze; the **"forgotten"** trigger (saved ≥ T days, ~no plays). Decide worklist UI in the §8e aesthetic (per the [mockup](mockups/decide-worklist.html)); keyboard triage.
 - **Done when:** stale saves surface in Decide with the right "why"; keep→`wanted`, drop→`dismissed`, snooze all work via UI + API; state-machine unit tests pass. *("can triage saved → wanted/dismissed")*
 
-### D7 · Acquire worklist + Bandcamp + `acquiring` + manual link  *(§7, §8d)*
+### D7 · Acquire worklist + Bandcamp + `acquiring` + mark-owned  *(§7, §8d)*  — ✅ done (pending CI)
 Close the loop's manual middle with buy-assist — and make it always closable.
-- Acquire worklist over `wanted`; one-click Buy-on-Bandcamp search URL + fallbacks + paste-a-URL; **Mark as ordered** → `acquiring` (drops out of the queue); reconcile promotes `acquiring`/`wanted` → `owned`.
-- **Link to library / mark owned** (minimal manual resolve, §4/§5): search beets, pick the album that satisfies the want → sticky `manual` link → `owned`. This is what lets edition-mismatch and MB-absent albums ever leave the buy list; required for the loop to close for the ~14% tail, so it's MVP.
-- **Done when:** wanted albums show working buy links; mark-ordered → `acquiring`; when a matching album lands in beets, reconcile flips it `owned`; **a manually-linked want (edition mismatch or MB-absent) reaches `owned` and stays there across reconcile**; tests pass. *("wanted → owned with buy assist, always closable")*
+- Acquire worklist over `wanted`; one-click Buy-on-Bandcamp search URL; **Mark as ordered** → `acquiring` (drops out of the queue; cancel restores); reconcile promotes `acquiring`/`wanted` → `owned`.
+- **Mark owned** (minimal manual resolve, §4/§5): a sticky `manual` link → `owned` that reconcile never clobbers. This is what lets edition-mismatch and MB-absent albums leave the buy list; MVP. *(Picking a specific beets album to link — the assisted search/suggestions — is D17; fallback/paste-a-URL buy links likewise deferred as YAGNI for now.)*
+- **Done when:** wanted albums show working buy links; mark-ordered → `acquiring`; when a matching album lands in beets, reconcile flips it `owned`; **a mark-owned want (edition mismatch or MB-absent) reaches `owned` and stays there across reconcile**; tests pass. *("wanted → owned with buy assist, always closable")*
 
 ### D8 · Play-history + "listened" trigger  *(§4a, §6a)*
 Upgrade the verdict from a timer to "you've actually heard this."

@@ -36,6 +36,14 @@ class DecideRow:
     has_art: bool
 
 
+@dataclass
+class AcquireRow:
+    id: int
+    artist: str
+    title: str
+    has_art: bool
+
+
 class AlbumRepo:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._sf = session_factory
@@ -175,6 +183,52 @@ class AlbumRepo:
                 update(Album)
                 .where(Album.id == album_id, Album.state == AlbumState.saved)
                 .values(snoozed_until=snoozed_until)
+            )
+            session.commit()
+
+    # --- acquire (§7) ----------------------------------------------------------------
+
+    def acquire_queue(self) -> list[AcquireRow]:
+        """`wanted` albums to buy — `acquiring` (ordered) ones have dropped out."""
+        with self._sf() as session:
+            has_art = exists().where(AlbumArt.album_id == Album.id)
+            rows = session.execute(
+                select(Album.id, Album.artist, Album.title, has_art)
+                .where(Album.state == AlbumState.wanted)
+                .order_by(Album.artist, Album.title)
+            )
+            return [AcquireRow(r[0], r[1], r[2], r[3]) for r in rows]
+
+    def mark_ordered(self, album_id: int, ordered_at: datetime) -> None:
+        with self._sf() as session:
+            session.execute(
+                update(Album)
+                .where(Album.id == album_id, Album.state == AlbumState.wanted)
+                .values(state=AlbumState.acquiring, ordered_at=ordered_at)
+            )
+            session.commit()
+
+    def cancel_order(self, album_id: int) -> None:
+        with self._sf() as session:
+            session.execute(
+                update(Album)
+                .where(Album.id == album_id, Album.state == AlbumState.acquiring)
+                .values(state=AlbumState.wanted, ordered_at=None)
+            )
+            session.commit()
+
+    def mark_owned_manual(self, album_id: int, beets_id: str | None) -> None:
+        """A sticky manual ownership link (§4/§5) — reconcile never clobbers it. Closes the
+        loop for edition mismatches and MB-absent albums."""
+        with self._sf() as session:
+            session.execute(
+                update(Album)
+                .where(Album.id == album_id)
+                .values(
+                    state=AlbumState.owned,
+                    owned_link_source=LinkSource.manual,
+                    owned_beets_id=beets_id,
+                )
             )
             session.commit()
 
