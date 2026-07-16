@@ -1,10 +1,13 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import exists, select, update
+from sqlalchemy import exists, func, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, sessionmaker
 
-from ..models import Album, AlbumArt, AlbumState, LinkSource, Provenance
+from ..domain.verdict import PlayStat
+from ..models import Album, AlbumArt, AlbumState, LinkSource, PlayHistory, Provenance
+from ..ports.spotify_api import Play
 
 
 @dataclass
@@ -28,11 +31,12 @@ class AlbumSummary:
 
 
 @dataclass
-class DecideRow:
+class SavedCandidate:
     id: int
+    spotify_id: str | None
     artist: str
     title: str
-    saved_at: datetime
+    saved_at: datetime | None
     has_art: bool
 
 
@@ -150,22 +154,65 @@ class AlbumRepo:
 
     # --- verdict / Decide (§6a) ------------------------------------------------------
 
-    def decide_queue(self, cutoff: datetime, now: datetime) -> list[DecideRow]:
-        """Saved albums ready to judge: awaiting a verdict, saved before the cutoff (the
-        'forgotten' trigger), and not currently snoozed. Oldest first."""
+    def saved_pending(self, now: datetime) -> list[SavedCandidate]:
+        """Saved albums awaiting a verdict and not currently snoozed. Trigger evaluation
+        (forgotten/listened) happens in the service against play stats. Oldest first."""
         with self._sf() as session:
             has_art = exists().where(AlbumArt.album_id == Album.id)
             rows = session.execute(
-                select(Album.id, Album.artist, Album.title, Album.saved_at, has_art)
+                select(
+                    Album.id, Album.spotify_id, Album.artist, Album.title, Album.saved_at, has_art
+                )
                 .where(
                     Album.state == AlbumState.saved,
-                    Album.saved_at.is_not(None),
-                    Album.saved_at <= cutoff,
                     (Album.snoozed_until.is_(None)) | (Album.snoozed_until <= now),
                 )
                 .order_by(Album.saved_at)
             )
-            return [DecideRow(r[0], r[1], r[2], r[3], r[4]) for r in rows]
+            return [SavedCandidate(r[0], r[1], r[2], r[3], r[4], r[5]) for r in rows]
+
+    def play_stats_by_album(self) -> dict[str, PlayStat]:
+        """Per-Spotify-album play stats from the accumulated play history (§4a)."""
+        with self._sf() as session:
+            rows = session.execute(
+                select(
+                    PlayHistory.spotify_album_id,
+                    func.count(func.distinct(PlayHistory.spotify_track_id)),
+                    func.min(PlayHistory.played_at),
+                    func.max(PlayHistory.played_at),
+                )
+                .where(PlayHistory.spotify_album_id.is_not(None))
+                .group_by(PlayHistory.spotify_album_id)
+            )
+            return {
+                r[0]: PlayStat(distinct_tracks=r[1], first_played=r[2], last_played=r[3])
+                for r in rows
+            }
+
+    def add_plays(self, plays: list[Play]) -> int:
+        """Append plays, ignoring ones already recorded (unique on track + played_at)."""
+        if not plays:
+            return 0
+        with self._sf() as session:
+            # RETURNING counts rows actually inserted (skipped conflicts aren't returned);
+            # psycopg3's rowcount is unreliable (-1) for a multi-row ON CONFLICT insert.
+            inserted = session.execute(
+                pg_insert(PlayHistory)
+                .values(
+                    [
+                        {
+                            "spotify_track_id": p.spotify_track_id,
+                            "spotify_album_id": p.spotify_album_id,
+                            "played_at": p.played_at,
+                        }
+                        for p in plays
+                    ]
+                )
+                .on_conflict_do_nothing(constraint="uq_play")
+                .returning(PlayHistory.id)
+            ).all()
+            session.commit()
+            return len(inserted)
 
     def set_verdict(self, album_id: int, state: AlbumState, verdict_at: datetime) -> None:
         """Keep/drop: only a `saved` album can receive a verdict."""

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from .adapters.album_repo import AlbumRepo
-from .domain.verdict import forgotten_reason
+from .domain.verdict import ZERO_PLAYS, verdict_reason
 from .models import AlbumState
 from .ports.clock import Clock
 
@@ -17,28 +17,44 @@ class DecideItem:
 
 
 class DecideService:
-    """The Decide worklist (§6a/§8d): surface saved albums ready to judge, and record the
-    keep/drop/snooze verdicts. v1 uses only the time-based 'forgotten' trigger."""
+    """The Decide worklist (§6a/§8d): surface saved albums ready to judge — via the
+    time-based 'forgotten' trigger or the play-history 'listened' trigger — and record the
+    keep/drop/snooze verdicts."""
 
-    def __init__(self, *, repo: AlbumRepo, clock: Clock, forgotten_days: int, snooze_days: int):
+    def __init__(
+        self,
+        *,
+        repo: AlbumRepo,
+        clock: Clock,
+        forgotten_days: int,
+        snooze_days: int,
+        listened_tracks: int,
+        listened_days: int,
+    ):
         self._repo = repo
         self._clock = clock
         self._forgotten_days = forgotten_days
         self._snooze_days = snooze_days
+        self._listened_tracks = listened_tracks
+        self._listened_days = listened_days
 
     def queue(self) -> list[DecideItem]:
         now = self._clock.now()
-        cutoff = now - timedelta(days=self._forgotten_days)
-        return [
-            DecideItem(
-                id=row.id,
-                artist=row.artist,
-                title=row.title,
-                reason=forgotten_reason(row.saved_at, now),
-                has_art=row.has_art,
+        stats = self._repo.play_stats_by_album()
+        items: list[DecideItem] = []
+        for cand in self._repo.saved_pending(now):
+            stat = stats.get(cand.spotify_id) if cand.spotify_id else None
+            reason = verdict_reason(
+                saved_at=cand.saved_at,
+                now=now,
+                stat=stat or ZERO_PLAYS,
+                forgotten_days=self._forgotten_days,
+                listened_tracks=self._listened_tracks,
+                listened_days=self._listened_days,
             )
-            for row in self._repo.decide_queue(cutoff, now)
-        ]
+            if reason:
+                items.append(DecideItem(cand.id, cand.artist, cand.title, reason, cand.has_art))
+        return items
 
     def keep(self, album_id: int) -> None:
         self._repo.set_verdict(album_id, AlbumState.wanted, self._clock.now())

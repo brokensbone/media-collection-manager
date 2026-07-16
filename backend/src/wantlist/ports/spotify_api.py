@@ -14,9 +14,18 @@ class SavedAlbum:
     art_url: str | None
 
 
+@dataclass
+class Play:
+    spotify_track_id: str
+    spotify_album_id: str | None
+    played_at: datetime
+
+
 class SpotifyApiClient(Protocol):
     """Read-only Spotify data we depend on (SPEC §4). Base URL is injected (§14)."""
 
     def saved_albums(self, access_token: str) -> Iterable[SavedAlbum]: ...
 
     def album_isrcs(self, access_token: str, album_id: str) -> list[str]: ...
+
+    def recently_played(self, access_token: str) -> list[Play]: ...

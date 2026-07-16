@@ -4,7 +4,7 @@ from typing import Any
 
 import httpx
 
-from ..ports.spotify_api import SavedAlbum
+from ..ports.spotify_api import Play, SavedAlbum
 
 
 class HttpxSpotifyApiClient:
@@ -39,6 +39,24 @@ class HttpxSpotifyApiClient:
                 if isrc:
                     isrcs.append(isrc)
         return isrcs
+
+    def recently_played(self, access_token: str) -> list[Play]:
+        """The last ~50 plays (SPEC §4a). No deep history exists; we accumulate over time."""
+        headers = {"Authorization": f"Bearer {access_token}"}
+        data = self._get_json(f"{self._api_url}/me/player/recently-played?limit=50", headers)
+        plays: list[Play] = []
+        for item in data.get("items", []):
+            track = item.get("track") or {}
+            if not track.get("id") or not item.get("played_at"):
+                continue
+            plays.append(
+                Play(
+                    spotify_track_id=track["id"],
+                    spotify_album_id=(track.get("album") or {}).get("id"),
+                    played_at=datetime.fromisoformat(item["played_at"]),
+                )
+            )
+        return plays
 
     @staticmethod
     def _get_json(url: str, headers: dict[str, str]) -> dict[str, Any]:

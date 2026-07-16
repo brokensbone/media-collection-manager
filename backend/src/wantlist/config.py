@@ -32,10 +32,14 @@ class Settings(BaseSettings):
     saves_poll_seconds: int = 3600
     art_target_px: int = 300
 
-    # Verdict / Decide (§6a). v1 ships the time-based "forgotten" trigger; the "listened"
-    # trigger arrives with play-history (D8).
+    # Verdict / Decide (§6a): the "forgotten" (time) and "listened" (play-history) triggers.
     verdict_forgotten_days: int = 21
     verdict_snooze_days: int = 14
+    verdict_listened_tracks: int = 4
+    verdict_listened_days: int = 3
+
+    # Play-history polling (§4a).
+    recently_played_poll_seconds: int = 1800
 
     # MusicBrainz resolution (§5, §11). Base URL overridable for tests/E2E (§14).
     musicbrainz_url: str = "https://musicbrainz.org/ws/2"
