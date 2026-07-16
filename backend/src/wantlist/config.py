@@ -12,3 +12,18 @@ class Settings(BaseSettings):
     # beets seam (§5): the command may be `beet`, `docker exec … beet`, `ssh … beet`, etc.
     beets_command: str = "beet"
     beets_config: str | None = None
+
+    # Spotify (§8c). Base URLs are overridable so E2E can point at a stub (§14).
+    spotify_client_id: str = ""
+    spotify_client_secret: str = ""
+    spotify_redirect_uri: str = "http://127.0.0.1:8000/auth/spotify/callback"
+    spotify_scopes: str = "user-library-read"  # §6b adds user-library-modify
+    spotify_accounts_url: str = "https://accounts.spotify.com"
+    spotify_api_url: str = "https://api.spotify.com/v1"
+
+    # Re-auth countdown (§8c): refresh tokens expire ~6 months after authorization.
+    reauth_lifetime_days: int = 183
+    reauth_warn_days: int = 21
+
+    # Where to send the browser after a successful callback.
+    frontend_url: str = "/"
