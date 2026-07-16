@@ -1,0 +1,43 @@
+import { useCallback, useEffect, useState } from 'react'
+
+type Item = { id: number; name: string; matched_album_id: number | null; matched: string | null }
+
+export function Imports() {
+  const [items, setItems] = useState<Item[] | null>(null)
+
+  useEffect(() => {
+    fetch('/imports')
+      .then((r) => r.json())
+      .then(setItems)
+      .catch(() => setItems([]))
+  }, [])
+
+  const runImport = useCallback((id: number) => {
+    setItems((list) => {
+      if (!list) return list
+      fetch(`/imports/${id}/import`, { method: 'POST' })
+      return list.filter((it) => it.id !== id)
+    })
+  }, [])
+
+  if (!items) return <p>Loading…</p>
+  if (items.length === 0) return <p>No downloads to import.</p>
+
+  return (
+    <table>
+      <tbody>
+        {items.map((it) => (
+          <tr key={it.id}>
+            <td>{it.name}</td>
+            <td>{it.matched ?? <span className="muted">no match</span>}</td>
+            <td>
+              <button type="button" onClick={() => runImport(it.id)}>
+                Import
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}

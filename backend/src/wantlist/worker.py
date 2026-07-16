@@ -7,6 +7,7 @@ from .jobs import (
     alerts_once,
     ingest_once,
     poll_plays_once,
+    poll_transmission_once,
     reconcile_once,
     watch_artists_once,
 )
@@ -44,6 +45,14 @@ def build_scheduler(settings: Settings) -> BlockingScheduler:
         args=[settings],
         id="artist_watch",
     )
+    if settings.transmission_rpc_url:
+        scheduler.add_job(
+            poll_transmission_once,
+            "interval",
+            seconds=settings.transmission_poll_seconds,
+            args=[settings],
+            id="transmission",
+        )
     scheduler.add_job(
         alerts_once,
         "interval",
@@ -61,6 +70,7 @@ def main() -> None:
     reconcile_once(settings)
     poll_plays_once(settings)
     watch_artists_once(settings)
+    poll_transmission_once(settings)
     alerts_once(settings)
     build_scheduler(settings).start()
 

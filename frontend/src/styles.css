@@ -97,3 +97,6 @@ button:hover {
 a {
   color: var(--accent);
 }
+.muted {
+  color: var(--muted);
+}

@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     notify_triage_threshold: int = 10
     alerts_poll_seconds: int = 3600
 
+    # Transmission auto-land (§12, D14). Empty rpc url = disabled. The seedbox download dir
+    # is assumed reachable as files (a mount); imports COPY (never move) so seeding is safe.
+    transmission_rpc_url: str = ""
+    transmission_user: str = ""
+    transmission_password: str = ""
+    import_inbox_path: str = "/inbox"
+    transmission_poll_seconds: int = 3600
+    import_match_threshold: float = 0.5
+
     # MusicBrainz resolution (§5, §11). Base URL overridable for tests/E2E (§14).
     musicbrainz_url: str = "https://musicbrainz.org/ws/2"
     musicbrainz_user_agent: str = "wantlist/0.1 ( https://github.com/EdwardSalkeld )"

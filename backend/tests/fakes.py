@@ -4,6 +4,7 @@ from datetime import datetime
 from wantlist.adapters.token_store import StoredAuth
 from wantlist.ports.spotify import ReauthRequired, SpotifyTokens
 from wantlist.ports.spotify_api import Play, SavedAlbum
+from wantlist.ports.transmission import Torrent
 
 
 class StubTokens:
@@ -68,6 +69,24 @@ class StubOwnedReleaseGroups:
 
     def owned_release_group_ids(self) -> set[str]:
         return set(self._owned)
+
+
+class StubTransmissionClient:
+    def __init__(self, torrents: Iterable[Torrent] = ()) -> None:
+        self._torrents = list(torrents)
+
+    def completed_torrents(self) -> list[Torrent]:
+        return list(self._torrents)
+
+
+class RecordingBeetsClient:
+    """Records the folders handed to `import_dir` (used to assert the import ran)."""
+
+    def __init__(self) -> None:
+        self.imported: list[str] = []
+
+    def import_dir(self, path: str) -> None:
+        self.imported.append(path)
 
 
 def fake_fetch_image(url: str) -> tuple[str, bytes]:

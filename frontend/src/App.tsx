@@ -2,6 +2,7 @@ import './styles.css'
 import { Acquire } from './Acquire'
 import { Dashboard } from './Dashboard'
 import { Decide } from './Decide'
+import { Imports } from './Imports'
 import { Library } from './Library'
 import { Releases } from './Releases'
 import { SpotifyStatus } from './SpotifyStatus'
@@ -20,6 +21,8 @@ export default function App() {
       <Decide />
       <h2>Acquire</h2>
       <Acquire />
+      <h2>Import</h2>
+      <Imports />
       <h2>Owned</h2>
       <Library state="owned" />
       <h2>Dismissed</h2>
