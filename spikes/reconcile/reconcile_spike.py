@@ -80,6 +80,7 @@ def _catch_callback(port: int) -> str:
 
 
 def spotify_token(client_id: str, client_secret: str, redirect: str, cache: Path) -> str:
+    cache.parent.mkdir(parents=True, exist_ok=True)
     tok = _load_token(cache)
     now = time.time()
     if tok and tok.get("expires_at", 0) > now + 60:
@@ -358,6 +359,7 @@ def main() -> None:
         raise SystemExit("Set --client-id/--client-secret (or SPOTIFY_CLIENT_ID/SECRET).")
 
     work = Path(args.work_dir)
+    work.mkdir(parents=True, exist_ok=True)
     owned, total_owned, with_id = owned_rgids(args.beets_cmd, args.beets_config, args.owned_file)
     print(f"beets: {total_owned} owned albums, {with_id} with a release-group id")
 
