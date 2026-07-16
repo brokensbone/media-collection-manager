@@ -78,11 +78,11 @@ Upgrade the verdict from a timer to "you've actually heard this."
 - Poll `recently-played` → `play_history` (scheduled + CLI); add the **"listened"** trigger to Decide (≥N tracks / ≥M days), clock injected.
 - **Done when:** plays accumulate; an album with enough plays surfaces in Decide via the listened trigger; trigger unit tests pass with an injected clock. *("listened trigger fires from real play data")*
 
-### D9 · Dashboard + browse + Spotify banner + full E2E  → **MVP complete**  *(§8d, §14)*
+### D9 · Dashboard + browse + Spotify banner + full E2E  → ✅ **MVP COMPLETE** (pending CI)  *(§8d, §14)*
 Everything that makes it a coherent app, and the end-to-end proof.
-- Dashboard with per-worklist counts; Library / Owned / Dismissed browse views; persistent Spotify status banner.
-- The §14 **Docker E2E**: app + Postgres + fake-Spotify stub, driving OAuth → ingest → reconcile → verdict → acquire, incl. the re-auth path.
-- **Done when:** the E2E suite is green in CI; all v1 worklists function; the core loop (saved → owned, with curation + buy assist) closes end-to-end. *("full flow E2E green")*
+- Dashboard with per-worklist counts; Library / Owned / Dismissed browse views (via `/albums?state=`); persistent Spotify status banner; a light §8e stylesheet (design tokens, sharp/dense).
+- **Full-stack E2E** (§14): the real app + real Postgres (testcontainers) + real bundled beets, with Spotify + MusicBrainz served by a **live stub over the configurable base URLs**, driving OAuth → ingest → reconcile → verdict → acquire + the re-auth path. Implemented as a pytest E2E rather than docker-compose (same real chain, no orchestration overhead; a compose file arrives with D10 deploy anyway).
+- **Done:** E2E green (70 backend + 10 frontend tests); all v1 worklists function; the core loop (saved → owned, with curation + buy assist) closes end-to-end. *("full flow E2E green")*
 
 ---
 

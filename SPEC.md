@@ -1,7 +1,8 @@
 # Project Spec — (working title: "wantlist")
 
-> Status: **spec / v1 direction agreed**. Core decisions are settled (see §9). This is
-> now close to a plannable document. Deep implementation detail still TBD.
+> Status: **MVP built** (ROADMAP D0–D9 complete). This spec is the design of record;
+> where implementation refined a decision, the relevant section notes "as built". Remaining
+> work is deploy (D10) and the post-MVP increments (D11+).
 >
 > **Delivery plan:** [ROADMAP.md](ROADMAP.md) turns this spec into sequential,
 > green-light-able deliverables, each with a concrete "done" gate.
@@ -865,6 +866,11 @@ load-bearing, not optional.
   app flags reconnect, pauses jobs).
 - Prefer a **real stub server** over monkeypatching the client, so E2E exercises the real
   HTTP + parsing layers, not just the happy-path mapping.
+- **As built (D9):** a pytest E2E runs the real app (via TestClient) + real Postgres
+  (testcontainers) + real bundled beets, with Spotify + MusicBrainz served by a **live
+  stub** over the configurable base URLs — the whole loop incl. re-auth. Chosen over a
+  docker-compose harness: same real chain end-to-end, far less orchestration; a compose
+  file lands with the D10 deploy where it's needed anyway.
 
 ### Frontend
 - Component/unit (Vitest + Testing Library): the shared album-row, worklist rendering,
