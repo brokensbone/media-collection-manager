@@ -1,17 +1,15 @@
-import shlex
 import subprocess
 
 
 class BeetsClient:
-    """The beets CLI seam (SPEC §5) — the ONLY place we touch beets. Command is configurable
-    (`beet`, `docker exec … beet`, `ssh … beet`), never raw SQLite (which locked constantly)."""
+    """The beets CLI seam (SPEC §5) — the ONLY place we touch beets. beets is bundled, so
+    we run `beet` directly; the config points at the mounted library. Never raw SQLite."""
 
-    def __init__(self, command: str, config: str | None = None) -> None:
-        self._command = command
+    def __init__(self, config: str | None = None) -> None:
         self._config = config
 
     def owned_release_group_ids(self) -> set[str]:
-        argv = shlex.split(self._command)
+        argv = ["beet"]
         if self._config:
             argv += ["-c", self._config]
         argv += ["list", "-a", "-f", "$mb_releasegroupid"]

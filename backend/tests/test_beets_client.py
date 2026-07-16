@@ -24,5 +24,5 @@ def _make_beets_library(tmp_path: Path) -> str:
 
 def test_owned_release_group_ids_from_real_beets(tmp_path: Path) -> None:
     config = _make_beets_library(tmp_path)
-    owned = BeetsClient("beet", config=config).owned_release_group_ids()
+    owned = BeetsClient(config=config).owned_release_group_ids()
     assert owned == {"rg-1", "rg-2"}  # the id-less album contributes a blank line, dropped

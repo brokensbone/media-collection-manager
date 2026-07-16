@@ -64,6 +64,6 @@ def build_ownership_reconciler(
     settings: Settings, session_factory: sessionmaker[Session]
 ) -> OwnershipReconciler:
     return OwnershipReconciler(
-        beets=BeetsClient(settings.beets_command, settings.beets_config),
+        beets=BeetsClient(settings.beets_config),
         repo=AlbumRepo(session_factory),
     )

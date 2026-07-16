@@ -244,13 +244,11 @@ raw SQLite anywhere.
   It runs behind a small "beets query" seam — v1 needs essentially **one operation**,
   "list all owned release-group ids" — via the CLI (not raw SQLite; the locking lesson
   above). Resolves the earlier mount-vs-sidecar question in favour of **bundle + mount**.
-  - **The config knob is a path to the beets config** (`-c` / `BEETSDIR`), whose
+  - **The one config knob is a path to the beets config** (`-c` / `BEETSDIR`), whose
     `library:` / `directory:` point at the **mounted** `library.db` (and, for imports, the
     music dir). So the deployment requirement is: *mount the beets library where the app
-    can read it, and point the config at it* — not "provide a beet command".
-  - **Escape hatch retained:** `beets_command` still defaults to the bundled `beet` but can
-    be overridden (`ssh … beet`, `docker exec … beet`) for a genuinely-remote, unmountable
-    beets. Not the expected path, just a bridge left un-burned.
+    can read it, and point the config at it*. (If beets ever genuinely had to be remote and
+    unmountable, we'd add a seam then — but that's not a case we have, so no knob for it.)
   - **Bonus:** because beets is bundled, CI and tests run **real beets** (build a tiny
     library via its API — no audio needed — and query it), not a stub.
 
@@ -407,7 +405,7 @@ to the code.
 | Requirement | Config | Notes |
 |---|---|---|
 | PostgreSQL backend | host, port, database, user, password (or a single `DATABASE_URL`) | The app runs its own migrations on the given database. |
-| Beets | beets config path (points at the **mounted** `library.db` + music) | beets is **bundled** in the image (a pinned dep); mount the library where the app can read it. `beets_command` defaults to the bundled `beet`; override only for a remote beets (§5). |
+| Beets | beets config path (points at the **mounted** `library.db` + music) | beets is **bundled** in the image (a pinned dep); mount the library where the app can read it (§5). |
 | Spotify API | client id/secret, **redirect URI** (public HTTPS, registered in the Spotify dashboard), token store, **overridable base URL** | Authorization Code flow via a thin httpx adapter (§15); see §8c for redirect-URI rules and 6-month re-auth. Read-only scopes for v1; **`user-library-modify`** added when §6b lands. Base URL overridable so E2E can point at a stub (§14) — likewise MB/CAA. |
 | Tunables | 6a thresholds, poll intervals, Bandcamp/base URLs, re-auth warning lead time | Sensible defaults; all overridable. |
 

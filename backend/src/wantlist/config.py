@@ -9,10 +9,8 @@ class Settings(BaseSettings):
     # Storage
     database_url: str = "postgresql+psycopg://localhost:5432/wantlist"
 
-    # beets seam (§5): beets is bundled, so the main knob is a path to the beets config
-    # (its `library:`/`directory:` point at the mounted library.db + music). `beets_command`
-    # defaults to the bundled `beet`; override only for a genuinely-remote beets (ssh/exec).
-    beets_command: str = "beet"
+    # beets seam (§5): beets is bundled; this points at the beets config, whose
+    # `library:`/`directory:` reference the mounted library.db + music.
     beets_config: str | None = None
 
     # Spotify (§8c). Base URLs are overridable so E2E can point at a stub (§14).
