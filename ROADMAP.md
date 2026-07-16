@@ -14,13 +14,14 @@ and de-risks the one hard part before anything is built around it.
 
 ## P0 — De-risk & foundations
 
-### D0 · Reconcile / identity spike  *(§11, standalone)*  — 🔧 tooling built, run pending
+### D0 · Reconcile / identity spike  *(§11, standalone)*  — ✅ done: **GO**
 Prove the Spotify→MusicBrainz→beets match on real data before committing the architecture.
-Tooling lives in [`spikes/reconcile/`](spikes/reconcile/) (verified offline). The beets
-side is proven end-to-end against a reproducible seeded library ([`fixtures/beets/`](fixtures/beets/),
-also the D2/D5/§14 fixture). Producing the **real** numbers needs two operator inputs: a
-Spotify app (client id/secret + loopback redirect) and a `beet list -a -f '$mb_releasegroupid'`
-dump from the real library — see the spike README.
+Ran on an 80-album real sample: **86% resolved** (barcode-first carries 56%), **98% beets
+coverage**, owned matches correct. The 14% tail is **MB-absent / not-real-albums, not a
+matching weakness** → **D16 (LLM Tier-3) dropped**; handle the tail with manual-match +
+periodic re-resolve, keeping unresolved albums as first-class wants (§5). Full write-up:
+[`spikes/reconcile/RESULTS.md`](spikes/reconcile/RESULTS.md). Tooling: [`spikes/reconcile/`](spikes/reconcile/);
+fixture: [`fixtures/beets/`](fixtures/beets/).
 - Standalone script: read-only Spotify + MB/CAA + `beet list` over a mixed ~50–100 album sample.
 - Measure resolution rate by tier, ownership accuracy (esp. false positives), the unresolved "hard bucket", and how many owned albums even carry an `mb_releasegroupid`.
 - **Done when:** a written result gives a go/no-go on the ISRC→MB→release-group chain, and answers whether an LLM Tier-3 (§5a) is needed (fat tail?) or the tail can go to a manual inbox.
@@ -114,17 +115,24 @@ Make it real. (Independent of dev — can land as soon as the blink→nix conver
 - Watch a dir → unpack zip → match (embedded tags) → import; no-match import allowed; original archived/deleted per config.
 - **Done when:** dropping a fixture zip results in unpack → import → `owned`, and the no-match path works; tests pass. *("drop zip → owned")*
 
-### D16 · LLM Tier-3 adjudicator  *(§5a — conditional on D0)*
-Only if the D0 spike showed a fat unresolved tail worth automating.
-- Batch job over unresolved albums; LLM adjudicates ambiguous matches, **abstains → human inbox**; writes a resolved release-group id (with confidence/provenance) so reconcile treats it as any other match.
-- **Done when:** previously-unresolved albums are resolved or escalated at a measured precision that beats sending the whole tail to the manual inbox. *("shrinks the tail at measured precision")*
+### D16 · LLM Tier-3 adjudicator  *(§5a)*  — ❌ dropped by D0
+The D0 spike showed the unresolved tail is **MB-absent / not-real-albums, not
+fuzzy-matchable**, so an LLM can't move the number. Superseded by the tail-handling in
+D17. Revisit only if edition-disambiguation false positives later prove a distinct problem.
+
+### D17 · Unresolved-tail handling  *(§5 — replaces D16, post-MVP)*
+Make the ~14% MB-absent tail a non-problem rather than trying to auto-resolve it.
+- Unresolved albums stay first-class `wanted` (ownership just not auto-derived); a
+  **manual-match** action (paste a MusicBrainz release-group id/URL, or mark owned); and a
+  **periodic re-resolve** job that retries unresolved albums as MB grows.
+- **Done when:** an unresolved album can be manually matched and then reconciles normally, and re-resolve picks up a formerly-missing release once it exists in MB. *("the tail stops being a dead end")*
 
 ---
 
 ## Critical path & notes
 - **D0 → D1 → D2** are foundations; **D3–D9** are the MVP spine and are mostly linear
-  (D5 depends on D4; D6 on D5; D7 on D6; D8 enriches D6). D0's result may insert D16 or a
-  manual-match escape hatch earlier.
+  (D5 depends on D4; D6 on D5; D7 on D6; D8 enriches D6). D0 is done (GO): it dropped D16
+  and added D17 (manual-match + re-resolve) as the tail's handling.
 - Dev + CI run entirely on local + testcontainers, so **D10 (deploy) is not on the
   critical path** — pull it forward the moment blink is nix-ready if you'd rather deploy a
   walking skeleton early.

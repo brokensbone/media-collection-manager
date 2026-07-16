@@ -216,6 +216,13 @@ raw SQLite anywhere.
   **once per album at ingest** and the result is stored. Ownership reconcile is then a
   pure deterministic join on the stored id, run continuously and cheaply. Keep the
   expensive/fuzzy step off the hot path.
+- **Unresolved is a first-class state, not a failure.** The D0 spike (§11) found ~14% of
+  saved albums don't resolve — mostly because they're **absent from MusicBrainz** or
+  aren't real album releases, *not* a matching weakness. So an unresolved album stays a
+  normal `wanted` (you still saved it); ownership just can't be auto-derived. Handle the
+  tail (post-MVP, ROADMAP D17) with: a **manual-match** action (paste a release-group
+  id/URL, or mark owned) and a **periodic re-resolve** that retries as MB grows. No LLM
+  needed — the tail isn't fuzzy-matchable.
 - **Beets access is config-driven, behind a small interface.** The app depends on an
   abstract "beets query" seam, not on beets living in any particular place. v1 needs
   essentially **one operation** — "list all owned release-group ids" — which keeps the
@@ -257,6 +264,12 @@ The three tiers split cleanly into two kinds of work:
 1+2 already cover ~95%, the cheapest good design is: exact-match the bulk, dump the small
 tail straight into the human triage inbox, skip the LLM entirely. If the tail is fat and
 an LLM meaningfully shrinks the manual work, it's worth adding. Measure first.
+
+**Resolved by D0 (§11): not building it.** The spike showed the unresolved tail is
+**MB-absent / not-real-albums, not fuzzy-matchable** — an LLM can't resolve a release-group
+that doesn't exist. So the LLM Tier-3 is **dropped** (ROADMAP D16 → D17); the tail is
+handled by manual-match + re-resolve (§5) instead. Reconsider only if edition-mismatch
+false positives later emerge as a distinct problem.
 
 **If built:** run it as a *batch* over unresolved albums (a scheduled job / skill — fits
 the existing `blink` scheduler and skills setup), never inline on the continuous
@@ -547,7 +560,7 @@ keep/drop/snooze.
 | Model | One `Album` table with a state field (`suggested→saved→wanted→acquiring→owned`/`dismissed`) — not two tables. |
 | Reconcile | **Beets CLI** behind a config-driven seam (command + config path), not direct SQLite (raw SQLite locked constantly). One `beet list -a -f '$mb_releasegroupid'` dump → in-memory diff (§5). |
 | Identity | MusicBrainz release-group as the spine; 3-tier resolution (barcode → ISRC-cluster → fuzzy). Resolve once at ingest, store the id; reconcile is a deterministic join thereafter (§5). |
-| LLM matching | Keep Tiers 1–2 deterministic. LLM only as a Tier-3 adjudicator that may abstain → human inbox, run as a batch off the hot path. Build-or-skip gated by the §11 spike (§5a). |
+| LLM matching | **Not building it** — the D0 spike showed the unresolved tail is MB-absent, not fuzzy-matchable, so an LLM can't help. Tail handled by manual-match + re-resolve instead (§5, §5a, ROADMAP D17). |
 | Play history | Poll `recently-played` from install; **no** GDPR backfill (accept cold-start, §4a/§6a). |
 | 6a thresholds | listened = ≥4 tracks or ≥3 days; forgotten = ≥21 days & <2 plays. Config-tunable. |
 | 6b seed set | Union of kept-album artists **and** followed artists. (Not in v1.) |
@@ -616,6 +629,11 @@ core, or the whole thing silently dies within 6 months.
   the "land" step. This is where acquired files enter and trigger reconcile.
 
 ## 11. Reconcile / identity spike (do before building around §5)
+
+> **Done — verdict GO.** 80-album real sample: 86% resolved (barcode-first carries 56%),
+> 98% beets coverage, owned matches correct; the 14% tail is MB-absent, not a matching
+> weakness → LLM Tier-3 dropped, tail handled per §5. Tooling + full write-up:
+> [`spikes/reconcile/`](spikes/reconcile/) (`RESULTS.md`).
 
 **Why:** the Spotify→MusicBrainz→beets match is the single technical risk — it's what
 made the old system only "sort of work." A want-list that mis-judges ownership is
