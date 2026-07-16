@@ -20,9 +20,18 @@ class StubTokens:
 
 
 class StubSpotifyApiClient:
-    def __init__(self, albums: Iterable[SavedAlbum] = (), plays: Iterable[Play] = ()) -> None:
+    def __init__(
+        self,
+        albums: Iterable[SavedAlbum] = (),
+        plays: Iterable[Play] = (),
+        followed: Iterable[str] = (),
+        artist_albums: dict[str, list[SavedAlbum]] | None = None,
+    ) -> None:
         self._albums = list(albums)
         self._plays = list(plays)
+        self._followed = list(followed)
+        self._artist_albums = artist_albums or {}
+        self.saved_calls: list[str] = []
 
     def saved_albums(self, access_token: str) -> Iterable[SavedAlbum]:
         return list(self._albums)
@@ -32,6 +41,15 @@ class StubSpotifyApiClient:
 
     def recently_played(self, access_token: str) -> list[Play]:
         return list(self._plays)
+
+    def followed_artist_ids(self, access_token: str) -> list[str]:
+        return list(self._followed)
+
+    def artist_albums(self, access_token: str, artist_id: str) -> list[SavedAlbum]:
+        return list(self._artist_albums.get(artist_id, []))
+
+    def save_album(self, access_token: str, spotify_album_id: str) -> None:
+        self.saved_calls.append(spotify_album_id)
 
 
 class StubMusicBrainzResolver:

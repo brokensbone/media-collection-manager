@@ -3,6 +3,7 @@ import logging
 from .config import Settings
 from .db import make_engine, make_session_factory
 from .factories import (
+    build_artist_watch_service,
     build_ingest_service,
     build_ownership_reconciler,
     build_play_history_service,
@@ -51,8 +52,22 @@ def poll_plays_once(settings: Settings | None = None) -> None:
     log.info("play-history: added=%s paused=%s", result.added, result.paused)
 
 
+def watch_artists_once(settings: Settings | None = None) -> None:
+    """One artist-watch pass — surface new releases as suggested (§6b)."""
+    settings = settings or Settings()
+    session_factory = make_session_factory(make_engine(settings.database_url))
+    result = build_artist_watch_service(settings, session_factory).poll()
+    log.info(
+        "artist-watch: artists=%s added=%s paused=%s",
+        result.artists,
+        result.added,
+        result.paused,
+    )
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     ingest_once()
     reconcile_once()
     poll_plays_once()
+    watch_artists_once()

@@ -48,6 +48,7 @@ class IngestService:
             self._repo.add_saved_album(
                 spotify_id=album.spotify_id,
                 artist=album.artist,
+                artist_id=album.artist_id,
                 title=album.title,
                 upc=album.upc,
                 added_at=album.added_at,

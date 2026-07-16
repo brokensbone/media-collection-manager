@@ -50,6 +50,7 @@ class Album(Base):
     spotify_id: Mapped[str | None] = mapped_column(unique=True, index=True)
     mb_releasegroup_id: Mapped[str | None] = mapped_column(index=True)
     artist: Mapped[str]
+    artist_id: Mapped[str | None] = mapped_column(index=True, default=None)  # primary artist (§6b)
     title: Mapped[str]
     upc: Mapped[str | None] = mapped_column(default=None)
     art_url: Mapped[str | None] = mapped_column(default=None)  # source URL; blob in album_art

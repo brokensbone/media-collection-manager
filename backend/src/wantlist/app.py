@@ -8,13 +8,14 @@ from .adapters.clock import SystemClock
 from .config import Settings
 from .db import make_engine, make_session_factory
 from .decide import DecideService
-from .factories import build_auth_service
+from .factories import build_auth_service, build_releases_service
 from .routers import acquire as acquire_router
 from .routers import art as art_router
 from .routers import auth as auth_router
 from .routers import dashboard as dashboard_router
 from .routers import decide as decide_router
 from .routers import library as library_router
+from .routers import releases as releases_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -36,12 +37,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         listened_days=settings.verdict_listened_days,
     )
     app.state.acquire_service = AcquireService(repo=AlbumRepo(session_factory), clock=SystemClock())
+    app.state.releases_service = build_releases_service(settings, session_factory)
     app.include_router(auth_router.router)
     app.include_router(art_router.router)
     app.include_router(library_router.router)
     app.include_router(decide_router.router)
     app.include_router(acquire_router.router)
     app.include_router(dashboard_router.router)
+    app.include_router(releases_router.router)
 
     @app.get("/health")
     def health_endpoint(request: Request) -> JSONResponse:
