@@ -279,6 +279,11 @@ class AlbumRepo:
             )
             session.commit()
 
+    def count_by_state(self) -> dict[str, int]:
+        with self._sf() as session:
+            rows = session.execute(select(Album.state, func.count()).group_by(Album.state))
+            return {state.value: count for state, count in rows}
+
     # --- library view ----------------------------------------------------------------
 
     def list_albums(self, state: str | None = None) -> list[AlbumSummary]:

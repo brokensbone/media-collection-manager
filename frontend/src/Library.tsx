@@ -8,18 +8,19 @@ type Album = {
   owned: boolean
 }
 
-export function Library() {
+export function Library({ state }: { state?: string }) {
   const [albums, setAlbums] = useState<Album[] | null>(null)
 
   useEffect(() => {
-    fetch('/albums')
+    const url = state ? `/albums?state=${state}` : '/albums'
+    fetch(url)
       .then((r) => r.json())
       .then(setAlbums)
       .catch(() => setAlbums([]))
-  }, [])
+  }, [state])
 
   if (!albums) return <p>Loading…</p>
-  if (albums.length === 0) return <p>No albums yet.</p>
+  if (albums.length === 0) return <p>Nothing here.</p>
 
   return (
     <table>

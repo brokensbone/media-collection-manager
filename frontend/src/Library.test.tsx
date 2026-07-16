@@ -30,6 +30,6 @@ describe('Library', () => {
   it('shows an empty state', async () => {
     mockAlbums([])
     render(<Library />)
-    expect(await screen.findByText(/No albums yet/)).toBeTruthy()
+    expect(await screen.findByText(/Nothing here/)).toBeTruthy()
   })
 })
