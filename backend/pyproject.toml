@@ -11,7 +11,7 @@ dependencies = [
     "alembic>=1.13",
     "psycopg[binary]>=3.2",
     "apscheduler>=3.10",
-    "beets>=2.2",
+    "beets>=2.12",
 ]
 
 [dependency-groups]
