@@ -14,8 +14,14 @@ and de-risks the one hard part before anything is built around it.
 
 ## P0 — De-risk & foundations
 
-### D0 · Reconcile / identity spike  *(§11, standalone)*
+### D0 · Reconcile / identity spike  *(§11, standalone)*  — ✅ done: **GO**
 Prove the Spotify→MusicBrainz→beets match on real data before committing the architecture.
+Ran on an 80-album real sample: **86% resolved** (barcode-first carries 56%), **98% beets
+coverage**, owned matches correct. The 14% tail is **MB-absent / not-real-albums, not a
+matching weakness** → **D16 (LLM Tier-3) dropped**; handle the tail with manual-match +
+periodic re-resolve, keeping unresolved albums as first-class wants (§5). Full write-up:
+[`spikes/reconcile/RESULTS.md`](spikes/reconcile/RESULTS.md). Tooling: [`spikes/reconcile/`](spikes/reconcile/);
+fixture: [`fixtures/beets/`](fixtures/beets/).
 - Standalone script: read-only Spotify + MB/CAA + `beet list` over a mixed ~50–100 album sample.
 - Measure resolution rate by tier, ownership accuracy (esp. false positives), the unresolved "hard bucket", and how many owned albums even carry an `mb_releasegroupid`.
 - **Done when:** a written result gives a go/no-go on the ISRC→MB→release-group chain, and answers whether an LLM Tier-3 (§5a) is needed (fat tail?) or the tail can go to a manual inbox.
@@ -53,17 +59,19 @@ Pull the firehose in, once each, with covers.
 The risky core, now wired in — plus the first real read-only screen.
 - ISRC→MB→release-group resolution (resolve-once, store the id); `beet list -a -f '$mb_releasegroupid'` dump → in-memory diff → derive `owned`. MB/CAA adapters (configurable base URL, rate-limit, User-Agent).
 - A read-only Library / Owned view so results are visible.
-- **Done when:** against saved albums + a seeded beets fixture, reconcile marks the owned ones `owned` and leaves the rest — matching D0's approach; matching logic unit-tested; integration test hits the beets fixture; accuracy on the fixture recorded. *("ownership derived correctly against beets")*
+- Ownership link carries a **source** (`auto` from reconcile vs `manual` sticky link, §4) — reconcile computes auto-ownership and never clobbers a manual link. (The manual *action* is D7; this deliverable just makes the model respect one.)
+- **Done when:** against saved albums + a seeded beets fixture, reconcile marks the owned ones `owned` and leaves the rest — matching D0's approach; a manual link is respected and survives a reconcile pass; matching logic unit-tested; integration test hits the beets fixture; accuracy on the fixture recorded. *("ownership derived correctly against beets")*
 
 ### D6 · Verdict + Decide worklist  *(§6a, §8d)*
 The curation gate — shipping first with the time-based trigger that works from day one.
 - State transitions `saved → wanted` / `dismissed`, plus Snooze; the **"forgotten"** trigger (saved ≥ T days, ~no plays). Decide worklist UI in the §8e aesthetic (per the [mockup](mockups/decide-worklist.html)); keyboard triage.
 - **Done when:** stale saves surface in Decide with the right "why"; keep→`wanted`, drop→`dismissed`, snooze all work via UI + API; state-machine unit tests pass. *("can triage saved → wanted/dismissed")*
 
-### D7 · Acquire worklist + Bandcamp + `acquiring`  *(§7, §8d)*
-Close the loop's manual middle with buy-assist.
+### D7 · Acquire worklist + Bandcamp + `acquiring` + manual link  *(§7, §8d)*
+Close the loop's manual middle with buy-assist — and make it always closable.
 - Acquire worklist over `wanted`; one-click Buy-on-Bandcamp search URL + fallbacks + paste-a-URL; **Mark as ordered** → `acquiring` (drops out of the queue); reconcile promotes `acquiring`/`wanted` → `owned`.
-- **Done when:** wanted albums show working buy links; mark-ordered moves to `acquiring`; when a matching album lands in beets, reconcile flips it `owned`; tests pass. *("wanted → owned with buy assist")*
+- **Link to library / mark owned** (minimal manual resolve, §4/§5): search beets, pick the album that satisfies the want → sticky `manual` link → `owned`. This is what lets edition-mismatch and MB-absent albums ever leave the buy list; required for the loop to close for the ~14% tail, so it's MVP.
+- **Done when:** wanted albums show working buy links; mark-ordered → `acquiring`; when a matching album lands in beets, reconcile flips it `owned`; **a manually-linked want (edition mismatch or MB-absent) reaches `owned` and stays there across reconcile**; tests pass. *("wanted → owned with buy assist, always closable")*
 
 ### D8 · Play-history + "listened" trigger  *(§4a, §6a)*
 Upgrade the verdict from a timer to "you've actually heard this."
@@ -109,17 +117,27 @@ Make it real. (Independent of dev — can land as soon as the blink→nix conver
 - Watch a dir → unpack zip → match (embedded tags) → import; no-match import allowed; original archived/deleted per config.
 - **Done when:** dropping a fixture zip results in unpack → import → `owned`, and the no-match path works; tests pass. *("drop zip → owned")*
 
-### D16 · LLM Tier-3 adjudicator  *(§5a — conditional on D0)*
-Only if the D0 spike showed a fat unresolved tail worth automating.
-- Batch job over unresolved albums; LLM adjudicates ambiguous matches, **abstains → human inbox**; writes a resolved release-group id (with confidence/provenance) so reconcile treats it as any other match.
-- **Done when:** previously-unresolved albums are resolved or escalated at a measured precision that beats sending the whole tail to the manual inbox. *("shrinks the tail at measured precision")*
+### D16 · LLM Tier-3 adjudicator  *(§5a)*  — ❌ dropped by D0
+The D0 spike showed the unresolved tail is **MB-absent / not-real-albums, not
+fuzzy-matchable**, so an LLM can't move the number. Superseded by the tail-handling in
+D17. Revisit only if edition-disambiguation false positives later prove a distinct problem.
+
+### D17 · Assisted tail handling  *(§5 — replaces D16, post-MVP)*
+Make the ~14% tail low-effort. (The *minimal* manual link already ships in D7; this is the
+assistance on top.)
+- **Fuzzy-suggested link candidates** — when linking a want, match it against the beets
+  library so it's one click (fuzzy is safe here; a human confirms).
+- **"Possibly already owned?" hint** in Acquire — proactively surface likely edition
+  mismatches (same artist + similar title, different/no rgid) so you don't re-buy.
+- **Periodic re-resolve** — retry unresolved albums as MB grows; also catches new releases.
+- **Done when:** linking a want offers correct candidates without manual search, likely-owned wants are flagged in Acquire, and re-resolve picks up a formerly-missing release once it exists in MB. *("the tail stops being a chore")*
 
 ---
 
 ## Critical path & notes
 - **D0 → D1 → D2** are foundations; **D3–D9** are the MVP spine and are mostly linear
-  (D5 depends on D4; D6 on D5; D7 on D6; D8 enriches D6). D0's result may insert D16 or a
-  manual-match escape hatch earlier.
+  (D5 depends on D4; D6 on D5; D7 on D6; D8 enriches D6). D0 is done (GO): it dropped D16
+  and added D17 (manual-match + re-resolve) as the tail's handling.
 - Dev + CI run entirely on local + testcontainers, so **D10 (deploy) is not on the
   critical path** — pull it forward the moment blink is nix-ready if you'd rather deploy a
   walking skeleton early.

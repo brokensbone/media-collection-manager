@@ -122,8 +122,13 @@ via the §6a verdict). Could be one table with a state field, or two — see ope
     look at, and reversibility doesn't distinguish the two.)
 - **Verdict timing fields:** saved-at, verdict-at (null = still awaiting judgement).
   Drives the 6a "surface saves older than N days with no verdict" query.
-- **Ownership link:** to the beets album when matched, else null. Recomputed on every
-  reconcile (§5).
+- **Ownership link:** the owned beets album (else null), with a **source**:
+  - `auto` — derived by reconcile from a release-group match; recomputed every pass (§5).
+  - `manual` — a link I made by hand to a specific beets album; **sticky** — reconcile
+    never overwrites or clears it (only re-surfaced if that beets album disappears).
+  Either sets state `owned`. The manual link is the **universal fallback** when
+  release-group ids don't match or don't exist — edition mismatches (saved the standard,
+  own the deluxe) and MB-absent albums (§5). It needs no MB id at all.
 - **Acquisition hints (optional):** candidate source links (Bandcamp, etc.), added
   manually or scraped read-only. Never acted on automatically.
 
@@ -216,6 +221,22 @@ raw SQLite anywhere.
   **once per album at ingest** and the result is stored. Ownership reconcile is then a
   pure deterministic join on the stored id, run continuously and cheaply. Keep the
   expensive/fuzzy step off the hot path.
+- **Unresolved is a first-class state, not a failure.** The D0 spike (§11) found ~14% of
+  saved albums don't resolve — mostly because they're **absent from MusicBrainz** or
+  aren't real album releases, *not* a matching weakness. So an unresolved album stays a
+  normal `wanted` (you still saved it); ownership just can't be *auto*-derived.
+- **The manual link makes the loop always closable — MVP.** Because MB is spotty and
+  editions diverge, the deterministic rgid join can't be the only way to reach `owned`.
+  A **manual link from a want to a specific beets album** (§4, sticky) is the universal
+  fallback: it needs no MB id, and it handles both edition mismatch (saved standard, own
+  deluxe) and MB-absent albums (buy it → import to beets → link the want → owned). A
+  *minimal* form of this ships in MVP — without it, those albums could never leave the
+  buy list even once owned.
+- **Assisted tail handling — post-MVP (ROADMAP D17):** fuzzy-suggested link candidates
+  (match the want against the beets library so linking is one click — fuzzy is safe here
+  because a human confirms), a proactive "you might already own this (different edition)?"
+  hint in Acquire, and a **periodic re-resolve** that retries unresolved albums as MB
+  grows. No LLM needed — the tail isn't fuzzy-matchable, just sometimes absent.
 - **Beets access is config-driven, behind a small interface.** The app depends on an
   abstract "beets query" seam, not on beets living in any particular place. v1 needs
   essentially **one operation** — "list all owned release-group ids" — which keeps the
@@ -257,6 +278,12 @@ The three tiers split cleanly into two kinds of work:
 1+2 already cover ~95%, the cheapest good design is: exact-match the bulk, dump the small
 tail straight into the human triage inbox, skip the LLM entirely. If the tail is fat and
 an LLM meaningfully shrinks the manual work, it's worth adding. Measure first.
+
+**Resolved by D0 (§11): not building it.** The spike showed the unresolved tail is
+**MB-absent / not-real-albums, not fuzzy-matchable** — an LLM can't resolve a release-group
+that doesn't exist. So the LLM Tier-3 is **dropped** (ROADMAP D16 → D17); the tail is
+handled by manual-match + re-resolve (§5) instead. Reconsider only if edition-mismatch
+false positives later emerge as a distinct problem.
 
 **If built:** run it as a *batch* over unresolved albums (a scheduled job / skill — fits
 the existing `blink` scheduler and skills setup), never inline on the continuous
@@ -471,9 +498,12 @@ releases → decide → acquire → import.
    tracks" / "saved 24 days ago, never played"), an open-in-Spotify link. Actions:
    **Keep** → `wanted` · **Drop** → `dismissed` · **Snooze** (not heard it yet).
 3. **Acquire** — albums in `wanted`. Item: artwork, artist/album, **Buy on Bandcamp**
-   (§7) + fallback links + paste-a-URL, and a **Mark as ordered** action that moves it to
-   `acquiring` (§4) — dropping it out of this queue until reconcile flips it `owned`.
-   (Cancel-order returns it to `wanted`.)
+   (§7) + fallback links + paste-a-URL; a **Mark as ordered** action that moves it to
+   `acquiring` (§4) — dropping it out until reconcile flips it `owned` (cancel-order
+   returns it to `wanted`); and a **Link to library / mark owned** action — search beets
+   and pick the album that satisfies this want (a sticky manual link, §4/§5) for edition
+   mismatches or MB-absent albums the rgid join can't catch. (D17 adds fuzzy-suggested
+   candidates + a "possibly already owned?" hint here.)
 4. **Import** — **extension-only (§12/§13); absent in v1.** Detected downloads
    (Transmission completions / watch-dir drops) awaiting the Import click. Item: source,
    matched want (or "no match → import as new owned"), **Import** button. In v1 landing is
@@ -547,7 +577,7 @@ keep/drop/snooze.
 | Model | One `Album` table with a state field (`suggested→saved→wanted→acquiring→owned`/`dismissed`) — not two tables. |
 | Reconcile | **Beets CLI** behind a config-driven seam (command + config path), not direct SQLite (raw SQLite locked constantly). One `beet list -a -f '$mb_releasegroupid'` dump → in-memory diff (§5). |
 | Identity | MusicBrainz release-group as the spine; 3-tier resolution (barcode → ISRC-cluster → fuzzy). Resolve once at ingest, store the id; reconcile is a deterministic join thereafter (§5). |
-| LLM matching | Keep Tiers 1–2 deterministic. LLM only as a Tier-3 adjudicator that may abstain → human inbox, run as a batch off the hot path. Build-or-skip gated by the §11 spike (§5a). |
+| LLM matching | **Not building it** — the D0 spike showed the unresolved tail is MB-absent, not fuzzy-matchable, so an LLM can't help. Tail handled by manual-match + re-resolve instead (§5, §5a, ROADMAP D17). |
 | Play history | Poll `recently-played` from install; **no** GDPR backfill (accept cold-start, §4a/§6a). |
 | 6a thresholds | listened = ≥4 tracks or ≥3 days; forgotten = ≥21 days & <2 plays. Config-tunable. |
 | 6b seed set | Union of kept-album artists **and** followed artists. (Not in v1.) |
@@ -565,10 +595,11 @@ keep/drop/snooze.
 
 **v1 scope (the "thin" cut):**
 Spotify OAuth **with a working re-auth flow** (§8c) → saves ingest → reconcile against
-beets → web list of *saved-but-not-owned*, each with a Buy-on-Bandcamp link → the **6a
-verdict prompt** (leaning on the time-based "forgotten" trigger early, per the cold-start
-note). Play-history polling ships in v1 because 6a's "listened" trigger depends on it,
-even though it starts quiet.
+beets → web list of *saved-but-not-owned*, each with a Buy-on-Bandcamp link **and a
+manual "link to library / mark owned"** (so edition-mismatch and MB-absent albums can
+always reach `owned`, §5) → the **6a verdict prompt** (leaning on the time-based
+"forgotten" trigger early, per the cold-start note). Play-history polling ships in v1
+because 6a's "listened" trigger depends on it, even though it starts quiet.
 
 **Explicitly deferred to v2+:** 6b new-release watch, 6c catalogue backfill,
 notifications, GDPR history backfill, any Bandcamp scraping beyond the search URL.
@@ -616,6 +647,11 @@ core, or the whole thing silently dies within 6 months.
   the "land" step. This is where acquired files enter and trigger reconcile.
 
 ## 11. Reconcile / identity spike (do before building around §5)
+
+> **Done — verdict GO.** 80-album real sample: 86% resolved (barcode-first carries 56%),
+> 98% beets coverage, owned matches correct; the 14% tail is MB-absent, not a matching
+> weakness → LLM Tier-3 dropped, tail handled per §5. Tooling + full write-up:
+> [`spikes/reconcile/`](spikes/reconcile/) (`RESULTS.md`).
 
 **Why:** the Spotify→MusicBrainz→beets match is the single technical risk — it's what
 made the old system only "sort of work." A want-list that mis-judges ownership is
@@ -814,7 +850,9 @@ load-bearing, not optional.
 - **Repositories against a real Postgres** (testcontainers): run migrations, exercise repo
   methods, assert. Don't mock the DB — SQL + migrations are where the bugs are.
 - **beets adapter against a tiny seeded `library.db` fixture** (a couple of albums with
-  `mb_releasegroupid`) so the CLI query + parse survive real `beet` output.
+  `mb_releasegroupid`) so the CLI query + parse survive real `beet` output. Fixture
+  harness already built: [`fixtures/beets/`](fixtures/beets/) (silent tagged FLACs →
+  `beet import` → `library.db` + owned dump, reproducible via Docker).
 
 ### E2E (few, high-value)
 - **docker compose: app + postgres**, plus a **fake-Spotify HTTP stub** serving
