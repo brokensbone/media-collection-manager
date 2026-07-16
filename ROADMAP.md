@@ -73,7 +73,7 @@ Close the loop's manual middle with buy-assist — and make it always closable.
 - **Mark owned** (minimal manual resolve, §4/§5): a sticky `manual` link → `owned` that reconcile never clobbers. This is what lets edition-mismatch and MB-absent albums leave the buy list; MVP. *(Picking a specific beets album to link — the assisted search/suggestions — is D17; fallback/paste-a-URL buy links likewise deferred as YAGNI for now.)*
 - **Done when:** wanted albums show working buy links; mark-ordered → `acquiring`; when a matching album lands in beets, reconcile flips it `owned`; **a mark-owned want (edition mismatch or MB-absent) reaches `owned` and stays there across reconcile**; tests pass. *("wanted → owned with buy assist, always closable")*
 
-### D8 · Play-history + "listened" trigger  *(§4a, §6a)*
+### D8 · Play-history + "listened" trigger  *(§4a, §6a)*  — ✅ done (pending CI)
 Upgrade the verdict from a timer to "you've actually heard this."
 - Poll `recently-played` → `play_history` (scheduled + CLI); add the **"listened"** trigger to Decide (≥N tracks / ≥M days), clock injected.
 - **Done when:** plays accumulate; an album with enough plays surfaces in Decide via the listened trigger; trigger unit tests pass with an injected clock. *("listened trigger fires from real play data")*

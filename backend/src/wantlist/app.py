@@ -31,6 +31,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         clock=SystemClock(),
         forgotten_days=settings.verdict_forgotten_days,
         snooze_days=settings.verdict_snooze_days,
+        listened_tracks=settings.verdict_listened_tracks,
+        listened_days=settings.verdict_listened_days,
     )
     app.state.acquire_service = AcquireService(repo=AlbumRepo(session_factory), clock=SystemClock())
     app.include_router(auth_router.router)

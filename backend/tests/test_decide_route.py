@@ -29,7 +29,12 @@ def _client(sf: sessionmaker[Session]) -> tuple[TestClient, AlbumRepo]:
         session.commit()
     app = create_app(Settings())
     app.state.decide_service = DecideService(
-        repo=AlbumRepo(sf), clock=FrozenClock(NOW), forgotten_days=21, snooze_days=14
+        repo=AlbumRepo(sf),
+        clock=FrozenClock(NOW),
+        forgotten_days=21,
+        snooze_days=14,
+        listened_tracks=4,
+        listened_days=3,
     )
     return TestClient(app), AlbumRepo(sf)
 

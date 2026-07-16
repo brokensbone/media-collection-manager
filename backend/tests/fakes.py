@@ -3,7 +3,7 @@ from datetime import datetime
 
 from wantlist.adapters.token_store import StoredAuth
 from wantlist.ports.spotify import ReauthRequired, SpotifyTokens
-from wantlist.ports.spotify_api import SavedAlbum
+from wantlist.ports.spotify_api import Play, SavedAlbum
 
 
 class StubTokens:
@@ -20,14 +20,18 @@ class StubTokens:
 
 
 class StubSpotifyApiClient:
-    def __init__(self, albums: Iterable[SavedAlbum]) -> None:
+    def __init__(self, albums: Iterable[SavedAlbum] = (), plays: Iterable[Play] = ()) -> None:
         self._albums = list(albums)
+        self._plays = list(plays)
 
     def saved_albums(self, access_token: str) -> Iterable[SavedAlbum]:
         return list(self._albums)
 
     def album_isrcs(self, access_token: str, album_id: str) -> list[str]:
         return []
+
+    def recently_played(self, access_token: str) -> list[Play]:
+        return list(self._plays)
 
 
 class StubMusicBrainzResolver:
