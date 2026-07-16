@@ -31,3 +31,9 @@ class Settings(BaseSettings):
     # Ingest (§4/§4b): poll interval and the cover-art size to keep.
     saves_poll_seconds: int = 3600
     art_target_px: int = 300
+
+    # MusicBrainz resolution (§5, §11). Base URL overridable for tests/E2E (§14).
+    musicbrainz_url: str = "https://musicbrainz.org/ws/2"
+    musicbrainz_user_agent: str = "wantlist/0.1 ( https://github.com/EdwardSalkeld )"
+    musicbrainz_min_interval: float = 1.1  # MB asks for <= 1 req/sec
+    musicbrainz_text_min_score: int = 90  # Tier-3 fuzzy accept threshold

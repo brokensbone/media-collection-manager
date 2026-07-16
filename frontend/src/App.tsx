@@ -1,3 +1,4 @@
+import { Library } from './Library'
 import { SpotifyStatus } from './SpotifyStatus'
 
 export default function App() {
@@ -5,6 +6,7 @@ export default function App() {
     <>
       <h1>wantlist</h1>
       <SpotifyStatus />
+      <Library />
     </>
   )
 }

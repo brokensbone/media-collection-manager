@@ -24,6 +24,28 @@ class HttpxSpotifyApiClient:
             yield from self._parse_page(page)
             url = page.get("next")
 
+    def album_isrcs(self, access_token: str, album_id: str) -> list[str]:
+        """Fetch an album's track ISRCs (Tier-2 resolution input, §5). ISRCs live on the
+        full track objects, not the album's simplified tracks — so a second /tracks call."""
+        headers = {"Authorization": f"Bearer {access_token}"}
+        album = self._get_json(f"{self._api_url}/albums/{album_id}", headers)
+        track_ids = [t["id"] for t in album.get("tracks", {}).get("items", []) if t.get("id")]
+        isrcs: list[str] = []
+        for start in range(0, len(track_ids), 50):
+            batch = ",".join(track_ids[start : start + 50])
+            data = self._get_json(f"{self._api_url}/tracks?ids={batch}", headers)
+            for track in data.get("tracks", []):
+                isrc = (track or {}).get("external_ids", {}).get("isrc")
+                if isrc:
+                    isrcs.append(isrc)
+        return isrcs
+
+    @staticmethod
+    def _get_json(url: str, headers: dict[str, str]) -> dict[str, Any]:
+        resp = httpx.get(url, headers=headers, timeout=30)
+        resp.raise_for_status()
+        return resp.json()  # type: ignore[no-any-return]
+
     def _parse_page(self, page: dict[str, Any]) -> Iterator[SavedAlbum]:
         for item in page["items"]:
             album = item["album"]

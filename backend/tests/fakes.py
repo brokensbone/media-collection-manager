@@ -26,6 +26,27 @@ class StubSpotifyApiClient:
     def saved_albums(self, access_token: str) -> Iterable[SavedAlbum]:
         return list(self._albums)
 
+    def album_isrcs(self, access_token: str, album_id: str) -> list[str]:
+        return []
+
+
+class StubMusicBrainzResolver:
+    """Resolves by album title via a mapping; everything else is the unresolvable tail."""
+
+    def __init__(self, mapping: dict[str, str] | None = None) -> None:
+        self._mapping = mapping or {}
+
+    def resolve(self, *, upc: str | None, isrcs: list[str], artist: str, title: str) -> str | None:
+        return self._mapping.get(title)
+
+
+class StubOwnedReleaseGroups:
+    def __init__(self, owned: set[str]) -> None:
+        self._owned = owned
+
+    def owned_release_group_ids(self) -> set[str]:
+        return set(self._owned)
+
 
 def fake_fetch_image(url: str) -> tuple[str, bytes]:
     return "image/jpeg", b"IMG:" + url.encode()
