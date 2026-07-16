@@ -1,3 +1,4 @@
+import { Decide } from './Decide'
 import { Library } from './Library'
 import { SpotifyStatus } from './SpotifyStatus'
 
@@ -6,6 +7,9 @@ export default function App() {
     <>
       <h1>wantlist</h1>
       <SpotifyStatus />
+      <h2>Decide</h2>
+      <Decide />
+      <h2>Library</h2>
       <Library />
     </>
   )
