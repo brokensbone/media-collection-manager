@@ -239,21 +239,20 @@ raw SQLite anywhere.
   because a human confirms), a proactive "you might already own this (different edition)?"
   hint in Acquire, and a **periodic re-resolve** that retries unresolved albums as MB
   grows. No LLM needed — the tail isn't fuzzy-matchable, just sometimes absent.
-- **Beets access is config-driven, behind a small interface.** The app depends on an
-  abstract "beets query" seam, not on beets living in any particular place. v1 needs
-  essentially **one operation** — "list all owned release-group ids" — which keeps the
-  seam tiny and easy to reimplement.
-  - **Config knobs:** a **beets command** (default `beet`) and an optional **beets config
-    path** (`-c` / `BEETSDIR`) telling beets where its library + music live.
-  - The command is deliberately a *string the deployment controls*, so the same code runs
-    beets however the environment provides it:
-    - `beet` — beets installed alongside the app (same host/container).
-    - `docker exec <beets-container> beet` — beets in a sidecar container.
-    - `ssh <host> beet` — beets on another machine.
-  - **Alternatives if shelling out proves awkward** (note, not v1): the beets **`web`
-    plugin** exposes an HTTP API — the seam could instead hold a *beets base URL*; or a
-    periodic **cached export** (dump owned release-group ids to a file the app reads).
-    All three satisfy the same interface. Not direct SQLite — see the locking lesson above.
+- **Beets is a bundled dependency; the app runs its own `beet`.** beets is a Python
+  package (pinned in our deps), so we don't rely on an external binary being provided.
+  It runs behind a small "beets query" seam — v1 needs essentially **one operation**,
+  "list all owned release-group ids" — via the CLI (not raw SQLite; the locking lesson
+  above). Resolves the earlier mount-vs-sidecar question in favour of **bundle + mount**.
+  - **The config knob is a path to the beets config** (`-c` / `BEETSDIR`), whose
+    `library:` / `directory:` point at the **mounted** `library.db` (and, for imports, the
+    music dir). So the deployment requirement is: *mount the beets library where the app
+    can read it, and point the config at it* — not "provide a beet command".
+  - **Escape hatch retained:** `beets_command` still defaults to the bundled `beet` but can
+    be overridden (`ssh … beet`, `docker exec … beet`) for a genuinely-remote, unmountable
+    beets. Not the expected path, just a bridge left un-burned.
+  - **Bonus:** because beets is bundled, CI and tests run **real beets** (build a tiny
+    library via its API — no audio needed — and query it), not a stub.
 
 ### 5a. Would an LLM do the matching better? (consideration)
 
@@ -408,7 +407,7 @@ to the code.
 | Requirement | Config | Notes |
 |---|---|---|
 | PostgreSQL backend | host, port, database, user, password (or a single `DATABASE_URL`) | The app runs its own migrations on the given database. |
-| Beets CLI access | beets command (default `beet`), optional beets config path | The command may be `beet`, `docker exec … beet`, `ssh … beet`, etc. (§5). |
+| Beets | beets config path (points at the **mounted** `library.db` + music) | beets is **bundled** in the image (a pinned dep); mount the library where the app can read it. `beets_command` defaults to the bundled `beet`; override only for a remote beets (§5). |
 | Spotify API | client id/secret, **redirect URI** (public HTTPS, registered in the Spotify dashboard), token store, **overridable base URL** | Authorization Code flow via a thin httpx adapter (§15); see §8c for redirect-URI rules and 6-month re-auth. Read-only scopes for v1; **`user-library-modify`** added when §6b lands. Base URL overridable so E2E can point at a stub (§14) — likewise MB/CAA. |
 | Tunables | 6a thresholds, poll intervals, Bandcamp/base URLs, re-auth warning lead time | Sensible defaults; all overridable. |
 
@@ -935,8 +934,8 @@ ports (§14), so this isn't a one-way door.
 
 ### Packaging & deploy
 - **Single multi-stage Docker image**: Node stage builds the SPA → Python runtime serves
-  the JSON API *and* the built static assets; **beets installed in the image** (the §5
-  mount-vs-sidecar question is about the *library*, not the binary). Behind Traefik on the
+  the JSON API *and* the built static assets; **beets is a bundled dependency** in the
+  image, and the beets **library is mounted** in (resolved in §5). Behind Traefik on the
   `blink` stack (§8b).
 - **Monorepo**: `backend/` + `frontend/` in this repo; one image out.
 

@@ -9,7 +9,9 @@ class Settings(BaseSettings):
     # Storage
     database_url: str = "postgresql+psycopg://localhost:5432/wantlist"
 
-    # beets seam (§5): the command may be `beet`, `docker exec … beet`, `ssh … beet`, etc.
+    # beets seam (§5): beets is bundled, so the main knob is a path to the beets config
+    # (its `library:`/`directory:` point at the mounted library.db + music). `beets_command`
+    # defaults to the bundled `beet`; override only for a genuinely-remote beets (ssh/exec).
     beets_command: str = "beet"
     beets_config: str | None = None
 
