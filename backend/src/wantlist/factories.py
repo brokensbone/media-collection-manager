@@ -6,14 +6,17 @@ from .adapters.beets import BeetsClient
 from .adapters.clock import SystemClock
 from .adapters.mb_resolver import HttpxMusicBrainzResolver
 from .adapters.notifier import WebhookNotifier
+from .adapters.rsync import RsyncTransfer
 from .adapters.spotify_api import HttpxSpotifyApiClient
 from .adapters.spotify_auth import HttpxSpotifyAuthClient
 from .adapters.token_store import TokenStore
+from .adapters.transmission import HttpxTransmissionClient
 from .alerts import AlertsService
 from .artist_watch import ArtistWatchService
 from .auth_service import AuthService
 from .config import Settings
 from .decide import DecideService
+from .imports import ImportDetectionService, ImportRunner
 from .ingest import IngestService
 from .play_history import PlayHistoryService
 from .reconcile import OwnershipReconciler
@@ -115,6 +118,34 @@ def build_alerts_service(
         notifier=WebhookNotifier(settings.notification_webhook_url),
         repo=AlbumRepo(session_factory),
         triage_threshold=settings.notify_triage_threshold,
+    )
+
+
+def build_import_detection_service(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> ImportDetectionService:
+    return ImportDetectionService(
+        transmission=HttpxTransmissionClient(
+            rpc_url=settings.transmission_rpc_url,
+            user=settings.transmission_user,
+            password=settings.transmission_password,
+        ),
+        repo=AlbumRepo(session_factory),
+        match_threshold=settings.import_match_threshold,
+    )
+
+
+def build_import_runner(settings: Settings, session_factory: sessionmaker[Session]) -> ImportRunner:
+    return ImportRunner(
+        repo=AlbumRepo(session_factory),
+        transfer=RsyncTransfer(
+            host=settings.transmission_ssh_host,
+            port=settings.transmission_ssh_port,
+            user=settings.transmission_ssh_user,
+            ssh_key=settings.transmission_ssh_key,
+        ),
+        beets=BeetsClient(settings.beets_config),
+        inbox=settings.import_inbox_path,
     )
 
 

@@ -509,10 +509,10 @@ releases → decide → acquire → import.
    and pick the album that satisfies this want (a sticky manual link, §4/§5) for edition
    mismatches or MB-absent albums the rgid join can't catch. (D17 adds fuzzy-suggested
    candidates + a "possibly already owned?" hint here.)
-4. **Import** — **extension-only (§12/§13); absent in v1.** Detected downloads
-   (Transmission completions / watch-dir drops) awaiting the Import click. Item: source,
-   matched want (or "no match → import as new owned"), **Import** button. In v1 landing is
-   fully manual and reconcile flips `owned` with no queue at all.
+4. **Import** — **built for Transmission (§12, D14); watch-dir (§13) still to come.**
+   Detected downloads awaiting the Import click. Item: download name, matched want (or
+   "no match"), **Import** button. Landing without this is fully manual — reconcile still
+   flips `owned` with no queue at all.
 
 **Browse / reference (not action queues):**
 
@@ -696,11 +696,36 @@ carrying the load → confirms the caching / barcode-first design matters. Fat
 unresolvable tail → decide *now* between an LLM Tier-3 (§5a) vs a manual-match UI, in a
 script rather than after building the whole tool.
 
-## 12. Extension (post-MVP): Transmission → auto-land pipeline
+## 12. Extension: Transmission → auto-land pipeline
 
-> **Status: sketch, explicitly not MVP.** This automates the one manual step left in the
-> loop (§3): getting downloaded files *into* beets. Today I download to the seedbox by
-> hand, then rsync + `beet import` by hand. This closes that gap.
+> **Status: built (D14).** This automates the one manual step left in the loop (§3):
+> getting downloaded files *into* beets. Today I download to the seedbox by hand, then
+> rsync + `beet import` by hand. This closes that gap.
+
+> **As built (D14):**
+> - **Transfer is rsync-over-SSH** behind a `FileTransfer` seam (`RsyncTransfer`). The
+>   import task rsyncs the torrent's exact file list (`--files-from`, relative to
+>   `downloadDir`) from `user@host:downloadDir/` into a per-download staging folder in the
+>   inbox. The seeding rule lives in the rsync flags — **copy only, never
+>   `--remove-source-files` or `--delete`** — so the seedbox originals (and seeding) are
+>   never touched. RPC (control/metadata) and SSH (file bytes) are two distinct credentials,
+>   both config-driven.
+> - **Match is `difflib` fuzzy only.** Normalized folder-name vs `"artist title"` ratio over
+>   `wanted`/`acquiring` albums, thresholded (`import_match_threshold`, default 0.5). No LLM
+>   adjudicator — the same call we made for §5's Tier-3 (the LLM tier was dropped; the tail
+>   is handled by the human-gated Import + manual match). Unmatched completions are still
+>   recorded so they can be hand-imported (the shared no-match rule).
+> - **Seen-set is the torrent hash** (`download_import.torrent_hash`, unique) — a completion
+>   is only ever recorded once. Per-download `state` is `detected → imported | failed`.
+> - **The post-import autotag sanity check is deferred** — reconcile flips `owned` off the
+>   release-group match; a mismatched autotag would be visible in the library view. Left as
+>   an open item rather than built in D14.
+> - **Adapter/seams:** `HttpxTransmissionClient` (the 409 `X-Transmission-Session-Id`
+>   handshake, basic auth, `torrent-get` filtered to `percentDone == 1`); `RsyncTransfer`
+>   behind the `FileTransfer` port; `ImportRunner` (transfer → `beet import -q` → tidy
+>   staging, marking `failed` and re-raising on error); `ImportDetectionService` (poll →
+>   dedupe by hash → match → record). Disabled when `transmission_rpc_url` is empty. Web
+>   surface: **Import** worklist (`GET /imports`, `POST /imports/{id}/import`).
 
 **What it does:** poll Transmission for newly-completed downloads, match each against the
 want-list, and offer a one-click **Import** that pulls the files over, runs a beets
@@ -745,16 +770,17 @@ import, and tidies the local staging — after which reconcile (§5) flips the w
 - **Reuses existing seams:** beets CLI (import), reconcile (owned-marking), the want-list.
   Little new surface beyond Transmission + file transfer.
 
-**Config additions (extends the §8a contract):**
+**Config additions (extends the §8a contract) — as built:**
 | Requirement | Config |
 |---|---|
-| Transmission RPC | rpc url, username, password |
-| Seedbox file transfer | SSH host/port/user/key, remote download base path, local inbox path (or: an sshfs/NFS mount, in which case transfer is a local copy and no per-import SSH is needed) |
-| Import behaviour | beets import flags / non-interactive mode (reuses the §5 beets command) |
+| Transmission RPC | `transmission_rpc_url`, `transmission_user`, `transmission_password` |
+| Seedbox file transfer | `transmission_ssh_host`, `transmission_ssh_port` (22), `transmission_ssh_user`, `transmission_ssh_key`, `import_inbox_path` (local staging) |
+| Match / poll | `import_match_threshold` (default 0.5), `transmission_poll_seconds` |
+| Import behaviour | reuses the §5 beets seam (`beet import -q`) |
 
 **Access note (answering "needs SSH too?"):** yes — Transmission RPC gives *control and
-metadata only*, not file bytes. File retrieval is a separate channel: rsync-over-SSH, or
-a pre-existing seedbox mount. Two distinct credentials (RPC + SSH), both config-driven.
+metadata only*, not file bytes. File retrieval is a separate channel: as built, rsync-over-SSH
+pulls the bytes into the local inbox. Two distinct credentials (RPC + SSH), both config-driven.
 
 **Safety:** this feature *downloads files and runs imports* — both gated behind an
 explicit user click, and all credentials come from config, never from torrent names or

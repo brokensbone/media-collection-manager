@@ -10,6 +10,8 @@ from ..models import (
     Album,
     AlbumArt,
     AlbumState,
+    DownloadImport,
+    ImportState,
     LinkSource,
     NotificationState,
     PlayHistory,
@@ -63,6 +65,32 @@ class SuggestedRow:
     artist: str
     title: str
     has_art: bool
+
+
+@dataclass
+class WantedForMatch:
+    id: int
+    artist: str
+    title: str
+
+
+@dataclass
+class ImportRow:
+    id: int
+    name: str
+    state: str
+    matched_album_id: int | None
+    matched_artist: str | None
+    matched_title: str | None
+
+
+@dataclass
+class ImportRecord:
+    id: int
+    download_dir: str
+    files: list[str]
+    matched_album_id: int | None
+    state: str
 
 
 class AlbumRepo:
@@ -392,6 +420,83 @@ class AlbumRepo:
                 update(Album)
                 .where(Album.id == album_id, Album.state == AlbumState.suggested)
                 .values(**values)
+            )
+            session.commit()
+
+    # --- transmission auto-land (§12) ------------------------------------------------
+
+    def known_torrent_hashes(self) -> set[str]:
+        """Torrent hashes already recorded — the seen ledger so a completion is processed once."""
+        with self._sf() as session:
+            return set(session.scalars(select(DownloadImport.torrent_hash)))
+
+    def wanted_for_matching(self) -> list[WantedForMatch]:
+        """`wanted`/`acquiring` albums a completed download could be fulfilling (§12 match)."""
+        targets = (AlbumState.wanted, AlbumState.acquiring)
+        with self._sf() as session:
+            rows = session.execute(
+                select(Album.id, Album.artist, Album.title).where(Album.state.in_(targets))
+            )
+            return [WantedForMatch(*row) for row in rows]
+
+    def add_download_import(
+        self,
+        *,
+        torrent_hash: str,
+        name: str,
+        download_dir: str,
+        files: list[str],
+        matched_album_id: int | None,
+    ) -> None:
+        with self._sf() as session:
+            session.execute(
+                pg_insert(DownloadImport)
+                .values(
+                    torrent_hash=torrent_hash,
+                    name=name,
+                    download_dir=download_dir,
+                    files=files,
+                    matched_album_id=matched_album_id,
+                )
+                .on_conflict_do_nothing(index_elements=["torrent_hash"])
+            )
+            session.commit()
+
+    def pending_imports(self) -> list[ImportRow]:
+        """Detected downloads awaiting the operator's Import click, newest first."""
+        with self._sf() as session:
+            rows = session.execute(
+                select(
+                    DownloadImport.id,
+                    DownloadImport.name,
+                    DownloadImport.state,
+                    DownloadImport.matched_album_id,
+                    Album.artist,
+                    Album.title,
+                )
+                .outerjoin(Album, Album.id == DownloadImport.matched_album_id)
+                .where(DownloadImport.state == ImportState.detected)
+                .order_by(DownloadImport.created_at.desc())
+            )
+            return [ImportRow(r[0], r[1], r[2].value, r[3], r[4], r[5]) for r in rows]
+
+    def get_download_import(self, import_id: int) -> ImportRecord | None:
+        with self._sf() as session:
+            row = session.get(DownloadImport, import_id)
+            if row is None:
+                return None
+            return ImportRecord(
+                id=row.id,
+                download_dir=row.download_dir,
+                files=list(row.files),
+                matched_album_id=row.matched_album_id,
+                state=row.state.value,
+            )
+
+    def mark_import(self, import_id: int, state: ImportState) -> None:
+        with self._sf() as session:
+            session.execute(
+                update(DownloadImport).where(DownloadImport.id == import_id).values(state=state)
             )
             session.commit()
 

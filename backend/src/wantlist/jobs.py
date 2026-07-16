@@ -7,6 +7,7 @@ from .factories import (
     build_artist_watch_service,
     build_auth_service,
     build_decide_service,
+    build_import_detection_service,
     build_ingest_service,
     build_ownership_reconciler,
     build_play_history_service,
@@ -69,6 +70,17 @@ def watch_artists_once(settings: Settings | None = None) -> None:
     )
 
 
+def poll_transmission_once(settings: Settings | None = None) -> None:
+    """One Transmission poll — detect completed downloads and match them to wants (§12).
+    Disabled when no rpc url is configured."""
+    settings = settings or Settings()
+    if not settings.transmission_rpc_url:
+        return
+    session_factory = make_session_factory(make_engine(settings.database_url))
+    result = build_import_detection_service(settings, session_factory).poll()
+    log.info("transmission: detected=%s", result.detected)
+
+
 def alerts_once(settings: Settings | None = None) -> None:
     """Fire operator alerts for re-auth-due and a triage backlog (§8d)."""
     settings = settings or Settings()
@@ -87,4 +99,5 @@ if __name__ == "__main__":
     reconcile_once()
     poll_plays_once()
     watch_artists_once()
+    poll_transmission_once()
     alerts_once()

@@ -2,6 +2,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import (
+    JSON,
     DateTime,
     ForeignKey,
     LargeBinary,
@@ -110,6 +111,32 @@ class SeenRelease(Base):
     spotify_album_id: Mapped[str] = mapped_column(primary_key=True)
     artist_id: Mapped[str] = mapped_column(index=True)
     seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ImportState(StrEnum):
+    detected = "detected"  # awaiting the operator's Import click
+    imported = "imported"
+    failed = "failed"
+
+
+class DownloadImport(Base):
+    """A completed Transmission download seen by the auto-land pipeline (SPEC §12). The
+    torrent hash is the seen-ledger key so a completion is only ever processed once."""
+
+    __tablename__ = "download_import"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    torrent_hash: Mapped[str] = mapped_column(unique=True, index=True)
+    name: Mapped[str]
+    download_dir: Mapped[str]
+    files: Mapped[list[str]] = mapped_column(JSON, default=list)  # paths relative to dir
+    matched_album_id: Mapped[int | None] = mapped_column(
+        ForeignKey("album.id", ondelete="SET NULL"), default=None
+    )
+    state: Mapped[ImportState] = mapped_column(
+        SAEnum(ImportState, name="import_state"), default=ImportState.detected
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class NotificationState(Base):
