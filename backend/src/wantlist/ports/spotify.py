@@ -22,3 +22,9 @@ class SpotifyAuthClient(Protocol):
     def exchange_code(self, code: str) -> SpotifyTokens: ...
 
     def refresh(self, refresh_token: str) -> SpotifyTokens: ...
+
+
+class AccessTokenProvider(Protocol):
+    """A valid access token for API calls; raises ReauthRequired when re-auth is needed."""
+
+    def valid_access_token(self) -> str: ...

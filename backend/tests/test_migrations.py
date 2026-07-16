@@ -34,8 +34,8 @@ def test_migrations_create_all_tables(pg_url: str) -> None:
     assert EXPECTED_TABLES <= tables
 
 
-def test_health_ok_against_real_postgres(pg_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    client = TestClient(create_app(Settings(database_url=pg_url, beets_command="true")))
+def test_health_ok_against_real_postgres(pg_url: str) -> None:
+    client = TestClient(create_app(Settings(database_url=pg_url)))
     resp = client.get("/health")
     assert resp.status_code == 200
     assert resp.json()["checks"]["postgres"] is True

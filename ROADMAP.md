@@ -55,7 +55,7 @@ Pull the firehose in, once each, with covers.
 - Async art fetch → `album_art` blob; served at `/art/<id>` with ETag.
 - **Done when:** an ingest run populates albums (stub + real) with **no duplicates on re-run**; covers serve; unit + integration tests pass. *("saved albums appear, idempotent")*
 
-### D5 · Reconcile engine + Owned/Library view  *(§5)*
+### D5 · Reconcile engine + Owned/Library view  *(§5)*  — ✅ done (pending CI)
 The risky core, now wired in — plus the first real read-only screen.
 - ISRC→MB→release-group resolution (resolve-once, store the id); `beet list -a -f '$mb_releasegroupid'` dump → in-memory diff → derive `owned`. MB/CAA adapters (configurable base URL, rate-limit, User-Agent).
 - A read-only Library / Owned view so results are visible.

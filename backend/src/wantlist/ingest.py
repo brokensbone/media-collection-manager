@@ -1,17 +1,12 @@
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol
 
 from .adapters.album_repo import AlbumRepo
-from .ports.spotify import ReauthRequired
+from .ports.spotify import AccessTokenProvider, ReauthRequired
 from .ports.spotify_api import SpotifyApiClient
 
 log = logging.getLogger(__name__)
-
-
-class AccessTokenProvider(Protocol):
-    def valid_access_token(self) -> str: ...
 
 
 @dataclass

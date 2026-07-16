@@ -2,7 +2,11 @@ import logging
 
 from .config import Settings
 from .db import make_engine, make_session_factory
-from .factories import build_ingest_service
+from .factories import (
+    build_ingest_service,
+    build_ownership_reconciler,
+    build_resolution_service,
+)
 
 log = logging.getLogger(__name__)
 
@@ -23,6 +27,22 @@ def ingest_once(settings: Settings | None = None) -> None:
     )
 
 
+def reconcile_once(settings: Settings | None = None) -> None:
+    """Resolve unresolved albums, then re-derive ownership against beets (§5)."""
+    settings = settings or Settings()
+    session_factory = make_session_factory(make_engine(settings.database_url))
+    resolution = build_resolution_service(settings, session_factory).resolve_unresolved()
+    reconciled = build_ownership_reconciler(settings, session_factory).reconcile()
+    log.info(
+        "reconcile: resolved=%s unresolved=%s paused=%s newly_owned=%s",
+        resolution.resolved,
+        resolution.unresolved,
+        resolution.paused,
+        reconciled.newly_owned,
+    )
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     ingest_once()
+    reconcile_once()

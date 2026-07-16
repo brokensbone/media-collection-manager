@@ -8,6 +8,7 @@ from .db import make_engine, make_session_factory
 from .factories import build_auth_service
 from .routers import art as art_router
 from .routers import auth as auth_router
+from .routers import library as library_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -22,12 +23,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.album_repo = AlbumRepo(session_factory)
     app.include_router(auth_router.router)
     app.include_router(art_router.router)
+    app.include_router(library_router.router)
 
     @app.get("/health")
     def health_endpoint(request: Request) -> JSONResponse:
-        cfg: Settings = request.app.state.settings
         postgres = health.check_postgres(request.app.state.engine)
-        beets = health.check_beets(cfg.beets_command)
+        beets = health.check_beets()
         ok = postgres and beets
         return JSONResponse(
             status_code=200 if ok else 503,

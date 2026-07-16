@@ -1,4 +1,3 @@
-import shlex
 import subprocess
 
 from sqlalchemy import Engine, text
@@ -13,14 +12,10 @@ def check_postgres(engine: Engine) -> bool:
         return False
 
 
-def check_beets(command: str) -> bool:
-    """Reachable if `<beets command> version` exits 0 (SPEC §5 CLI seam)."""
+def check_beets() -> bool:
+    """Confirm the bundled beets is runnable (SPEC §5). Library reachability is surfaced
+    by the reconcile job + metrics (§16), not this liveness check."""
     try:
-        result = subprocess.run(
-            [*shlex.split(command), "version"],
-            capture_output=True,
-            timeout=10,
-        )
-        return result.returncode == 0
+        return subprocess.run(["beet", "version"], capture_output=True, timeout=10).returncode == 0
     except Exception:
         return False

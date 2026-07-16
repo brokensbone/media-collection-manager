@@ -2,13 +2,17 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from .adapters.album_repo import AlbumRepo
 from .adapters.art_fetcher import fetch_image
+from .adapters.beets import BeetsClient
 from .adapters.clock import SystemClock
+from .adapters.mb_resolver import HttpxMusicBrainzResolver
 from .adapters.spotify_api import HttpxSpotifyApiClient
 from .adapters.spotify_auth import HttpxSpotifyAuthClient
 from .adapters.token_store import TokenStore
 from .auth_service import AuthService
 from .config import Settings
 from .ingest import IngestService
+from .reconcile import OwnershipReconciler
+from .resolution import ResolutionService
 
 
 def build_auth_service(settings: Settings, session_factory: sessionmaker[Session]) -> AuthService:
@@ -37,4 +41,29 @@ def build_ingest_service(
         repo=AlbumRepo(session_factory),
         tokens=build_auth_service(settings, session_factory),
         fetch_image=fetch_image,
+    )
+
+
+def build_resolution_service(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> ResolutionService:
+    return ResolutionService(
+        api=HttpxSpotifyApiClient(settings.spotify_api_url, settings.art_target_px),
+        resolver=HttpxMusicBrainzResolver(
+            base_url=settings.musicbrainz_url,
+            user_agent=settings.musicbrainz_user_agent,
+            min_interval=settings.musicbrainz_min_interval,
+            text_min_score=settings.musicbrainz_text_min_score,
+        ),
+        repo=AlbumRepo(session_factory),
+        tokens=build_auth_service(settings, session_factory),
+    )
+
+
+def build_ownership_reconciler(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> OwnershipReconciler:
+    return OwnershipReconciler(
+        beets=BeetsClient(settings.beets_config),
+        repo=AlbumRepo(session_factory),
     )
