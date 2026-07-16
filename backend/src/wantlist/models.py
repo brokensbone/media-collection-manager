@@ -100,6 +100,18 @@ class AlbumArt(Base):
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class SeenRelease(Base):
+    """Every album the artist-watch has already accounted for (SPEC §6b). On an artist's
+    FIRST watch the whole catalogue is recorded here (baseline) and nothing is surfaced;
+    later runs surface only album ids not yet seen — i.e. genuinely new releases."""
+
+    __tablename__ = "seen_release"
+
+    spotify_album_id: Mapped[str] = mapped_column(primary_key=True)
+    artist_id: Mapped[str] = mapped_column(index=True)
+    seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class SpotifyAuth(Base):
     """Single-row token store incl. authorized_at for the 6-month re-auth (SPEC §8c)."""
 

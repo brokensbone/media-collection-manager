@@ -2,55 +2,59 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from wantlist.adapters.album_repo import AlbumRepo
 from wantlist.artist_watch import ArtistWatchService
-from wantlist.models import Album, AlbumState, Provenance
 from wantlist.ports.spotify_api import SavedAlbum
 
 from .fakes import StubSpotifyApiClient, StubTokens
 
 
-def _release(album_id: str, artist_id: str) -> SavedAlbum:
-    return SavedAlbum(album_id, "The Band", artist_id, "New Album", None, None, None)
+def _rel(spotify_id: str, artist_id: str = "artA") -> SavedAlbum:
+    return SavedAlbum(spotify_id, "The Band", artist_id, spotify_id, None, None, None)
 
 
-def _kept_album(sf: sessionmaker[Session], artist_id: str) -> None:
-    with sf() as session:
-        session.add(
-            Album(
-                spotify_id=f"owned-{artist_id}",
-                artist="The Band",
-                artist_id=artist_id,
-                title="Owned",
-                state=AlbumState.owned,
-                provenance=Provenance.spotify_save,
-            )
-        )
-        session.commit()
+def _svc(sf: sessionmaker[Session], api: StubSpotifyApiClient) -> ArtistWatchService:
+    return ArtistWatchService(api=api, repo=AlbumRepo(sf), tokens=StubTokens())  # type: ignore[arg-type]
 
 
-def test_watch_surfaces_new_releases_from_followed_and_kept(
+def test_first_run_baselines_without_surfacing(clean_album_tables: sessionmaker[Session]) -> None:
+    sf = clean_album_tables
+    api = StubSpotifyApiClient(followed=["artA"], artist_albums={"artA": [_rel("a1"), _rel("a2")]})
+    result = _svc(sf, api).poll()
+    assert result.baselined == 1
+    assert result.added == 0  # whole catalogue recorded as seen, nothing surfaced
+    assert AlbumRepo(sf).suggested_queue() == []
+
+
+def test_second_run_surfaces_only_new_releases(
     clean_album_tables: sessionmaker[Session],
 ) -> None:
     sf = clean_album_tables
-    _kept_album(sf, "keptArtist")  # seeds a kept-artist id
-    api = StubSpotifyApiClient(
-        followed=["followedArtist"],
-        artist_albums={
-            "followedArtist": [_release("relF", "followedArtist")],
-            "keptArtist": [_release("relK", "keptArtist")],
-        },
-    )
-    result = ArtistWatchService(api=api, repo=AlbumRepo(sf), tokens=StubTokens()).poll()  # type: ignore[arg-type]
-    assert result.added == 2
-    assert result.artists == 2  # followed ∪ kept
-    assert len(AlbumRepo(sf).suggested_queue()) == 2
+    catalogue = [_rel("a1"), _rel("a2")]
+    api = StubSpotifyApiClient(followed=["artA"], artist_albums={"artA": catalogue})
+    _svc(sf, api).poll()  # baseline a1, a2
+
+    catalogue.append(_rel("a3"))  # a genuinely new release
+    result = _svc(sf, api).poll()
+    assert result.added == 1
+    assert [r.title for r in AlbumRepo(sf).suggested_queue()] == ["a3"]
 
 
-def test_watch_dedupes_known_albums(clean_album_tables: sessionmaker[Session]) -> None:
+def test_already_tracked_album_is_not_resurfaced(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
     sf = clean_album_tables
-    _kept_album(sf, "keptArtist")  # spotify_id owned-keptArtist already exists
-    api = StubSpotifyApiClient(
-        followed=[],
-        artist_albums={"keptArtist": [_release("owned-keptArtist", "keptArtist")]},
+    catalogue = [_rel("a1")]
+    api = StubSpotifyApiClient(followed=["artA"], artist_albums={"artA": catalogue})
+    _svc(sf, api).poll()  # baseline a1
+
+    AlbumRepo(sf).add_saved_album(
+        spotify_id="a2",
+        artist="The Band",
+        artist_id="artA",
+        title="a2",
+        upc=None,
+        added_at=None,
+        art_url=None,
     )
-    result = ArtistWatchService(api=api, repo=AlbumRepo(sf), tokens=StubTokens()).poll()  # type: ignore[arg-type]
-    assert result.added == 0  # already known → not re-suggested
+    catalogue.append(_rel("a2"))  # appears in the catalogue but we already saved it
+    result = _svc(sf, api).poll()
+    assert result.added == 0  # already tracked → not surfaced as a suggestion

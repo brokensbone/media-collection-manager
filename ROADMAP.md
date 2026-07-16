@@ -101,9 +101,15 @@ Make it real. (Independent of dev — can land as soon as the blink→nix conver
 - `suggested` state; artist-watch seeded from kept + followed artists; Releases worklist with **Save** / **Want** / **Dismiss**; first Spotify **writes** (`PUT /me/albums`, `user-library-modify`).
 - **Done when:** new releases from watched artists appear as `suggested`; Save writes to Spotify and enters the flow; Want → `wanted`; dedupe holds; tests pass. *("new releases surface; Save/Want work")*
 
-### D12 · Catalogue backfill  *(§6c)*
-- On a keep-verdict, surface the rest of that artist's catalogue as `suggested`.
-- **Done when:** keeping an album surfaces its artist's other (unowned) albums as suggestions. *("keep → catalogue offered")*
+### D12 · Artist-watch baseline (supersedes §6c backfill)  *(§6b)*  — ✅ done (pending CI)
+Reframed after review: D11's watch surfaced full catalogues (a flood), and back-catalogue
+surfacing turned out to be unwanted. So D12 corrects the watch to **baseline-then-new**:
+- An artist's first watch records its whole catalogue in a `seen_release` ledger and
+  surfaces **nothing**; later runs surface only album ids not seen before (genuinely new).
+- §6c (push the back-catalogue on keep) is **dropped** — old releases are noise; only new
+  ones should surface.
+- **Done:** first watch of an artist surfaces nothing (baselines); a subsequent genuinely-new
+  release surfaces as `suggested`; already-tracked albums are never re-surfaced. *("only new, never history")*
 
 ### D13 · Notifications  *(§8d)*
 - Push/Slack on: a want auto-resolving to `owned`, N items waiting to triage, and re-auth approaching.

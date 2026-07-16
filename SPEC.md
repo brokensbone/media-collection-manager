@@ -333,8 +333,12 @@ and surface their new albums as candidate wants.
   artists are the strongest signal but need 6a to have produced verdicts first; folding
   in followed artists gives coverage from day one before that data exists. De-dupe the
   union. Expect some noise from the followed side — acceptable.
-- Mechanism: periodically poll each watched artist's albums, diff against what's
-  already known, surface anything new. Same idea as `artistwatch.py`, wider seed set.
+- **Mechanism — baseline, then new only (as built, D12).** An artist's *first* watch
+  **baselines** it: the whole current catalogue is recorded in a `seen_release` ledger and
+  **nothing is surfaced** — so becoming interested in an artist never floods Releases with
+  their back-catalogue. Every later poll surfaces only album ids not already in the ledger,
+  i.e. genuinely new releases since the baseline. (This supersedes the original "surface
+  the whole catalogue" idea and the separate §6c backfill.)
 - **Surfaced as the "Releases" worklist (§8d)**, at the front of the funnel. Per-item
   actions:
   - **Save** → save the album to my Spotify library, entering the normal `saved` → Decide
@@ -347,12 +351,13 @@ and surface their new albums as candidate wants.
   state (everything else is read-only). Still user-initiated per item, never automatic.
 - Not in v1 (see §9) — this is increment two.
 
-### 6c. "More of this artist's catalogue" — the backfill  *(the thing you half-remembered)*
-When an album survives the 6a verdict, optionally fan out and show the rest of that
-artist's catalogue, so I can grab the ones I don't own. One-time enrichment per artist,
-triggered by a kept album — not an ongoing crawl.
-- This is the closest thing to what you remembered; it wasn't actually in the old code
-  (that only ever fetched the saved album itself), so it's effectively new.
+### 6c. "More of this artist's catalogue" — the backfill  *(DROPPED)*
+Originally: on keeping an album, fan out the artist's whole back-catalogue as suggestions.
+**Dropped in D12 by decision:** surfacing old catalogue is unwanted noise — becoming
+interested in an artist should only ever surface their *new* releases going forward, not
+their history. The 6b baseline (above) records the existing catalogue as seen precisely so
+it *isn't* surfaced. If "browse an artist's catalogue to buy" is ever wanted, it'd be a
+pull action (search on demand), not a push into the worklist.
 
 ### On "recheck occasionally"
 Two distinct scheduled loops, both cheap:
