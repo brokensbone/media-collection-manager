@@ -703,11 +703,13 @@ script rather than after building the whole tool.
 > rsync + `beet import` by hand. This closes that gap.
 
 > **As built (D14):**
-> - **Transfer is a local copy, not SSH/rsync.** The seedbox download dir is assumed
->   reachable as a **mount** (like the beets library) — the same simplification we made for
->   storage. The import task copies files from `downloadDir` into a per-download staging
->   folder in the inbox; SSH/rsync machinery was dropped. The copy-never-move-never-delete
->   seeding rule is preserved (`shutil.copy2`; originals never touched).
+> - **Transfer is rsync-over-SSH** behind a `FileTransfer` seam (`RsyncTransfer`). The
+>   import task rsyncs the torrent's exact file list (`--files-from`, relative to
+>   `downloadDir`) from `user@host:downloadDir/` into a per-download staging folder in the
+>   inbox. The seeding rule lives in the rsync flags — **copy only, never
+>   `--remove-source-files` or `--delete`** — so the seedbox originals (and seeding) are
+>   never touched. RPC (control/metadata) and SSH (file bytes) are two distinct credentials,
+>   both config-driven.
 > - **Match is `difflib` fuzzy only.** Normalized folder-name vs `"artist title"` ratio over
 >   `wanted`/`acquiring` albums, thresholded (`import_match_threshold`, default 0.5). No LLM
 >   adjudicator — the same call we made for §5's Tier-3 (the LLM tier was dropped; the tail
@@ -719,11 +721,11 @@ script rather than after building the whole tool.
 >   release-group match; a mismatched autotag would be visible in the library view. Left as
 >   an open item rather than built in D14.
 > - **Adapter/seams:** `HttpxTransmissionClient` (the 409 `X-Transmission-Session-Id`
->   handshake, basic auth, `torrent-get` filtered to `percentDone == 1`); `ImportRunner`
->   (copy → `beet import -q` → tidy staging, marking `failed` and re-raising on error);
->   `ImportDetectionService` (poll → dedupe by hash → match → record). Disabled when
->   `transmission_rpc_url` is empty. Web surface: **Import** worklist (`GET /imports`,
->   `POST /imports/{id}/import`).
+>   handshake, basic auth, `torrent-get` filtered to `percentDone == 1`); `RsyncTransfer`
+>   behind the `FileTransfer` port; `ImportRunner` (transfer → `beet import -q` → tidy
+>   staging, marking `failed` and re-raising on error); `ImportDetectionService` (poll →
+>   dedupe by hash → match → record). Disabled when `transmission_rpc_url` is empty. Web
+>   surface: **Import** worklist (`GET /imports`, `POST /imports/{id}/import`).
 
 **What it does:** poll Transmission for newly-completed downloads, match each against the
 want-list, and offer a one-click **Import** that pulls the files over, runs a beets
@@ -772,14 +774,13 @@ import, and tidies the local staging — after which reconcile (§5) flips the w
 | Requirement | Config |
 |---|---|
 | Transmission RPC | `transmission_rpc_url`, `transmission_user`, `transmission_password` |
-| Seedbox file transfer | `import_inbox_path` (staging); the seedbox `downloadDir` is a **mount**, so transfer is a plain local copy — no SSH config |
+| Seedbox file transfer | `transmission_ssh_host`, `transmission_ssh_port` (22), `transmission_ssh_user`, `transmission_ssh_key`, `import_inbox_path` (local staging) |
 | Match / poll | `import_match_threshold` (default 0.5), `transmission_poll_seconds` |
 | Import behaviour | reuses the §5 beets seam (`beet import -q`) |
 
-**Access note (answering "needs SSH too?"):** Transmission RPC gives *control and metadata
-only*, not file bytes. As built we retrieve bytes via a **pre-existing seedbox mount** (the
-same choice as the beets library), so there is exactly one credential (RPC); SSH/rsync was
-not needed.
+**Access note (answering "needs SSH too?"):** yes — Transmission RPC gives *control and
+metadata only*, not file bytes. File retrieval is a separate channel: as built, rsync-over-SSH
+pulls the bytes into the local inbox. Two distinct credentials (RPC + SSH), both config-driven.
 
 **Safety:** this feature *downloads files and runs imports* — both gated behind an
 explicit user click, and all credentials come from config, never from torrent names or

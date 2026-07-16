@@ -116,8 +116,8 @@ surfacing turned out to be unwanted. So D12 corrects the watch to **baseline-the
 - **Done when:** a notification fires on each chosen trigger. *("gets pinged")*
 
 ### D14 · Transmission auto-land  *(§12)*  — ✅ done (pending CI)
-- RPC poll (409-handshake) → fuzzy match → Import worklist → **local copy off the seedbox mount** → `beet import -q` → tidy staging; seeding never disturbed.
-- **Built lean:** transfer is a plain local copy (seedbox dir is a mount, like the beets library) — SSH/rsync dropped; match is `difflib` fuzzy (no LLM, per the D16 call); unmatched completions still recorded for hand-import; hash-keyed seen-set; per-download state `detected → imported | failed`.
+- RPC poll (409-handshake) → fuzzy match → Import worklist → **rsync-over-SSH** off the seedbox → `beet import -q` → tidy staging; seeding never disturbed.
+- **Built lean:** transfer is rsync-over-SSH behind a `FileTransfer` seam (`RsyncTransfer`), copy-only (`--files-from`, never `--remove-source-files`/`--delete`) so seeding is safe; match is `difflib` fuzzy (no LLM, per the D16 call); unmatched completions still recorded for hand-import; hash-keyed seen-set; per-download state `detected → imported | failed`.
 - **Done when:** a completed torrent is detected, matched, one-click imported, lands in beets, and reconcile flips it `owned` — with seedbox originals untouched; tests incl. the seeding-safety rule and the no-match import path. *("torrent → one-click import → owned, seeding safe")*
 
 ### D15 · Watch-dir import  *(§13)*

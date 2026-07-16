@@ -49,11 +49,16 @@ class Settings(BaseSettings):
     notify_triage_threshold: int = 10
     alerts_poll_seconds: int = 3600
 
-    # Transmission auto-land (§12, D14). Empty rpc url = disabled. The seedbox download dir
-    # is assumed reachable as files (a mount); imports COPY (never move) so seeding is safe.
+    # Transmission auto-land (§12, D14). Empty rpc url = disabled. Files are pulled off the
+    # seedbox with rsync-over-SSH into the local inbox; imports COPY (never move) so seeding
+    # is safe. RPC (control/metadata) and SSH (file bytes) are two distinct credentials.
     transmission_rpc_url: str = ""
     transmission_user: str = ""
     transmission_password: str = ""
+    transmission_ssh_host: str = ""
+    transmission_ssh_port: int = 22
+    transmission_ssh_user: str = ""
+    transmission_ssh_key: str = ""  # path to the private key rsync's ssh should use
     import_inbox_path: str = "/inbox"
     transmission_poll_seconds: int = 3600
     import_match_threshold: float = 0.5

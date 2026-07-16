@@ -6,6 +6,7 @@ from .adapters.beets import BeetsClient
 from .adapters.clock import SystemClock
 from .adapters.mb_resolver import HttpxMusicBrainzResolver
 from .adapters.notifier import WebhookNotifier
+from .adapters.rsync import RsyncTransfer
 from .adapters.spotify_api import HttpxSpotifyApiClient
 from .adapters.spotify_auth import HttpxSpotifyAuthClient
 from .adapters.token_store import TokenStore
@@ -137,6 +138,12 @@ def build_import_detection_service(
 def build_import_runner(settings: Settings, session_factory: sessionmaker[Session]) -> ImportRunner:
     return ImportRunner(
         repo=AlbumRepo(session_factory),
+        transfer=RsyncTransfer(
+            host=settings.transmission_ssh_host,
+            port=settings.transmission_ssh_port,
+            user=settings.transmission_ssh_user,
+            ssh_key=settings.transmission_ssh_key,
+        ),
         beets=BeetsClient(settings.beets_config),
         inbox=settings.import_inbox_path,
     )

@@ -6,6 +6,7 @@ from typing import Protocol
 from .adapters.album_repo import AlbumRepo
 from .domain.match import MatchTarget, best_match
 from .models import ImportState
+from .ports.file_transfer import FileTransfer
 from .ports.transmission import TransmissionClient
 
 
@@ -62,12 +63,15 @@ class ImportDetectionService:
 
 
 class ImportRunner:
-    """Copies a completed download into the beets inbox (never moving the seedbox originals,
-    so seeding is never disturbed — SPEC §12), imports it into beets, and tidies the staging
-    copy. Ownership then flips to `owned` on the next reconcile via the release-group match."""
+    """Pulls a completed download off the seedbox into the beets inbox via the transfer seam
+    (a copy — seeding is never disturbed, SPEC §12), imports it into beets, and tidies the
+    staging copy. Ownership then flips to `owned` on the next reconcile via the rgid match."""
 
-    def __init__(self, *, repo: AlbumRepo, beets: BeetsImporter, inbox: str):
+    def __init__(
+        self, *, repo: AlbumRepo, transfer: FileTransfer, beets: BeetsImporter, inbox: str
+    ):
         self._repo = repo
+        self._transfer = transfer
         self._beets = beets
         self._inbox = inbox
 
@@ -76,24 +80,16 @@ class ImportRunner:
         if rec is None or rec.state != ImportState.detected.value:
             return
 
-        staging = Path(self._inbox) / Path(rec.download_dir).name
+        staging = Path(self._inbox) / str(rec.id)  # unique per download; no name-collisions
         try:
-            self._copy_in(rec.download_dir, rec.files, staging)
+            self._transfer.fetch(download_dir=rec.download_dir, files=rec.files, dest=str(staging))
             self._beets.import_dir(str(staging))
         except Exception:
             self._repo.mark_import(import_id, ImportState.failed)
             raise
         finally:
-            shutil.rmtree(staging, ignore_errors=True)  # tidy the staging copy either way
+            shutil.rmtree(staging, ignore_errors=True)  # tidy the local staging copy either way
         self._repo.mark_import(import_id, ImportState.imported)
-
-    @staticmethod
-    def _copy_in(download_dir: str, files: list[str], staging: Path) -> None:
-        staging.mkdir(parents=True, exist_ok=True)
-        for rel in files:
-            dest = staging / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(Path(download_dir) / rel, dest)
 
 
 class ImportsService:

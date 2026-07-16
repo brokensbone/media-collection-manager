@@ -8,7 +8,7 @@ from wantlist.imports import ImportDetectionService, ImportRunner, ImportsServic
 from wantlist.models import Album, AlbumState, ImportState, Provenance
 from wantlist.ports.transmission import Torrent
 
-from .fakes import RecordingBeetsClient, StubTransmissionClient
+from .fakes import FakeFileTransfer, RecordingBeetsClient, StubTransmissionClient
 
 
 def _add_wanted(sf: sessionmaker[Session], *, artist: str, title: str) -> int:
@@ -73,12 +73,13 @@ def test_import_runner_copies_leaving_source_untouched_and_tidies(
     import_id = repo.pending_imports()[0].id
 
     beets = RecordingBeetsClient()
-    ImportRunner(repo=repo, beets=beets, inbox=str(inbox)).run(import_id)
+    ImportRunner(repo=repo, transfer=FakeFileTransfer(), beets=beets, inbox=str(inbox)).run(
+        import_id
+    )
 
     # beets was handed the staging copy...
     assert len(beets.imported) == 1
     staged = Path(beets.imported[0])
-    assert staged.name == "Album"
     # ...seedbox originals are untouched (seeding-safe, §12)...
     assert (download_dir / "01.flac").read_text() == "track one"
     assert (download_dir / "02.flac").read_text() == "track two"
@@ -114,10 +115,12 @@ def test_import_runner_marks_failed_and_reraises(
             raise RuntimeError("beets blew up")
 
     with pytest.raises(RuntimeError, match="beets blew up"):
-        ImportRunner(repo=repo, beets=BoomBeets(), inbox=str(inbox)).run(import_id)
+        ImportRunner(
+            repo=repo, transfer=FakeFileTransfer(), beets=BoomBeets(), inbox=str(inbox)
+        ).run(import_id)
 
     assert repo.get_download_import(import_id).state == ImportState.failed.value
-    assert not (inbox / "d").exists()  # staging still tidied on failure
+    assert not (inbox / str(import_id)).exists()  # staging still tidied on failure
 
 
 def test_imports_service_queue_labels_match(
@@ -140,7 +143,9 @@ def test_imports_service_queue_labels_match(
         files=["b.flac"],
         matched_album_id=None,
     )
-    runner = ImportRunner(repo=repo, beets=RecordingBeetsClient(), inbox="/x")
+    runner = ImportRunner(
+        repo=repo, transfer=FakeFileTransfer(), beets=RecordingBeetsClient(), inbox="/x"
+    )
     service = ImportsService(repo=repo, runner=runner)
 
     queue = {i.name: i for i in service.queue()}

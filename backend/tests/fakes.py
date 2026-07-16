@@ -89,6 +89,20 @@ class RecordingBeetsClient:
         self.imported.append(path)
 
 
+class FakeFileTransfer:
+    """Stands in for rsync: copies the listed files from a local `download_dir` into `dest`,
+    leaving the source untouched (mirrors rsync's copy-only, seeding-safe behaviour)."""
+
+    def fetch(self, *, download_dir: str, files: list[str], dest: str) -> None:
+        import shutil
+        from pathlib import Path
+
+        for rel in files:
+            target = Path(dest) / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(Path(download_dir) / rel, target)
+
+
 def fake_fetch_image(url: str) -> tuple[str, bytes]:
     return "image/jpeg", b"IMG:" + url.encode()
 

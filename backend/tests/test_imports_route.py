@@ -8,7 +8,7 @@ from wantlist.app import create_app
 from wantlist.config import Settings
 from wantlist.imports import ImportRunner, ImportsService
 
-from .fakes import RecordingBeetsClient
+from .fakes import FakeFileTransfer, RecordingBeetsClient
 
 
 def test_import_queue_then_one_click_import(
@@ -33,7 +33,8 @@ def test_import_queue_then_one_click_import(
     beets = RecordingBeetsClient()
     app = create_app(Settings())
     app.state.imports_service = ImportsService(
-        repo=repo, runner=ImportRunner(repo=repo, beets=beets, inbox=str(inbox))
+        repo=repo,
+        runner=ImportRunner(repo=repo, transfer=FakeFileTransfer(), beets=beets, inbox=str(inbox)),
     )
     client = TestClient(app)
 
