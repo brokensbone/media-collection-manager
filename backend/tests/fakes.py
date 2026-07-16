@@ -1,7 +1,34 @@
+from collections.abc import Iterable
 from datetime import datetime
 
 from wantlist.adapters.token_store import StoredAuth
 from wantlist.ports.spotify import ReauthRequired, SpotifyTokens
+from wantlist.ports.spotify_api import SavedAlbum
+
+
+class StubTokens:
+    """Access-token provider double. `fail=True` simulates the 6-month re-auth."""
+
+    def __init__(self, token: str = "tok", fail: bool = False) -> None:
+        self._token = token
+        self._fail = fail
+
+    def valid_access_token(self) -> str:
+        if self._fail:
+            raise ReauthRequired
+        return self._token
+
+
+class StubSpotifyApiClient:
+    def __init__(self, albums: Iterable[SavedAlbum]) -> None:
+        self._albums = list(albums)
+
+    def saved_albums(self, access_token: str) -> Iterable[SavedAlbum]:
+        return list(self._albums)
+
+
+def fake_fetch_image(url: str) -> tuple[str, bytes]:
+    return "image/jpeg", b"IMG:" + url.encode()
 
 
 class FrozenClock:

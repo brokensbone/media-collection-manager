@@ -52,6 +52,7 @@ class Album(Base):
     artist: Mapped[str]
     title: Mapped[str]
     upc: Mapped[str | None] = mapped_column(default=None)
+    art_url: Mapped[str | None] = mapped_column(default=None)  # source URL; blob in album_art
 
     state: Mapped[AlbumState] = mapped_column(SAEnum(AlbumState, name="album_state"))
     provenance: Mapped[Provenance] = mapped_column(SAEnum(Provenance, name="provenance"))

@@ -49,7 +49,7 @@ The thin httpx adapter and the whole OAuth lifecycle, including the 6-month reco
 - Minimal web "Connect / Reconnect Spotify" + status (reauth countdown).
 - **Done when:** OAuth completes against real Spotify *and* the stub; refresh works; `invalid_grant` surfaces reconnect; status shows connected + days-to-reauth. *("can connect to Spotify, and reconnect")*
 
-### D4 · Saves ingest + dedupe + art  *(§4, §4b)*
+### D4 · Saves ingest + dedupe + art  *(§4, §4b)*  — ✅ done (pending CI)
 Pull the firehose in, once each, with covers.
 - Poll saved albums → `album` rows in `saved`; dedupe by release-group / Spotify id; record provenance. APScheduler job + a CLI command form.
 - Async art fetch → `album_art` blob; served at `/art/<id>` with ETag.
@@ -131,6 +131,26 @@ assistance on top.)
   mismatches (same artist + similar title, different/no rgid) so you don't re-buy.
 - **Periodic re-resolve** — retry unresolved albums as MB grows; also catches new releases.
 - **Done when:** linking a want offers correct candidates without manual search, likely-owned wants are flagged in Acquire, and re-resolve picks up a formerly-missing release once it exists in MB. *("the tail stops being a chore")*
+
+### D18 · Metrics endpoint (Prometheus) + alerting hooks  *(§16, post-MVP)*
+The app runs unattended, so without metrics it can **silently stop working** — a poller
+dies, or the Spotify refresh token expires — and I won't notice until I look. Expose
+Prometheus metrics so Grafana (already on partridge) can alert.
+- **`GET /metrics`** (Prometheus text) on the API, sourced from the **DB** so it's correct
+  across processes (the API and the poller worker are separate — in-process counters in
+  the worker are invisible to the API). Exposes:
+  - `wantlist_spotify_connected` (0/1) and `wantlist_spotify_reauth_days_remaining` →
+    alert *before* the 6-month token expiry (§8c);
+  - `wantlist_albums{state=…}` → Decide / Acquire backlog gauges; `wantlist_albums_missing_art`;
+  - `wantlist_job_last_success_timestamp{job=…}` + run/error counters → alert if a poller
+    stalls or errors (the "silently stopped" guard). Pollers write a heartbeat to a small
+    `job_run` table on each pass; `/metrics` reads it.
+- **Done when:** `GET /metrics` returns valid Prometheus text with the above, and scraping
+  it can drive Grafana alerts for (a) reauth-due and (b) a stalled poller. (Prometheus
+  scrape config + Grafana dashboards/alerts live in the `house`/`lab` repos, not here.)
+- **Pull-forward note:** the reauth-days and job-freshness metrics are the highest-value
+  and depend only on things that exist by D8 — worth pulling earlier than the tail work if
+  you start running it for real (D10) before then.
 
 ---
 

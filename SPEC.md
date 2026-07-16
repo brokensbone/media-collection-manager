@@ -135,7 +135,9 @@ via the §6a verdict). Could be one table with a state field, or two — see ope
 **Auth/credentials store** (small, separate): the Spotify refresh + access tokens, access
 expiry, and — critically — **`spotify_authorized_at`**, the timestamp of the last full
 authorization. Needed because refresh tokens now expire at 6 months and carry no
-issuance time of their own (§8c).
+issuance time of their own (§8c). **Stored plaintext in Postgres** (single `spotify_auth`
+row) — a deliberate choice for a single-user LAN deployment; encryption-at-rest was
+considered and declined. (`client_id`/`client_secret` live in config, not the DB.)
 
 ### 4a. Play history (listening data) — a local store the tool builds itself
 
@@ -592,6 +594,7 @@ keep/drop/snooze.
 | Deployment | **Agnostic** — app only requires a Postgres backend + a beets command, both from config (§8a). My blink+partridge hosting is a reference deployment (§8b), not a requirement. |
 | Acquisition | Manual; assisted by one-click Bandcamp search-URL per want (§7). Links, never buys. |
 | Testing | Ports-and-adapters + pure core + injectable clock + configurable base URLs → unit-test the bulk; real-Postgres integration (testcontainers); Docker E2E (app+postgres, fake-Spotify stub) for the full flow (§14). |
+| Observability | `GET /metrics` (Prometheus), DB-sourced so it's correct across the API/worker split; alerts for reauth-due and stalled pollers via Grafana (§16, ROADMAP D18). |
 
 **v1 scope (the "thin" cut):**
 Spotify OAuth **with a working re-auth flow** (§8c) → saves ingest → reconcile against
@@ -936,3 +939,26 @@ ports (§14), so this isn't a one-way door.
   mount-vs-sidecar question is about the *library*, not the binary). Behind Traefik on the
   `blink` stack (§8b).
 - **Monorepo**: `backend/` + `frontend/` in this repo; one image out.
+
+## 16. Observability & metrics
+
+The app runs unattended on a schedule, so its main operational risk is **silent failure**:
+a poller dies or the Spotify refresh token expires and nothing tells me until I next look
+and find the library hasn't grown. Prometheus metrics + Grafana alerts close that gap
+(Grafana/Prometheus already run on partridge, §8b). Built in ROADMAP **D18**.
+
+- **`GET /metrics`** in Prometheus text format, served by the API.
+- **Sourced from the DB, not in-process counters.** The API and the poller `worker` are
+  separate processes (§15), so worker-local counters are invisible to the API's `/metrics`.
+  Instead, pollers persist a **heartbeat** (last-run, last-success, last-error) to a small
+  `job_run` table each pass, and `/metrics` derives everything by querying the DB. One
+  scrape target, correct across processes, survives restarts.
+- **Metrics that matter:**
+  - `wantlist_spotify_connected`, `wantlist_spotify_reauth_days_remaining` — alert *before*
+    the 6-month expiry (§8c) rather than discovering it after ingest has silently stopped.
+  - `wantlist_albums{state=…}` — the funnel as gauges (Decide/Acquire backlog);
+    `wantlist_albums_missing_art`.
+  - `wantlist_job_last_success_timestamp{job=…}` + run/error counters — alert if any poller
+    (saves, play-history, watch, reconcile) stalls or errors.
+- **Boundary:** the app *exposes* metrics; the Prometheus scrape config and Grafana
+  dashboards/alerts live in the `house`/`lab` repos, per the deployment split (§8b).
