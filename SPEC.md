@@ -996,3 +996,32 @@ and find the library hasn't grown. Prometheus metrics + Grafana alerts close tha
     (saves, play-history, watch, reconcile) stalls or errors.
 - **Boundary:** the app *exposes* metrics; the Prometheus scrape config and Grafana
   dashboards/alerts live in the `house`/`lab` repos, per the deployment split (§8b).
+
+## 17. In-app user guide
+
+A friendly **Guide** page inside the web app that explains, in plain language, what the
+app is for and how to use it day-to-day. Not API docs — a "here's the loop, here's each
+worklist, here's what a button does" walkthrough for me (or anyone I show it to), so the
+app is self-explanatory without re-reading the spec. Built in ROADMAP **D19**.
+
+- **In-app, not a separate site.** A `Guide` view in the React app (its own route/tab),
+  styled with the existing theme-aware CSS (§8e) — sharp, readable, no new dependencies. It
+  reads as HTML content; no backend or data fetching required (static content component).
+- **Tone: friendly and brief.** Welcoming, second-person, skimmable. Explains the *why*
+  (a smart want-list, not a recommender) before the *how*.
+- **Covers the whole loop, worklist by worklist:**
+  - The funnel in one picture/paragraph: `saved → decide → wanted → acquire → owned`, plus
+    where **suggested** (artist-watch) and **dismissed** fit.
+  - **Decide** — what "forgotten" and "listened" triggers mean, and Keep / Drop / Snooze.
+  - **Acquire** — the Bandcamp buy-assist, Mark ordered, and the manual "mark owned" link
+    for edition mismatches / MB-absent albums (why the loop is always closable).
+  - **Releases** — new-from-same-artist, Save vs. straight-to-Want.
+  - **Import** — how Transmission auto-land (§12) and watch-dir drops (§13) surface here,
+    and that Import is one click and reconcile flips it `owned`.
+  - **Spotify connection** — the reconnect banner and why it matters (§8c): if it lapses,
+    every worklist silently stops filling.
+  - A short **"how it works behind the scenes"** note: pollers run on a schedule; ownership
+    is derived from beets by reconcile; nothing is a recommendation engine.
+- **Discoverable:** a link in the top bar (§8e) so it's always one click away.
+- **Low-maintenance:** content lives in one place; when a worklist changes, the guide is
+  the obvious thing to update (called out in that deliverable's "done"). No generated docs.
