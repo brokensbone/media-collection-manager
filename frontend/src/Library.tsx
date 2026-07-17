@@ -18,6 +18,7 @@ export function Library({
 }: { state?: string; refreshKey?: number; query?: string }) {
   const [albums, setAlbums] = useState<Album[] | null>(null)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey is a manual refetch trigger
   useEffect(() => {
     const url = state ? `/albums?state=${state}` : '/albums'
     fetch(url)

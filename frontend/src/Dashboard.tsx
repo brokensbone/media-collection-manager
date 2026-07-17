@@ -30,6 +30,7 @@ type Props = {
 export function Dashboard({ refreshKey = 0, active = 'all', onSelect }: Props) {
   const [counts, setCounts] = useState<Counts | null>(null)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey is a manual refetch trigger
   useEffect(() => {
     fetch('/dashboard')
       .then((r) => r.json())
