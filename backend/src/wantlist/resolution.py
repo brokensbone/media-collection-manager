@@ -42,10 +42,17 @@ class ResolutionService:
 
         resolved = unresolved = 0
         for album in self._repo.albums_needing_resolution():
-            isrcs = self._api.album_isrcs(token, album.spotify_id) if album.spotify_id else []
-            rgid = self._resolver.resolve(
-                upc=album.upc, isrcs=isrcs, artist=album.artist, title=album.title
-            )
+            try:
+                isrcs = self._api.album_isrcs(token, album.spotify_id) if album.spotify_id else []
+                rgid = self._resolver.resolve(
+                    upc=album.upc, isrcs=isrcs, artist=album.artist, title=album.title
+                )
+            except Exception:
+                # A flaky upstream (MB 503, Spotify hiccup) must not abort the whole pass —
+                # leave this one unresolved and it retries next reconcile.
+                log.warning("resolve failed for album %s; will retry", album.id, exc_info=True)
+                unresolved += 1
+                continue
             if rgid:
                 self._repo.set_release_group(album.id, rgid)
                 resolved += 1

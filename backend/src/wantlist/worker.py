@@ -75,13 +75,22 @@ def build_scheduler(settings: Settings) -> BlockingScheduler:
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     settings = Settings()
-    ingest_once(settings)  # run once at startup, then on the intervals
-    reconcile_once(settings)
-    poll_plays_once(settings)
-    watch_artists_once(settings)
-    poll_transmission_once(settings)
-    poll_watchdir_once(settings)
-    alerts_once(settings)
+    # Run each job once at startup, then on the intervals. Guard each: a transient failure
+    # (e.g. a MusicBrainz 503 during reconcile) must not stop the scheduler from starting —
+    # otherwise one flaky upstream call kills every poller. The scheduled run retries later.
+    for job in (
+        ingest_once,
+        reconcile_once,
+        poll_plays_once,
+        watch_artists_once,
+        poll_transmission_once,
+        poll_watchdir_once,
+        alerts_once,
+    ):
+        try:
+            job(settings)
+        except Exception:
+            log.exception("startup run of %s failed; continuing", job.__name__)
     build_scheduler(settings).start()
 
 
