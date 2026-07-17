@@ -1,4 +1,5 @@
 import logging
+import os
 import signal
 import threading
 from collections.abc import Callable
@@ -57,11 +58,12 @@ def main() -> None:
         signal.signal(sig, lambda *_: stop.set())
 
     scheduler.start()
-    try:
-        while not stop.wait(1.0):
-            pass
-    finally:
-        scheduler.shutdown(wait=False)
+    while not stop.wait(1.0):
+        pass
+    scheduler.shutdown(wait=False)
+    # Force exit: APScheduler's thread-pool threads are non-daemon, so a job in flight (a long
+    # cold-start reconcile) would otherwise block interpreter shutdown until Docker SIGKILLs us.
+    os._exit(0)
 
 
 if __name__ == "__main__":
