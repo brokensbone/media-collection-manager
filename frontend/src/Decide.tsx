@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Cover } from './Cover'
 import { matchesQuery } from './filter'
 
@@ -8,6 +8,7 @@ type Action = 'keep' | 'drop' | 'snooze'
 export function Decide({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
   const [items, setItems] = useState<Item[] | null>(null)
   const [sel, setSel] = useState(0)
+  const selRef = useRef<HTMLTableRowElement | null>(null)
 
   useEffect(() => {
     fetch('/decide')
@@ -47,6 +48,11 @@ export function Decide({ onChange, query = '' }: { onChange?: () => void; query?
     return () => window.removeEventListener('keydown', onKey)
   }, [items, sel, query, act])
 
+  // Keep the selected row in view as it moves (holding ↓ shouldn't run off-screen).
+  useEffect(() => {
+    selRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [sel])
+
   if (!items) return <p>Loading…</p>
   if (items.length === 0) return <p>Nothing to judge.</p>
 
@@ -66,7 +72,11 @@ export function Decide({ onChange, query = '' }: { onChange?: () => void; query?
       </thead>
       <tbody>
         {shown.map((it, i) => (
-          <tr key={it.id} className={i === cur ? 'sel' : undefined}>
+          <tr
+            key={it.id}
+            ref={i === cur ? selRef : undefined}
+            className={i === cur ? 'sel' : undefined}
+          >
             <Cover id={it.id} hasArt={it.has_art} />
             <td>{it.artist}</td>
             <td>{it.title}</td>
