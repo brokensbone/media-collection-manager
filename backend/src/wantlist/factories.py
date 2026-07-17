@@ -9,6 +9,7 @@ from .adapters.notifier import WebhookNotifier
 from .adapters.rsync import RsyncTransfer
 from .adapters.spotify_api import HttpxSpotifyApiClient
 from .adapters.spotify_auth import HttpxSpotifyAuthClient
+from .adapters.tags import MediaFileTagReader
 from .adapters.token_store import TokenStore
 from .adapters.transmission import HttpxTransmissionClient
 from .alerts import AlertsService
@@ -16,8 +17,15 @@ from .artist_watch import ArtistWatchService
 from .auth_service import AuthService
 from .config import Settings
 from .decide import DecideService
-from .imports import ImportDetectionService, ImportRunner
+from .imports import (
+    ImportDetectionService,
+    ImportRunner,
+    TransmissionStager,
+    WatchdirDetectionService,
+    WatchdirStager,
+)
 from .ingest import IngestService
+from .models import ImportSource
 from .play_history import PlayHistoryService
 from .reconcile import OwnershipReconciler
 from .releases import ReleasesService
@@ -135,15 +143,40 @@ def build_import_detection_service(
     )
 
 
-def build_import_runner(settings: Settings, session_factory: sessionmaker[Session]) -> ImportRunner:
-    return ImportRunner(
+def build_watchdir_detection_service(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> WatchdirDetectionService:
+    return WatchdirDetectionService(
         repo=AlbumRepo(session_factory),
-        transfer=RsyncTransfer(
+        tags=MediaFileTagReader(),
+        clock=SystemClock(),
+        watch_dir=settings.watchdir_path,
+        archive_subdir=settings.watchdir_archive_subdir,
+        settle_seconds=settings.watchdir_settle_seconds,
+        match_threshold=settings.import_match_threshold,
+    )
+
+
+def build_import_runner(settings: Settings, session_factory: sessionmaker[Session]) -> ImportRunner:
+    transmission = TransmissionStager(
+        RsyncTransfer(
             host=settings.transmission_ssh_host,
             port=settings.transmission_ssh_port,
             user=settings.transmission_ssh_user,
             ssh_key=settings.transmission_ssh_key,
-        ),
+        )
+    )
+    watchdir = WatchdirStager(
+        watch_dir=settings.watchdir_path,
+        disposition=settings.watchdir_disposition,
+        archive_subdir=settings.watchdir_archive_subdir,
+    )
+    return ImportRunner(
+        repo=AlbumRepo(session_factory),
+        stagers={
+            ImportSource.transmission: transmission,
+            ImportSource.watchdir: watchdir,
+        },
         beets=BeetsClient(settings.beets_config),
         inbox=settings.import_inbox_path,
     )

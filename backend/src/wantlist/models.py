@@ -119,17 +119,28 @@ class ImportState(StrEnum):
     failed = "failed"
 
 
-class DownloadImport(Base):
-    """A completed Transmission download seen by the auto-land pipeline (SPEC §12). The
-    torrent hash is the seen-ledger key so a completion is only ever processed once."""
+class ImportSource(StrEnum):
+    """Which front surfaced this import (SPEC §12/§13). They share the import → beets →
+    reconcile tail; only the staging step differs (rsync pull vs. local unpack)."""
 
-    __tablename__ = "download_import"
+    transmission = "transmission"
+    watchdir = "watchdir"
+
+
+class PendingImport(Base):
+    """An acquisition awaiting a one-click import into beets, from either front (§12/§13).
+    `source_key` is the per-source seen-ledger key (torrent hash / drop path) so a given
+    acquisition is only ever processed once."""
+
+    __tablename__ = "pending_import"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    torrent_hash: Mapped[str] = mapped_column(unique=True, index=True)
+    source: Mapped[ImportSource] = mapped_column(SAEnum(ImportSource, name="import_source"))
+    source_key: Mapped[str] = mapped_column(unique=True, index=True)
     name: Mapped[str]
-    download_dir: Mapped[str]
-    files: Mapped[list[str]] = mapped_column(JSON, default=list)  # paths relative to dir
+    download_dir: Mapped[str | None] = mapped_column(default=None)  # §12 transfer source
+    files: Mapped[list[str]] = mapped_column(JSON, default=list)  # §12 paths relative to dir
+    archive_path: Mapped[str | None] = mapped_column(default=None)  # §13 zip/folder to unpack
     matched_album_id: Mapped[int | None] = mapped_column(
         ForeignKey("album.id", ondelete="SET NULL"), default=None
     )

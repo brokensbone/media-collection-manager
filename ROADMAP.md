@@ -120,8 +120,9 @@ surfacing turned out to be unwanted. So D12 corrects the watch to **baseline-the
 - **Built lean:** transfer is rsync-over-SSH behind a `FileTransfer` seam (`RsyncTransfer`), copy-only (`--files-from`, never `--remove-source-files`/`--delete`) so seeding is safe; match is `difflib` fuzzy (no LLM, per the D16 call); unmatched completions still recorded for hand-import; hash-keyed seen-set; per-download state `detected → imported | failed`.
 - **Done when:** a completed torrent is detected, matched, one-click imported, lands in beets, and reconcile flips it `owned` — with seedbox originals untouched; tests incl. the seeding-safety rule and the no-match import path. *("torrent → one-click import → owned, seeding safe")*
 
-### D15 · Watch-dir import  *(§13)*
-- Watch a dir → unpack zip → match (embedded tags) → import; no-match import allowed; original archived/deleted per config.
+### D15 · Watch-dir import  *(§13)*  — ✅ done (pending CI)
+- Scan a dir (settle check) → match by embedded tags → one-click unpack (zip-slip guarded) → `beet import` → tidy → dispose drop (archive/delete/leave); no-match import allowed.
+- **Built on a shared tail:** D14's `download_import` generalized to a source-agnostic `pending_import` (`source` discriminator, `source_key`, `archive_path`); the Import worklist / routes / runner / reconcile are shared, only staging differs (`Stager` seam: rsync vs. unpack). Tags read via bundled `mediafile` behind a `TagReader` seam.
 - **Done when:** dropping a fixture zip results in unpack → import → `owned`, and the no-match path works; tests pass. *("drop zip → owned")*
 
 ### D16 · LLM Tier-3 adjudicator  *(§5a)*  — ❌ dropped by D0

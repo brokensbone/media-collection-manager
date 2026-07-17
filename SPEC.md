@@ -509,8 +509,8 @@ releases → decide → acquire → import.
    and pick the album that satisfies this want (a sticky manual link, §4/§5) for edition
    mismatches or MB-absent albums the rgid join can't catch. (D17 adds fuzzy-suggested
    candidates + a "possibly already owned?" hint here.)
-4. **Import** — **built for Transmission (§12, D14); watch-dir (§13) still to come.**
-   Detected downloads awaiting the Import click. Item: download name, matched want (or
+4. **Import** — **built for both fronts: Transmission (§12, D14) and watch-dir (§13, D15).**
+   Detected acquisitions awaiting the Import click. Item: source, name, matched want (or
    "no match"), **Import** button. Landing without this is fully manual — reconcile still
    flips `owned` with no queue at all.
 
@@ -715,8 +715,9 @@ script rather than after building the whole tool.
 >   adjudicator — the same call we made for §5's Tier-3 (the LLM tier was dropped; the tail
 >   is handled by the human-gated Import + manual match). Unmatched completions are still
 >   recorded so they can be hand-imported (the shared no-match rule).
-> - **Seen-set is the torrent hash** (`download_import.torrent_hash`, unique) — a completion
->   is only ever recorded once. Per-download `state` is `detected → imported | failed`.
+> - **Seen-set is the torrent hash** (the `pending_import.source_key`, unique — D15
+>   generalized D14's `download_import.torrent_hash`) — a completion is only ever recorded
+>   once. Per-import `state` is `detected → imported | failed`.
 > - **The post-import autotag sanity check is deferred** — reconcile flips `owned` off the
 >   release-group match; a mismatched autotag would be visible in the library view. Left as
 >   an open item rather than built in D14.
@@ -793,13 +794,32 @@ any other observed content.
 - A sibling watch-dir importer for non-torrent acquisitions (Bandcamp zips) reuses this
   extension's match→import→tidy tail — see §13.
 
-## 13. Extension (post-MVP): watch-dir import (Bandcamp zips & dropped folders)
+## 13. Extension: watch-dir import (Bandcamp zips & dropped folders)
 
-> **Status: sketch, not MVP.** Sibling of §12 — it **reuses the same match → Import
-> button → beets import → tidy → reconcile tail**, and differs only at the front: the
-> files are already local and *owned*, so instead of a Transmission poll + SSH transfer
-> there's a directory watch + unpack. Makes landing a Bandcamp purchase as easy as
-> dropping the zip in a folder.
+> **Status: built (D15).** Sibling of §12 — it **reuses the same match → Import button →
+> beets import → tidy → reconcile tail**, and differs only at the front: the files are
+> already local and *owned*, so instead of a Transmission poll + SSH transfer there's a
+> directory watch + unpack. Makes landing a Bandcamp purchase as easy as dropping the zip
+> in a folder.
+
+> **As built (D15):**
+> - **The import ledger is now source-agnostic.** D14's `download_import` table became
+>   `pending_import` with a `source` discriminator (`transmission` | `watchdir`), a generic
+>   `source_key` (torrent hash / drop path+size+mtime), and a nullable `archive_path` for the
+>   §13 drop. The Import worklist, `/imports` routes, `ImportRunner`, and reconcile are fully
+>   shared; only **staging** differs, behind a `Stager` seam: `TransmissionStager` (rsync
+>   pull, never touch source) vs. `WatchdirStager` (unpack, then dispose the drop).
+> - **Match uses embedded tags** (beets' bundled `mediafile`, behind a `TagReader` seam): a
+>   folder's first audio file, or the first audio entry peeked out of a `.zip` — with a
+>   fallback to the filename stem. Then the same `difflib` match as §12.
+> - **Scan, not inotify** — a periodic scan with a **settle check** (skip drops whose newest
+>   mtime is within `watchdir_settle_seconds`) so partial copies aren't grabbed. `.zip` files
+>   and loose folders only; the archive subdir is skipped.
+> - **Unpack guards against zip-slip** (every member must resolve inside the staging dir).
+> - **Disposition after a successful import:** archive to `<watch>/<subdir>` (default) /
+>   delete / leave — the deliberate contrast with §12's copy-never rule, since the drop is
+>   ours. A disposition hiccup is logged, never causes a re-import (the source_key is already
+>   recorded and the row already `imported`).
 
 **Motivation:** the §7 acquisition assist points me at Bandcamp; purchases arrive as
 zips. This closes the loop on them with zero ceremony.
@@ -827,12 +847,14 @@ zips. This closes the loop on them with zero ceremony.
   §12's copy-never-move-never-delete seedbox rule.)
 - **Matching is more reliable** — real tags beat scene names.
 
-**Config additions (extends §8a):**
+**Config additions (extends §8a) — as built:**
 | Requirement | Config |
 |---|---|
-| Watch directory | path to watch; staging/extract path |
-| Post-import disposition | archive dir / delete / leave (default: archive) |
-| Import behaviour | reuses the §5 beets command + §12 import settings |
+| Watch directory | `watchdir_path` (empty = disabled); staging reuses `import_inbox_path` |
+| Scan cadence / settle | `watchdir_poll_seconds` (300), `watchdir_settle_seconds` (60) |
+| Post-import disposition | `watchdir_disposition` (archive / delete / leave), `watchdir_archive_subdir` (`done`) |
+| Match threshold | reuses `import_match_threshold` |
+| Import behaviour | reuses the §5 beets seam (`beet import -q`) |
 
 **DECIDED — imports don't require a want match (shared by §12 and §13).** Acquisitions
 often bypass the want-list entirely — a Bandcamp buy you found directly, or a torrent you

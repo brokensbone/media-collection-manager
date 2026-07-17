@@ -8,6 +8,7 @@ from .jobs import (
     ingest_once,
     poll_plays_once,
     poll_transmission_once,
+    poll_watchdir_once,
     reconcile_once,
     watch_artists_once,
 )
@@ -53,6 +54,14 @@ def build_scheduler(settings: Settings) -> BlockingScheduler:
             args=[settings],
             id="transmission",
         )
+    if settings.watchdir_path:
+        scheduler.add_job(
+            poll_watchdir_once,
+            "interval",
+            seconds=settings.watchdir_poll_seconds,
+            args=[settings],
+            id="watchdir",
+        )
     scheduler.add_job(
         alerts_once,
         "interval",
@@ -71,6 +80,7 @@ def main() -> None:
     poll_plays_once(settings)
     watch_artists_once(settings)
     poll_transmission_once(settings)
+    poll_watchdir_once(settings)
     alerts_once(settings)
     build_scheduler(settings).start()
 

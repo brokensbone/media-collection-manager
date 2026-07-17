@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 
-type Item = { id: number; name: string; matched_album_id: number | null; matched: string | null }
+type Item = {
+  id: number
+  source: string
+  name: string
+  matched_album_id: number | null
+  matched: string | null
+}
 
 export function Imports() {
   const [items, setItems] = useState<Item[] | null>(null)
@@ -28,6 +34,7 @@ export function Imports() {
       <tbody>
         {items.map((it) => (
           <tr key={it.id}>
+            <td className="muted">{it.source}</td>
             <td>{it.name}</td>
             <td>{it.matched ?? <span className="muted">no match</span>}</td>
             <td>

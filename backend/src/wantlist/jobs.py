@@ -12,6 +12,7 @@ from .factories import (
     build_ownership_reconciler,
     build_play_history_service,
     build_resolution_service,
+    build_watchdir_detection_service,
 )
 
 log = logging.getLogger(__name__)
@@ -81,6 +82,17 @@ def poll_transmission_once(settings: Settings | None = None) -> None:
     log.info("transmission: detected=%s", result.detected)
 
 
+def poll_watchdir_once(settings: Settings | None = None) -> None:
+    """One watch-dir scan — detect settled drops and match them to wants (§13). Disabled when
+    no watch path is configured."""
+    settings = settings or Settings()
+    if not settings.watchdir_path:
+        return
+    session_factory = make_session_factory(make_engine(settings.database_url))
+    result = build_watchdir_detection_service(settings, session_factory).poll()
+    log.info("watchdir: detected=%s", result.detected)
+
+
 def alerts_once(settings: Settings | None = None) -> None:
     """Fire operator alerts for re-auth-due and a triage backlog (§8d)."""
     settings = settings or Settings()
@@ -100,4 +112,5 @@ if __name__ == "__main__":
     poll_plays_once()
     watch_artists_once()
     poll_transmission_once()
+    poll_watchdir_once()
     alerts_once()

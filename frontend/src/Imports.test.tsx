@@ -18,18 +18,27 @@ afterEach(() => {
 })
 
 describe('Imports', () => {
-  it('shows the matched want and a no-match label', async () => {
+  it('shows the source, matched want and a no-match label', async () => {
     mockApi([
-      { id: 1, name: 'Burial-Untrue', matched_album_id: 5, matched: 'Burial — Untrue' },
-      { id: 2, name: 'Mystery', matched_album_id: null, matched: null },
+      {
+        id: 1,
+        source: 'transmission',
+        name: 'Burial-Untrue',
+        matched_album_id: 5,
+        matched: 'Burial — Untrue',
+      },
+      { id: 2, source: 'watchdir', name: 'Mystery', matched_album_id: null, matched: null },
     ])
     render(<Imports />)
     expect(await screen.findByText('Burial — Untrue')).toBeTruthy()
+    expect(screen.getByText('watchdir')).toBeTruthy()
     expect(screen.getByText('no match')).toBeTruthy()
   })
 
   it('imports: POSTs and removes the row', async () => {
-    const fetchMock = mockApi([{ id: 9, name: 'Only', matched_album_id: null, matched: null }])
+    const fetchMock = mockApi([
+      { id: 9, source: 'watchdir', name: 'Only', matched_album_id: null, matched: null },
+    ])
     render(<Imports />)
     await screen.findByText('Only')
     fireEvent.click(screen.getByRole('button', { name: 'Import' }))
