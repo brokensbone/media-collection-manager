@@ -1,10 +1,10 @@
 import logging
 import signal
+import threading
 from collections.abc import Callable
 from datetime import datetime
-from types import FrameType
 
-from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from .config import Settings
 from .jobs import (
@@ -21,11 +21,11 @@ from .jobs import (
 log = logging.getLogger(__name__)
 
 
-def build_scheduler(settings: Settings) -> BlockingScheduler:
+def build_scheduler(settings: Settings) -> BackgroundScheduler:
     # Jobs run on a thread pool and each also fires immediately at startup (next_run_time=now),
     # so a slow poller (e.g. a cold-start reconcile hammering MusicBrainz) runs concurrently
     # and never blocks the others — the earlier serial startup burst did exactly that.
-    scheduler = BlockingScheduler()
+    scheduler = BackgroundScheduler()
     now = datetime.now()
 
     def every(job: Callable[[Settings], None], seconds: int, job_id: str) -> None:
@@ -48,18 +48,20 @@ def build_scheduler(settings: Settings) -> BlockingScheduler:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-    # Each job fires immediately (and then on its interval) on the scheduler's thread pool,
-    # so startup runs happen concurrently and a slow/failing one can't block the rest.
+    # BackgroundScheduler runs jobs on its own threads; the main thread waits on a stop event
+    # with a short poll so a SIGTERM handler (which a long blocking wait would starve) is acted
+    # on within ~1s — otherwise `docker stop` SIGKILLs the worker after its grace period (137).
     scheduler = build_scheduler(Settings())
+    stop = threading.Event()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(sig, lambda *_: stop.set())
 
-    # BlockingScheduler only handles SIGINT; without this, `docker stop` sends SIGTERM, the
-    # process ignores it, and Docker SIGKILLs it after the timeout (exit 137). Shut down
-    # cleanly on SIGTERM so it exits 0.
-    def _stop(_signum: int, _frame: FrameType | None) -> None:
-        scheduler.shutdown(wait=False)
-
-    signal.signal(signal.SIGTERM, _stop)
     scheduler.start()
+    try:
+        while not stop.wait(1.0):
+            pass
+    finally:
+        scheduler.shutdown(wait=False)
 
 
 if __name__ == "__main__":
