@@ -19,7 +19,7 @@ const TILES: { key: keyof Counts; label: string }[] = [
   { key: 'dismissed', label: 'dismissed' },
 ]
 
-export function Dashboard() {
+export function Dashboard({ refreshKey = 0 }: { refreshKey?: number }) {
   const [counts, setCounts] = useState<Counts | null>(null)
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export function Dashboard() {
       .then((r) => r.json())
       .then(setCounts)
       .catch(() => setCounts(null))
-  }, [])
+  }, [refreshKey])
 
   if (!counts) return null
 

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Decide } from './Decide'
 
@@ -33,5 +33,14 @@ describe('Decide', () => {
     await screen.findByText(/Nothing to judge/)
     const posted = fetchMock.mock.calls.find((c) => c[1]?.method === 'POST')
     expect(posted?.[0]).toBe('/albums/7/keep')
+  })
+
+  it('notifies onChange after an action so the dashboard can refresh', async () => {
+    mockApi([{ id: 7, artist: 'A', title: 'Only', reason: 'r', has_art: false }])
+    const onChange = vi.fn()
+    render(<Decide onChange={onChange} />)
+    await screen.findByText('Only')
+    fireEvent.click(screen.getByRole('button', { name: 'Drop' }))
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
   })
 })

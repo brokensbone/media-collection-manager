@@ -8,7 +8,7 @@ type Item = {
   matched: string | null
 }
 
-export function Imports() {
+export function Imports({ onChange }: { onChange?: () => void }) {
   const [items, setItems] = useState<Item[] | null>(null)
 
   useEffect(() => {
@@ -18,13 +18,16 @@ export function Imports() {
       .catch(() => setItems([]))
   }, [])
 
-  const runImport = useCallback((id: number) => {
-    setItems((list) => {
-      if (!list) return list
-      fetch(`/imports/${id}/import`, { method: 'POST' })
-      return list.filter((it) => it.id !== id)
-    })
-  }, [])
+  const runImport = useCallback(
+    (id: number) => {
+      setItems((list) => {
+        if (!list) return list
+        fetch(`/imports/${id}/import`, { method: 'POST' }).then(() => onChange?.())
+        return list.filter((it) => it.id !== id)
+      })
+    },
+    [onChange],
+  )
 
   if (!items) return <p>Loading…</p>
   if (items.length === 0) return <p>No downloads to import.</p>

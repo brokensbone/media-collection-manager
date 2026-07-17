@@ -19,7 +19,7 @@ type Candidate = {
   score: number
 }
 
-export function Acquire() {
+export function Acquire({ onChange }: { onChange?: () => void }) {
   const [items, setItems] = useState<Item[] | null>(null)
   const [linking, setLinking] = useState<number | null>(null)
   const [candidates, setCandidates] = useState<Candidate[] | null>(null)
@@ -37,10 +37,10 @@ export function Acquire() {
 
   const order = useCallback(
     (id: number) => {
-      fetch(`/albums/${id}/order`, { method: 'POST' })
+      fetch(`/albums/${id}/order`, { method: 'POST' }).then(() => onChange?.())
       remove(id)
     },
-    [remove],
+    [remove, onChange],
   )
 
   const markOwned = useCallback(
@@ -49,12 +49,12 @@ export function Acquire() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ beets_id: beetsId ?? null }),
-      })
+      }).then(() => onChange?.())
       setLinking(null)
       setCandidates(null)
       remove(id)
     },
-    [remove],
+    [remove, onChange],
   )
 
   const startLinking = useCallback((id: number) => {

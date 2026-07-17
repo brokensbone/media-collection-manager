@@ -4,7 +4,7 @@ import { Cover } from './Cover'
 type Item = { id: number; artist: string; title: string; has_art: boolean }
 type Action = 'save' | 'want' | 'dismiss'
 
-export function Releases() {
+export function Releases({ onChange }: { onChange?: () => void }) {
   const [items, setItems] = useState<Item[] | null>(null)
 
   useEffect(() => {
@@ -14,13 +14,16 @@ export function Releases() {
       .catch(() => setItems([]))
   }, [])
 
-  const act = useCallback((id: number, action: Action) => {
-    setItems((list) => {
-      if (!list) return list
-      fetch(`/albums/${id}/${action}`, { method: 'POST' })
-      return list.filter((it) => it.id !== id)
-    })
-  }, [])
+  const act = useCallback(
+    (id: number, action: Action) => {
+      setItems((list) => {
+        if (!list) return list
+        fetch(`/albums/${id}/${action}`, { method: 'POST' }).then(() => onChange?.())
+        return list.filter((it) => it.id !== id)
+      })
+    },
+    [onChange],
+  )
 
   if (!items) return <p>Loading…</p>
   if (items.length === 0) return <p>No new releases.</p>

@@ -10,7 +10,7 @@ type Album = {
   has_art: boolean
 }
 
-export function Library({ state }: { state?: string }) {
+export function Library({ state, refreshKey = 0 }: { state?: string; refreshKey?: number }) {
   const [albums, setAlbums] = useState<Album[] | null>(null)
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export function Library({ state }: { state?: string }) {
       .then((r) => r.json())
       .then(setAlbums)
       .catch(() => setAlbums([]))
-  }, [state])
+  }, [state, refreshKey])
 
   if (!albums) return <p>Loading…</p>
   if (albums.length === 0) return <p>Nothing here.</p>

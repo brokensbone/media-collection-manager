@@ -4,7 +4,7 @@ import { Cover } from './Cover'
 type Item = { id: number; artist: string; title: string; reason: string; has_art: boolean }
 type Action = 'keep' | 'drop' | 'snooze'
 
-export function Decide() {
+export function Decide({ onChange }: { onChange?: () => void }) {
   const [items, setItems] = useState<Item[] | null>(null)
   const [sel, setSel] = useState(0)
 
@@ -15,15 +15,18 @@ export function Decide() {
       .catch(() => setItems([]))
   }, [])
 
-  const act = useCallback((index: number, action: Action) => {
-    setItems((list) => {
-      if (!list?.[index]) return list
-      fetch(`/albums/${list[index].id}/${action}`, { method: 'POST' })
-      const next = list.filter((_, i) => i !== index)
-      setSel((s) => Math.max(0, Math.min(s, next.length - 1)))
-      return next
-    })
-  }, [])
+  const act = useCallback(
+    (index: number, action: Action) => {
+      setItems((list) => {
+        if (!list?.[index]) return list
+        fetch(`/albums/${list[index].id}/${action}`, { method: 'POST' }).then(() => onChange?.())
+        const next = list.filter((_, i) => i !== index)
+        setSel((s) => Math.max(0, Math.min(s, next.length - 1)))
+        return next
+      })
+    },
+    [onChange],
+  )
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
