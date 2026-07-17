@@ -60,13 +60,29 @@ h2 {
   gap: 20px;
   padding: 12px 0;
   font-size: 13px;
+}
+.stat {
+  border: none;
+  background: none;
+  font: inherit;
   color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+}
+.stat:hover {
+  color: var(--text);
+}
+.stat.active {
+  color: var(--accent);
 }
 .stat b {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--text);
   font-weight: 500;
+}
+.stat.active b {
+  color: var(--accent);
 }
 table {
   width: 100%;

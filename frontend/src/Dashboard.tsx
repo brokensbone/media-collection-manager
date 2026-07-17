@@ -9,6 +9,8 @@ type Counts = {
   dismissed: number
 }
 
+export type Section = 'all' | keyof Counts
+
 // One tile per worklist section, in the same order and wording as the page below.
 const TILES: { key: keyof Counts; label: string }[] = [
   { key: 'releases', label: 'releases' },
@@ -19,7 +21,13 @@ const TILES: { key: keyof Counts; label: string }[] = [
   { key: 'dismissed', label: 'dismissed' },
 ]
 
-export function Dashboard({ refreshKey = 0 }: { refreshKey?: number }) {
+type Props = {
+  refreshKey?: number
+  active?: Section
+  onSelect?: (s: Section) => void
+}
+
+export function Dashboard({ refreshKey = 0, active = 'all', onSelect }: Props) {
   const [counts, setCounts] = useState<Counts | null>(null)
 
   useEffect(() => {
@@ -33,10 +41,22 @@ export function Dashboard({ refreshKey = 0 }: { refreshKey?: number }) {
 
   return (
     <div className="dashboard">
+      <button
+        type="button"
+        className={active === 'all' ? 'stat active' : 'stat'}
+        onClick={() => onSelect?.('all')}
+      >
+        all
+      </button>
       {TILES.map((t) => (
-        <span key={t.key} className="stat">
+        <button
+          key={t.key}
+          type="button"
+          className={active === t.key ? 'stat active' : 'stat'}
+          onClick={() => onSelect?.(t.key)}
+        >
           <b>{counts[t.key]}</b> {t.label}
-        </span>
+        </button>
       ))}
     </div>
   )

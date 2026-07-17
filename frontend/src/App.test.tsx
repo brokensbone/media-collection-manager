@@ -3,9 +3,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
 function stubFetch() {
+  const counts = { releases: 0, decide: 0, acquire: 0, import: 0, owned: 0, dismissed: 0 }
   vi.stubGlobal(
     'fetch',
-    vi.fn(() => Promise.resolve({ json: () => Promise.resolve([]) })),
+    vi.fn((url: string) =>
+      Promise.resolve({
+        json: () => Promise.resolve(url === '/dashboard' ? counts : []),
+      }),
+    ),
   )
 }
 
@@ -28,5 +33,18 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'How wantlist works' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Dashboard' }))
     expect(screen.queryByRole('heading', { name: 'How wantlist works' })).toBeNull()
+  })
+
+  it('filters to a single worklist when a dashboard label is clicked', async () => {
+    stubFetch()
+    render(<App />)
+    // all sections shown to start
+    expect(await screen.findByRole('heading', { name: 'Releases' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Acquire' })).toBeTruthy()
+    // click the "decide" label → only Decide remains
+    fireEvent.click(screen.getByRole('button', { name: /decide/ }))
+    expect(screen.getByRole('heading', { name: 'Decide' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Releases' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Acquire' })).toBeNull()
   })
 })
