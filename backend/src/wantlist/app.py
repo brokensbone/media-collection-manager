@@ -13,6 +13,7 @@ from .factories import (
     build_releases_service,
 )
 from .imports import ImportsService
+from .metrics import MetricsService
 from .routers import acquire as acquire_router
 from .routers import art as art_router
 from .routers import auth as auth_router
@@ -20,6 +21,7 @@ from .routers import dashboard as dashboard_router
 from .routers import decide as decide_router
 from .routers import imports as imports_router
 from .routers import library as library_router
+from .routers import metrics as metrics_router
 from .routers import releases as releases_router
 
 
@@ -40,6 +42,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         repo=AlbumRepo(session_factory),
         runner=build_import_runner(settings, session_factory),
     )
+    app.state.metrics_service = MetricsService(
+        repo=AlbumRepo(session_factory),
+        auth=build_auth_service(settings, session_factory),
+    )
     app.include_router(auth_router.router)
     app.include_router(art_router.router)
     app.include_router(library_router.router)
@@ -48,6 +54,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(dashboard_router.router)
     app.include_router(releases_router.router)
     app.include_router(imports_router.router)
+    app.include_router(metrics_router.router)
 
     @app.get("/health")
     def health_endpoint(request: Request) -> JSONResponse:

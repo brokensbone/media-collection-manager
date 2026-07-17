@@ -7,7 +7,15 @@ from sqlalchemy.orm import Session, sessionmaker
 from testcontainers.postgres import PostgresContainer
 
 from wantlist.db import make_session_factory
-from wantlist.models import Album, AlbumArt, Base, PendingImport, PlayHistory, SeenRelease
+from wantlist.models import (
+    Album,
+    AlbumArt,
+    Base,
+    JobRun,
+    PendingImport,
+    PlayHistory,
+    SeenRelease,
+)
 
 # testcontainers' ryuk reaper bind-mounts the docker socket, which colima rejects; our
 # containers are context-managed (`with ...`), so the reaper is just a safety net.
@@ -32,6 +40,7 @@ def clean_album_tables(pg_session_factory: sessionmaker[Session]) -> sessionmake
         session.execute(delete(PlayHistory))
         session.execute(delete(SeenRelease))
         session.execute(delete(PendingImport))
+        session.execute(delete(JobRun))
         session.execute(delete(Album))
         session.commit()
     return pg_session_factory
