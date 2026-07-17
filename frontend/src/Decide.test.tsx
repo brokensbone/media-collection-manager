@@ -43,4 +43,15 @@ describe('Decide', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Drop' }))
     await waitFor(() => expect(onChange).toHaveBeenCalled())
   })
+
+  it('ignores triage hotkeys while a text field is focused', async () => {
+    const fetchMock = mockApi([{ id: 7, artist: 'A', title: 'Only', reason: 'r', has_art: false }])
+    render(<Decide />)
+    await screen.findByText('Only')
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    fireEvent.keyDown(input, { key: 's' }) // typing 's' in a field must not snooze
+    expect(fetchMock.mock.calls.some((c) => c[1]?.method === 'POST')).toBe(false)
+    input.remove()
+  })
 })

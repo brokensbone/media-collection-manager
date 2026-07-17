@@ -27,6 +27,10 @@ export function Decide({ onChange, query = '' }: { onChange?: () => void; query?
   // Keyboard triage operates on the currently-shown (filtered) rows.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      const el = e.target as HTMLElement | null
+      // don't hijack keystrokes while the user is typing in a field (e.g. the filter box)
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable))
+        return
       const shown = (items ?? []).filter((it) => matchesQuery(`${it.artist} ${it.title}`, query))
       if (shown.length === 0) return
       const k = e.key.toLowerCase()
