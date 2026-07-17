@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Cover } from './Cover'
+import { matchesQuery } from './filter'
 
 type Album = {
   id: number
@@ -10,7 +11,11 @@ type Album = {
   has_art: boolean
 }
 
-export function Library({ state, refreshKey = 0 }: { state?: string; refreshKey?: number }) {
+export function Library({
+  state,
+  refreshKey = 0,
+  query = '',
+}: { state?: string; refreshKey?: number; query?: string }) {
   const [albums, setAlbums] = useState<Album[] | null>(null)
 
   useEffect(() => {
@@ -24,10 +29,12 @@ export function Library({ state, refreshKey = 0 }: { state?: string; refreshKey?
   if (!albums) return <p>Loading…</p>
   if (albums.length === 0) return <p>Nothing here.</p>
 
+  const shown = albums.filter((a) => matchesQuery(`${a.artist} ${a.title}`, query))
+
   return (
     <table>
       <tbody>
-        {albums.map((a) => (
+        {shown.map((a) => (
           <tr key={a.id}>
             <Cover id={a.id} hasArt={a.has_art} />
             <td>{a.artist}</td>

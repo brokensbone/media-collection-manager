@@ -35,8 +35,18 @@ describe('Acquire', () => {
   it('shows a Bandcamp buy link per item', async () => {
     mockApi([item()])
     render(<Acquire />)
-    const link = await screen.findByRole('link', { name: 'Buy on Bandcamp' })
+    const link = await screen.findByRole('link', { name: 'Bandcamp' })
     expect(link.getAttribute('href')).toBe('https://bandcamp.com/search?q=A+T1')
+  })
+
+  it('filters rows by the query across artist and title', async () => {
+    mockApi([
+      item({ id: 1, artist: 'Porridge Radio', title: 'Every Bad' }),
+      item({ id: 2, artist: 'Burial', title: 'Untrue' }),
+    ])
+    render(<Acquire query="porri ev" />)
+    expect(await screen.findByText('Every Bad')).toBeTruthy()
+    expect(screen.queryByText('Untrue')).toBeNull()
   })
 
   it('flags a possibly-owned want with its hint', async () => {

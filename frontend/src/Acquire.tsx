@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Cover } from './Cover'
+import { matchesQuery } from './filter'
 
 type Item = {
   id: number
@@ -19,7 +20,7 @@ type Candidate = {
   score: number
 }
 
-export function Acquire({ onChange }: { onChange?: () => void }) {
+export function Acquire({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
   const [items, setItems] = useState<Item[] | null>(null)
   const [linking, setLinking] = useState<number | null>(null)
   const [candidates, setCandidates] = useState<Candidate[] | null>(null)
@@ -69,10 +70,12 @@ export function Acquire({ onChange }: { onChange?: () => void }) {
   if (!items) return <p>Loading…</p>
   if (items.length === 0) return <p>Nothing to acquire.</p>
 
+  const shown = items.filter((it) => matchesQuery(`${it.artist} ${it.title}`, query))
+
   return (
     <table>
       <tbody>
-        {items.map((it) => (
+        {shown.map((it) => (
           <tr key={it.id}>
             <Cover id={it.id} hasArt={it.has_art} />
             <td>{it.artist}</td>
@@ -82,7 +85,7 @@ export function Acquire({ onChange }: { onChange?: () => void }) {
             </td>
             <td>
               <a href={it.bandcamp_url} target="_blank" rel="noreferrer">
-                Buy on Bandcamp
+                Bandcamp
               </a>
             </td>
             <td className="nowrap">

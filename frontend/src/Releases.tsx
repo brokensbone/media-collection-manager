@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Cover } from './Cover'
+import { matchesQuery } from './filter'
 
 type Item = { id: number; artist: string; title: string; has_art: boolean }
 type Action = 'save' | 'want' | 'dismiss'
 
-export function Releases({ onChange }: { onChange?: () => void }) {
+export function Releases({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
   const [items, setItems] = useState<Item[] | null>(null)
 
   useEffect(() => {
@@ -28,10 +29,12 @@ export function Releases({ onChange }: { onChange?: () => void }) {
   if (!items) return <p>Loading…</p>
   if (items.length === 0) return <p>No new releases.</p>
 
+  const shown = items.filter((it) => matchesQuery(`${it.artist} ${it.title}`, query))
+
   return (
     <table>
       <tbody>
-        {items.map((it) => (
+        {shown.map((it) => (
           <tr key={it.id}>
             <Cover id={it.id} hasArt={it.has_art} />
             <td>{it.artist}</td>

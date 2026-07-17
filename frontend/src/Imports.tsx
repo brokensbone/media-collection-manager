@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { matchesQuery } from './filter'
 
 type Item = {
   id: number
@@ -16,7 +17,7 @@ const STATUS: Record<Item['state'], string> = {
   failed: 'failed',
 }
 
-export function Imports({ onChange }: { onChange?: () => void }) {
+export function Imports({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
   const [items, setItems] = useState<Item[] | null>(null)
 
   const refresh = useCallback(() => {
@@ -47,10 +48,12 @@ export function Imports({ onChange }: { onChange?: () => void }) {
   if (!items) return <p>Loading…</p>
   if (items.length === 0) return <p>No downloads to import.</p>
 
+  const shown = items.filter((it) => matchesQuery(`${it.name} ${it.matched ?? ''}`, query))
+
   return (
     <table>
       <tbody>
-        {items.map((it) => (
+        {shown.map((it) => (
           <tr key={it.id}>
             <td className="muted">{it.source}</td>
             <td>{it.name}</td>
