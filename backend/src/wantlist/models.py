@@ -150,6 +150,21 @@ class PendingImport(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class JobRun(Base):
+    """Per-poller heartbeat (SPEC §16, D18). Each scheduled job records its last run/success/
+    error to the DB so `/metrics` (served by the *API* process) can see the *worker* process's
+    liveness — in-process counters wouldn't cross the process boundary. Alerts on staleness."""
+
+    __tablename__ = "job_run"
+
+    job: Mapped[str] = mapped_column(primary_key=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    last_error_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    runs: Mapped[int] = mapped_column(default=0)
+    errors: Mapped[int] = mapped_column(default=0)
+
+
 class NotificationState(Base):
     """Single-row dedup flags so alerts (§8d) fire once per episode, not every poll."""
 

@@ -12,6 +12,7 @@ from ..models import (
     AlbumState,
     ImportSource,
     ImportState,
+    JobRun,
     LinkSource,
     NotificationState,
     PendingImport,
@@ -95,6 +96,14 @@ class ImportRecord:
     archive_path: str | None
     matched_album_id: int | None
     state: str
+
+
+@dataclass
+class JobRunRow:
+    job: str
+    last_success_at: datetime | None
+    runs: int
+    errors: int
 
 
 class AlbumRepo:
@@ -545,6 +554,68 @@ class AlbumRepo:
         with self._sf() as session:
             rows = session.execute(select(Album.state, func.count()).group_by(Album.state))
             return {state.value: count for state, count in rows}
+
+    def count_missing_art(self) -> int:
+        """Albums with a source art URL but no stored blob — a §16 backlog gauge."""
+        with self._sf() as session:
+            return int(
+                session.scalar(
+                    select(func.count())
+                    .select_from(Album)
+                    .outerjoin(AlbumArt, AlbumArt.album_id == Album.id)
+                    .where(Album.art_url.is_not(None), AlbumArt.album_id.is_(None))
+                )
+                or 0
+            )
+
+    # --- job heartbeats / metrics (§16) ----------------------------------------------
+
+    def record_job_success(self, job: str, at: datetime) -> None:
+        self._upsert_job(job, last_run_at=at, last_success_at=at, runs_delta=1)
+
+    def record_job_error(self, job: str, at: datetime) -> None:
+        self._upsert_job(job, last_run_at=at, last_error_at=at, errors_delta=1)
+
+    def _upsert_job(
+        self,
+        job: str,
+        *,
+        last_run_at: datetime,
+        last_success_at: datetime | None = None,
+        last_error_at: datetime | None = None,
+        runs_delta: int = 0,
+        errors_delta: int = 0,
+    ) -> None:
+        with self._sf() as session:
+            values: dict[str, object] = {
+                "job": job,
+                "last_run_at": last_run_at,
+                "last_success_at": last_success_at,
+                "last_error_at": last_error_at,
+                "runs": runs_delta,
+                "errors": errors_delta,
+            }
+            update: dict[str, object] = {"last_run_at": last_run_at}
+            if last_success_at is not None:
+                update["last_success_at"] = last_success_at
+            if last_error_at is not None:
+                update["last_error_at"] = last_error_at
+            if runs_delta:
+                update["runs"] = JobRun.runs + runs_delta
+            if errors_delta:
+                update["errors"] = JobRun.errors + errors_delta
+            stmt = pg_insert(JobRun).values(**values)
+            session.execute(stmt.on_conflict_do_update(index_elements=["job"], set_=update))
+            session.commit()
+
+    def job_runs(self) -> list[JobRunRow]:
+        with self._sf() as session:
+            rows = session.execute(
+                select(JobRun.job, JobRun.last_success_at, JobRun.runs, JobRun.errors).order_by(
+                    JobRun.job
+                )
+            )
+            return [JobRunRow(*row) for row in rows]
 
     # --- library view ----------------------------------------------------------------
 

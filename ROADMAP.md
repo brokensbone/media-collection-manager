@@ -143,7 +143,7 @@ assistance on top.)
 - **Built on** a new `BeetsClient.all_albums()` catalogue seam + a `LibraryAssistService`.
 - **Done when:** linking a want offers correct candidates without manual search, likely-owned wants are flagged in Acquire, and re-resolve picks up a formerly-missing release once it exists in MB. *("the tail stops being a chore")*
 
-### D18 · Metrics endpoint (Prometheus) + alerting hooks  *(§16, post-MVP)*
+### D18 · Metrics endpoint (Prometheus) + alerting hooks  *(§16, post-MVP)*  — ✅ done (pending CI)
 The app runs unattended, so without metrics it can **silently stop working** — a poller
 dies, or the Spotify refresh token expires — and I won't notice until I look. Expose
 Prometheus metrics so Grafana (already on partridge) can alert.
@@ -159,6 +159,10 @@ Prometheus metrics so Grafana (already on partridge) can alert.
 - **Done when:** `GET /metrics` returns valid Prometheus text with the above, and scraping
   it can drive Grafana alerts for (a) reauth-due and (b) a stalled poller. (Prometheus
   scrape config + Grafana dashboards/alerts live in the `house`/`lab` repos, not here.)
+- **As built:** `job_run` heartbeat table + a `heartbeat()` context wrapping every poller;
+  `MetricsService` renders all series from the DB (so the API sees the worker's liveness).
+  All series always emitted (0 when absent) for stable Grafana alert targets. Disabled
+  pollers don't heartbeat, so they never read as stalled.
 - **Pull-forward note:** the reauth-days and job-freshness metrics are the highest-value
   and depend only on things that exist by D8 — worth pulling earlier than the tail work if
   you start running it for real (D10) before then.
