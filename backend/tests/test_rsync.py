@@ -27,8 +27,9 @@ def test_builds_a_copy_only_rsync_over_ssh(monkeypatch: Any, tmp_path: Any) -> N
     # copy-only — seeding must never be disturbed (§12)
     assert "--remove-source-files" not in argv
     assert "--delete" not in argv
-    # ssh with the configured port + key
-    assert argv[argv.index("-e") + 1] == "ssh -p 2222 -i /keys/id"
+    # ssh with the configured port + key, headless (no prompts, trust-on-first-use)
+    ssh = argv[argv.index("-e") + 1]
+    assert ssh == "ssh -p 2222 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i /keys/id"
     # exact file list on stdin, source is the remote download dir
     assert captured["input"] == "01.flac\n02.flac"
     assert "me@seedbox:/downloads/Album/" in argv
@@ -39,4 +40,5 @@ def test_omits_key_flag_when_unset(monkeypatch: Any, tmp_path: Any) -> None:
     RsyncTransfer(host="h", port=22, user="u", ssh_key="").fetch(
         download_dir="/d", files=["a"], dest=str(tmp_path / "s")
     )
-    assert captured["argv"][captured["argv"].index("-e") + 1] == "ssh -p 22"
+    ssh = captured["argv"][captured["argv"].index("-e") + 1]
+    assert ssh == "ssh -p 22 -o BatchMode=yes -o StrictHostKeyChecking=accept-new"

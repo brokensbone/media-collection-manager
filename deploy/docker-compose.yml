@@ -17,9 +17,18 @@ x-app: &app
     WANTLIST_BEETS_CONFIG: /etc/beets/config.yaml
     WANTLIST_IMPORT_INBOX_PATH: /beets/inbox
     WANTLIST_STATIC_DIR: /app/frontend-dist  # api serves the SPA; worker ignores it
+    # --- watch-dir import (§13): drop albums/zips into ./watchdir on the host to test ---
+    WANTLIST_WATCHDIR_PATH: /watchdir
+    WANTLIST_WATCHDIR_POLL_SECONDS: "30"   # snappy for testing (real default 300)
+    WANTLIST_WATCHDIR_SETTLE_SECONDS: "5"  # snappy for testing (real default 60)
+    # --- Transmission auto-land (§12): set the RPC/SSH vars in .env to enable. Also uncomment
+    #     the SSH key mount below and set WANTLIST_TRANSMISSION_SSH_KEY=/keys/id in .env. ---
+    WANTLIST_TRANSMISSION_POLL_SECONDS: "60"  # snappy for testing (real default 3600)
   volumes:
     - beetsdata:/beets
     - ./beets/config.yaml:/etc/beets/config.yaml:ro
+    - ./watchdir:/watchdir  # host ./watchdir <-> container /watchdir
+    # - ~/.ssh/id_ed25519:/keys/id:ro   # uncomment to give rsync a key for the seedbox (§12)
 
 services:
   postgres:

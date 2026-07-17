@@ -9,6 +9,10 @@ RUN npm run build  # -> /fe/dist
 
 # Stage 2: the backend + bundled beets, with the built SPA copied in.
 FROM python:3.12-slim AS app
+# rsync + ssh client are needed at runtime to pull completed torrents off the seedbox (§12).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends rsync openssh-client \
+    && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir uv
 WORKDIR /app/backend
 
