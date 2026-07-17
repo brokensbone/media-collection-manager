@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Cover } from './Cover'
 
 type Item = { id: number; artist: string; title: string; reason: string; has_art: boolean }
 type Action = 'keep' | 'drop' | 'snooze'
@@ -48,6 +49,7 @@ export function Decide() {
       <tbody>
         {items.map((it, i) => (
           <tr key={it.id} className={i === sel ? 'sel' : undefined}>
+            <Cover id={it.id} hasArt={it.has_art} />
             <td>{it.artist}</td>
             <td>{it.title}</td>
             <td>{it.reason}</td>

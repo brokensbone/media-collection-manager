@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Cover } from './Cover'
 
 type Item = {
   id: number
@@ -73,6 +74,7 @@ export function Acquire() {
       <tbody>
         {items.map((it) => (
           <tr key={it.id}>
+            <Cover id={it.id} hasArt={it.has_art} />
             <td>{it.artist}</td>
             <td>
               {it.title}

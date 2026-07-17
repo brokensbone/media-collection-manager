@@ -77,6 +77,20 @@ td {
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
 }
+.cover-cell {
+  width: 44px;
+  padding: 4px 8px 4px 0;
+}
+.cover {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  display: block;
+}
+.cover-empty {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
 tr.sel td {
   background: var(--surface);
   box-shadow: inset 2px 0 0 var(--accent);

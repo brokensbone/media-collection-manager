@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Cover } from './Cover'
 
 type Item = { id: number; artist: string; title: string; has_art: boolean }
 type Action = 'save' | 'want' | 'dismiss'
@@ -29,6 +30,7 @@ export function Releases() {
       <tbody>
         {items.map((it) => (
           <tr key={it.id}>
+            <Cover id={it.id} hasArt={it.has_art} />
             <td>{it.artist}</td>
             <td>{it.title}</td>
             <td>

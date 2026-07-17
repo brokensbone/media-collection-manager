@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Cover } from './Cover'
 
 type Album = {
   id: number
@@ -6,6 +7,7 @@ type Album = {
   title: string
   state: string
   owned: boolean
+  has_art: boolean
 }
 
 export function Library({ state }: { state?: string }) {
@@ -27,6 +29,7 @@ export function Library({ state }: { state?: string }) {
       <tbody>
         {albums.map((a) => (
           <tr key={a.id}>
+            <Cover id={a.id} hasArt={a.has_art} />
             <td>{a.artist}</td>
             <td>{a.title}</td>
             <td>{a.owned ? 'owned' : a.state}</td>
