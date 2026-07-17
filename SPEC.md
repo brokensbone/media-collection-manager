@@ -1070,3 +1070,10 @@ app is self-explanatory without re-reading the spec. Built in ROADMAP **D19**.
 - **Discoverable:** a link in the top bar (§8e) so it's always one click away.
 - **Low-maintenance:** content lives in one place; when a worklist changes, the guide is
   the obvious thing to update (called out in that deliverable's "done"). No generated docs.
+
+> **As built (D19):** a `Guide` React component in `frontend/src/Guide.tsx`, toggled from the
+> top bar via a small view switch in `App.tsx` (no router dependency added). Static content
+> only, styled with the existing §8e theme tokens (a `.guide` prose block + a mono `.funnel`
+> line). Covers the loop, Decide/Acquire/Releases/Import, the Spotify-reconnect banner, and a
+> "behind the scenes" note. Tested: `Guide.test.tsx` (worklists + reconnect guidance) and an
+> `App.test.tsx` top-bar toggle.
