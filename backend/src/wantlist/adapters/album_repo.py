@@ -503,7 +503,8 @@ class AlbumRepo:
                 )
                 .outerjoin(Album, Album.id == PendingImport.matched_album_id)
                 .where(PendingImport.state == ImportState.detected)
-                .order_by(PendingImport.created_at.desc())
+                # sort by the download name (not all rows have a matched artist/title)
+                .order_by(func.lower(PendingImport.name))
             )
             return [ImportRow(r[0], r[1].value, r[2], r[3].value, r[4], r[5], r[6]) for r in rows]
 
