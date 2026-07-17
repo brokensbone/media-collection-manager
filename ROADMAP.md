@@ -159,6 +159,22 @@ Prometheus metrics so Grafana (already on partridge) can alert.
   and depend only on things that exist by D8 — worth pulling earlier than the tail work if
   you start running it for real (D10) before then.
 
+### D19 · In-app user guide  *(§17)*
+A friendly **Guide** page in the web app that explains, in plain language, what the app is
+for and how to use each worklist — so it's self-explanatory without re-reading the spec.
+- **A `Guide` view** in the React app (own route/tab, linked from the top bar), theme-aware
+  with the existing CSS, no new deps and no backend — static HTML content.
+- **Friendly + brief**, second-person: the loop in one picture (`saved → decide → wanted →
+  acquire → owned`, plus suggested/dismissed), then a short section per worklist (Decide,
+  Acquire, Releases, Import) covering what each button does, the Spotify-reconnect banner,
+  and a "how it works behind the scenes" note (pollers, reconcile-derives-owned, not a
+  recommender).
+- **Done when:** the running app has a linked Guide page that walks through the loop and
+  every worklist in plain language, renders in both themes, and has a component test
+  asserting it lists the worklists and reconnect guidance. *("the app explains itself")*
+- **Best done last** (it's here at the end deliberately): it should describe the app as it
+  actually ends up, so writing it after the worklists settle avoids rework.
+
 ---
 
 ## Critical path & notes
