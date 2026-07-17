@@ -46,6 +46,15 @@ export function Decide() {
 
   return (
     <table>
+      <thead>
+        <tr>
+          <th className="cover-cell" />
+          <th>artist</th>
+          <th>title</th>
+          <th>why</th>
+          <th />
+        </tr>
+      </thead>
       <tbody>
         {items.map((it, i) => (
           <tr key={it.id} className={i === sel ? 'sel' : undefined}>

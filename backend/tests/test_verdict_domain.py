@@ -18,12 +18,12 @@ def _reason(saved_days: int | None, stat: PlayStat) -> str | None:
 
 
 def test_forgotten_reason_reports_days() -> None:
-    assert forgotten_reason(NOW - timedelta(days=30), NOW) == "saved 30d ago"
+    assert forgotten_reason(NOW - timedelta(days=30), NOW) == "30d"
 
 
 def test_listened_by_track_count_takes_priority() -> None:
     stat = PlayStat(distinct_tracks=4, first_played=NOW, last_played=NOW)
-    assert _reason(saved_days=30, stat=stat) == "played 4 tracks"
+    assert _reason(saved_days=30, stat=stat) == "4 plays"
 
 
 def test_listened_by_day_span() -> None:
@@ -32,7 +32,7 @@ def test_listened_by_day_span() -> None:
 
 
 def test_forgotten_fallback_when_not_listened() -> None:
-    assert _reason(saved_days=30, stat=ZERO_PLAYS) == "saved 30d ago"
+    assert _reason(saved_days=30, stat=ZERO_PLAYS) == "30d"
 
 
 def test_none_when_neither_fires() -> None:

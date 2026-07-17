@@ -14,7 +14,7 @@ ZERO_PLAYS = PlayStat(0, None, None)
 
 def forgotten_reason(saved_at: datetime, now: datetime) -> str:
     days = (now - saved_at).days
-    return f"saved {days}d ago"
+    return f"{days}d"
 
 
 def verdict_reason(
@@ -30,7 +30,7 @@ def verdict_reason(
     'listened' (enough distinct tracks, or plays spread over enough days) — preferred, more
     informative — and the time-based 'forgotten' fallback. None means not ready."""
     if stat.distinct_tracks >= listened_tracks:
-        return f"played {stat.distinct_tracks} tracks"
+        return f"{stat.distinct_tracks} plays"
     if stat.first_played and stat.last_played:
         span = (stat.last_played - stat.first_played).days
         if span >= listened_days:

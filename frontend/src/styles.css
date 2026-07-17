@@ -77,6 +77,15 @@ td {
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
 }
+th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: lowercase;
+  color: var(--muted);
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
 .cover-cell {
   width: 44px;
   padding: 4px 8px 4px 0;

@@ -43,7 +43,7 @@ def test_decide_lists_then_keep_clears(clean_album_tables: sessionmaker[Session]
     client, repo = _client(clean_album_tables)
     queue = client.get("/decide").json()
     assert len(queue) == 1
-    assert queue[0]["reason"] == "saved 30d ago"
+    assert queue[0]["reason"] == "30d"
 
     resp = client.post(f"/albums/{queue[0]['id']}/keep")
     assert resp.status_code == 204

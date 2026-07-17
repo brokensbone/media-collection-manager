@@ -19,10 +19,10 @@ afterEach(() => {
 
 describe('Decide', () => {
   it('lists items with their reason', async () => {
-    mockApi([{ id: 1, artist: 'A', title: 'T1', reason: 'saved 30d ago', has_art: false }])
+    mockApi([{ id: 1, artist: 'A', title: 'T1', reason: '30d', has_art: false }])
     render(<Decide />)
     expect(await screen.findByText('T1')).toBeTruthy()
-    expect(screen.getByText('saved 30d ago')).toBeTruthy()
+    expect(screen.getByText('30d')).toBeTruthy()
   })
 
   it('keeps an item: POSTs and removes it from the queue', async () => {
