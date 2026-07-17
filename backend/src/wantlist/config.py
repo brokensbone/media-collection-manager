@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     import_inbox_path: str = "/inbox"
     transmission_poll_seconds: int = 3600
     import_match_threshold: float = 0.5
+    import_process_seconds: int = 30  # how often the worker imports queued acquisitions
 
     # Watch-dir import (§13, D15). Empty path = disabled. Bandcamp zips / dropped folders are
     # scanned, matched by embedded tags, and one-click imported; the drop is ours, so it's

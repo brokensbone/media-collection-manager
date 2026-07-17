@@ -33,6 +33,7 @@ class ImportItem:
     id: int
     source: str
     name: str
+    state: str  # detected | queued | imported | failed — drives the status shown per row
     matched_album_id: int | None
     matched: str | None  # "Artist — Title" of the matched want, or None for the no-match tail
 
@@ -192,8 +193,8 @@ class ImportRunner:
 
     def run(self, import_id: int) -> None:
         rec = self._repo.get_pending_import(import_id)
-        if rec is None or rec.state != ImportState.detected.value:
-            return
+        if rec is None or rec.state != ImportState.queued.value:
+            return  # only queued imports are processed (the click/retry enqueues them)
         stager = self._stagers[ImportSource(rec.source)]
 
         staging = Path(self._inbox) / str(rec.id)  # unique per import; no name-collisions
@@ -212,13 +213,24 @@ class ImportRunner:
         except Exception:
             log.warning("import %s: finalize/dispose failed", import_id, exc_info=True)
 
+    def run_queued(self) -> int:
+        """Process every queued import (worker job). One failure never blocks the rest — the
+        runner marks it failed; the operator can retry it from the Import screen."""
+        ids = self._repo.queued_import_ids()
+        for import_id in ids:
+            try:
+                self.run(import_id)
+            except Exception:
+                log.warning("import %s failed", import_id)  # already marked failed in run()
+        return len(ids)
+
 
 class ImportsService:
-    """The Import worklist (§12/§13): detected acquisitions awaiting a one-click import."""
+    """The Import worklist (§12/§13). Clicking Import just enqueues; the worker imports in the
+    background so the operator can tick a batch and come back. Rows persist with their status."""
 
-    def __init__(self, *, repo: AlbumRepo, runner: ImportRunner):
+    def __init__(self, *, repo: AlbumRepo) -> None:
         self._repo = repo
-        self._runner = runner
 
     def queue(self) -> list[ImportItem]:
         return [
@@ -226,14 +238,15 @@ class ImportsService:
                 id=r.id,
                 source=r.source,
                 name=r.name,
+                state=r.state,
                 matched_album_id=r.matched_album_id,
                 matched=f"{r.matched_artist} — {r.matched_title}" if r.matched_album_id else None,
             )
-            for r in self._repo.pending_imports()
+            for r in self._repo.list_imports()
         ]
 
-    def run_import(self, import_id: int) -> None:
-        self._runner.run(import_id)
+    def enqueue(self, import_id: int) -> None:
+        self._repo.queue_import(import_id)
 
 
 def _match_targets(repo: AlbumRepo) -> list[MatchTarget]:

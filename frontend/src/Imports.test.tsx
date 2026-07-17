@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Imports } from './Imports'
 
@@ -12,6 +12,18 @@ function mockApi(items: unknown) {
   return fetchMock
 }
 
+function item(over: Record<string, unknown> = {}) {
+  return {
+    id: 1,
+    source: 'watchdir',
+    name: 'Album.zip',
+    state: 'detected',
+    matched_album_id: null,
+    matched: null,
+    ...over,
+  }
+}
+
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
@@ -20,30 +32,39 @@ afterEach(() => {
 describe('Imports', () => {
   it('shows the source, matched want and a no-match label', async () => {
     mockApi([
-      {
-        id: 1,
-        source: 'transmission',
-        name: 'Burial-Untrue',
-        matched_album_id: 5,
-        matched: 'Burial — Untrue',
-      },
-      { id: 2, source: 'watchdir', name: 'Mystery', matched_album_id: null, matched: null },
+      item({ id: 1, source: 'transmission', name: 'Burial-Untrue', matched: 'Burial — Untrue' }),
+      item({ id: 2, name: 'Mystery' }),
     ])
     render(<Imports />)
     expect(await screen.findByText('Burial — Untrue')).toBeTruthy()
-    expect(screen.getByText('watchdir')).toBeTruthy()
+    expect(screen.getByText('transmission')).toBeTruthy()
     expect(screen.getByText('no match')).toBeTruthy()
   })
 
-  it('imports: POSTs and removes the row', async () => {
-    const fetchMock = mockApi([
-      { id: 9, source: 'watchdir', name: 'Only', matched_album_id: null, matched: null },
-    ])
+  it('import enqueues and the row persists showing pending, not vanishing', async () => {
+    const fetchMock = mockApi([item({ id: 9, name: 'Only' })])
     render(<Imports />)
     await screen.findByText('Only')
     fireEvent.click(screen.getByRole('button', { name: 'Import' }))
-    await screen.findByText(/No downloads to import/)
+
     const posted = fetchMock.mock.calls.find((c) => c[1]?.method === 'POST')
     expect(posted?.[0]).toBe('/imports/9/import')
+    // row stays, now showing pending status
+    expect(screen.getByText('Only')).toBeTruthy()
+    await waitFor(() => expect(screen.getByText('pending…')).toBeTruthy())
+  })
+
+  it('shows a Retry for a failed import', async () => {
+    mockApi([item({ id: 3, name: 'Bad.zip', state: 'failed' })])
+    render(<Imports />)
+    expect(await screen.findByText('failed')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+  })
+
+  it('shows imported status without an action', async () => {
+    mockApi([item({ id: 4, name: 'Done.zip', state: 'imported' })])
+    render(<Imports />)
+    expect(await screen.findByText('imported ✓')).toBeTruthy()
+    expect(screen.queryByRole('button')).toBeNull()
   })
 })

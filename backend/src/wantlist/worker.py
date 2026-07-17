@@ -12,6 +12,7 @@ from .jobs import (
     poll_transmission_once,
     poll_watchdir_once,
     reconcile_once,
+    run_imports_once,
     watch_artists_once,
 )
 
@@ -38,6 +39,7 @@ def build_scheduler(settings: Settings) -> BlockingScheduler:
         every(poll_transmission_once, settings.transmission_poll_seconds, "transmission")
     if settings.watchdir_path:
         every(poll_watchdir_once, settings.watchdir_poll_seconds, "watchdir")
+    every(run_imports_once, settings.import_process_seconds, "imports")
     every(alerts_once, settings.alerts_poll_seconds, "alerts")
     return scheduler
 

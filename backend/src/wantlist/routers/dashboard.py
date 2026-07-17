@@ -13,7 +13,7 @@ def dashboard(request: Request) -> dict[str, int]:
         "releases": counts.get("suggested", 0),
         "decide": len(state.decide_service.queue()),
         "acquire": len(state.acquire_service.queue()),
-        "import": len(state.album_repo.pending_imports()),
+        "import": state.album_repo.count_active_imports(),
         "owned": counts.get("owned", 0),
         "dismissed": counts.get("dismissed", 0),
     }

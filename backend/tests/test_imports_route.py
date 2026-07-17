@@ -1,56 +1,39 @@
-from pathlib import Path
-
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
 from wantlist.adapters.album_repo import AlbumRepo
 from wantlist.app import create_app
 from wantlist.config import Settings
-from wantlist.imports import ImportRunner, ImportsService, TransmissionStager
+from wantlist.imports import ImportsService
 from wantlist.models import ImportSource
 
-from .fakes import FakeFileTransfer, RecordingBeetsClient
 
-
-def test_import_queue_then_one_click_import(
-    clean_album_tables: sessionmaker[Session], tmp_path: Path
+def test_import_click_enqueues_and_row_persists_with_status(
+    clean_album_tables: sessionmaker[Session],
 ) -> None:
     sf = clean_album_tables
-    download_dir = tmp_path / "Album"
-    download_dir.mkdir()
-    (download_dir / "01.flac").write_text("track")
-    inbox = tmp_path / "inbox"
-    inbox.mkdir()
-
     repo = AlbumRepo(sf)
     repo.add_pending_import(
-        source=ImportSource.transmission,
-        source_key="h1",
-        name="Album",
-        download_dir=str(download_dir),
-        files=["01.flac"],
+        source=ImportSource.watchdir,
+        source_key="k1",
+        name="Album.zip",
+        archive_path="/w/Album.zip",
         matched_album_id=None,
     )
 
-    beets = RecordingBeetsClient()
     app = create_app(Settings())
-    app.state.imports_service = ImportsService(
-        repo=repo,
-        runner=ImportRunner(
-            repo=repo,
-            stagers={ImportSource.transmission: TransmissionStager(FakeFileTransfer())},
-            beets=beets,
-            inbox=str(inbox),
-        ),
-    )
+    app.state.imports_service = ImportsService(repo=repo)
     client = TestClient(app)
 
     queue = client.get("/imports").json()
     assert len(queue) == 1
+    assert queue[0]["state"] == "detected"
     import_id = queue[0]["id"]
 
     resp = client.post(f"/imports/{import_id}/import")
     assert resp.status_code == 204
-    assert len(beets.imported) == 1
-    assert client.get("/imports").json() == []
-    assert (download_dir / "01.flac").read_text() == "track"  # seedbox source untouched
+
+    # the row doesn't vanish — it stays, now queued for the worker to process
+    after = client.get("/imports").json()
+    assert len(after) == 1
+    assert after[0]["state"] == "queued"
