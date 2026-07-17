@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     # Storage
     database_url: str = "postgresql+psycopg://localhost:5432/wantlist"
 
+    # Optional: serve the built frontend (SPA) from this directory at `/`, so a single
+    # container can serve both UI and API on one origin (D10). Empty = API only (dev uses Vite).
+    static_dir: str = ""
+
     # beets seam (§5): beets is bundled; this points at the beets config, whose
     # `library:`/`directory:` reference the mounted library.db + music.
     beets_config: str | None = None
@@ -62,6 +66,7 @@ class Settings(BaseSettings):
     import_inbox_path: str = "/inbox"
     transmission_poll_seconds: int = 3600
     import_match_threshold: float = 0.5
+    import_process_seconds: int = 30  # how often the worker imports queued acquisitions
 
     # Watch-dir import (§13, D15). Empty path = disabled. Bandcamp zips / dropped folders are
     # scanned, matched by embedded tags, and one-click imported; the drop is ours, so it's
@@ -77,3 +82,4 @@ class Settings(BaseSettings):
     musicbrainz_user_agent: str = "wantlist/0.1 ( https://github.com/EdwardSalkeld )"
     musicbrainz_min_interval: float = 1.1  # MB asks for <= 1 req/sec
     musicbrainz_text_min_score: int = 90  # Tier-3 fuzzy accept threshold
+    resolution_max_per_run: int = 100  # cap MB lookups per reconcile (cold-start politeness)

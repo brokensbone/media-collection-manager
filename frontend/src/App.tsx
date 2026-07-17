@@ -1,7 +1,7 @@
 import './styles.css'
-import { useState } from 'react'
+import { type ReactNode, useCallback, useState } from 'react'
 import { Acquire } from './Acquire'
-import { Dashboard } from './Dashboard'
+import { Dashboard, type Section } from './Dashboard'
 import { Decide } from './Decide'
 import { Guide } from './Guide'
 import { Imports } from './Imports'
@@ -13,6 +13,28 @@ type View = 'app' | 'guide'
 
 export default function App() {
   const [view, setView] = useState<View>('app')
+  const [section, setSection] = useState<Section>('all')
+  const [query, setQuery] = useState('')
+  // Any worklist action bumps this; the count/browse views refetch when it changes.
+  const [refresh, setRefresh] = useState(0)
+  const bump = useCallback(() => setRefresh((n) => n + 1), [])
+
+  const sections: { key: Section; heading: string; node: ReactNode }[] = [
+    { key: 'releases', heading: 'Releases', node: <Releases onChange={bump} query={query} /> },
+    { key: 'decide', heading: 'Decide', node: <Decide onChange={bump} query={query} /> },
+    { key: 'acquire', heading: 'Acquire', node: <Acquire onChange={bump} query={query} /> },
+    { key: 'import', heading: 'Import', node: <Imports onChange={bump} query={query} /> },
+    {
+      key: 'owned',
+      heading: 'Owned',
+      node: <Library state="owned" refreshKey={refresh} query={query} />,
+    },
+    {
+      key: 'dismissed',
+      heading: 'Dismissed',
+      node: <Library state="dismissed" refreshKey={refresh} query={query} />,
+    },
+  ]
 
   return (
     <div className="app">
@@ -33,19 +55,22 @@ export default function App() {
         <Guide />
       ) : (
         <>
-          <Dashboard />
-          <h2>Releases</h2>
-          <Releases />
-          <h2>Decide</h2>
-          <Decide />
-          <h2>Acquire</h2>
-          <Acquire />
-          <h2>Import</h2>
-          <Imports />
-          <h2>Owned</h2>
-          <Library state="owned" />
-          <h2>Dismissed</h2>
-          <Library state="dismissed" />
+          <Dashboard refreshKey={refresh} active={section} onSelect={setSection} />
+          <input
+            type="search"
+            className="filter"
+            placeholder="filter by artist or title…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {sections
+            .filter((s) => section === 'all' || s.key === section)
+            .map((s) => (
+              <section key={s.key}>
+                <h2>{s.heading}</h2>
+                {s.node}
+              </section>
+            ))}
         </>
       )}
     </div>

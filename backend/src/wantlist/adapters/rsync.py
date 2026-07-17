@@ -16,7 +16,11 @@ class RsyncTransfer:
 
     def fetch(self, *, download_dir: str, files: list[str], dest: str) -> None:
         Path(dest).mkdir(parents=True, exist_ok=True)
-        ssh = f"ssh -p {self._port}" + (f" -i {self._ssh_key}" if self._ssh_key else "")
+        # BatchMode: never prompt (fail fast instead of hanging). accept-new: trust the
+        # seedbox host key on first use but still detect a later key change (§12, runs headless).
+        ssh = f"ssh -p {self._port} -o BatchMode=yes -o StrictHostKeyChecking=accept-new"
+        if self._ssh_key:
+            ssh += f" -i {self._ssh_key}"
         source = f"{self._user}@{self._host}:{download_dir.rstrip('/')}/"
         argv = ["rsync", "-a", "-e", ssh, "--files-from=-", source, f"{dest.rstrip('/')}/"]
         subprocess.run(

@@ -1,46 +1,79 @@
 import { useCallback, useEffect, useState } from 'react'
+import { matchesQuery } from './filter'
 
 type Item = {
   id: number
   source: string
   name: string
+  state: 'detected' | 'queued' | 'imported' | 'failed'
   matched_album_id: number | null
   matched: string | null
 }
 
-export function Imports() {
+const STATUS: Record<Item['state'], string> = {
+  detected: '',
+  queued: 'pending…',
+  imported: 'imported ✓',
+  failed: 'failed',
+}
+
+export function Imports({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
   const [items, setItems] = useState<Item[] | null>(null)
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     fetch('/imports')
       .then((r) => r.json())
       .then(setItems)
       .catch(() => setItems([]))
   }, [])
 
-  const runImport = useCallback((id: number) => {
-    setItems((list) => {
-      if (!list) return list
-      fetch(`/imports/${id}/import`, { method: 'POST' })
-      return list.filter((it) => it.id !== id)
-    })
-  }, [])
+  // Poll so background imports (queued → imported/failed) update on screen without a reload.
+  useEffect(() => {
+    refresh()
+    const t = setInterval(refresh, 4000)
+    return () => clearInterval(t)
+  }, [refresh])
+
+  const enqueue = useCallback(
+    (id: number) => {
+      // optimistically show it queued; the poll then tracks it to imported/failed
+      setItems(
+        (list) => list?.map((it) => (it.id === id ? { ...it, state: 'queued' } : it)) ?? list,
+      )
+      fetch(`/imports/${id}/import`, { method: 'POST' }).then(() => onChange?.())
+    },
+    [onChange],
+  )
 
   if (!items) return <p>Loading…</p>
   if (items.length === 0) return <p>No downloads to import.</p>
 
+  const shown = items.filter((it) => matchesQuery(`${it.name} ${it.matched ?? ''}`, query))
+
   return (
     <table>
       <tbody>
-        {items.map((it) => (
+        {shown.map((it) => (
           <tr key={it.id}>
             <td className="muted">{it.source}</td>
             <td>{it.name}</td>
             <td>{it.matched ?? <span className="muted">no match</span>}</td>
-            <td>
-              <button type="button" onClick={() => runImport(it.id)}>
-                Import
-              </button>
+            <td className="nowrap">
+              {it.state === 'detected' && (
+                <button type="button" onClick={() => enqueue(it.id)}>
+                  Import
+                </button>
+              )}
+              {it.state === 'queued' && <span className="muted">{STATUS.queued}</span>}
+              {it.state === 'imported' && <span className="muted">{STATUS.imported}</span>}
+              {it.state === 'failed' && (
+                <>
+                  <span className="muted">{STATUS.failed}</span>{' '}
+                  <button type="button" onClick={() => enqueue(it.id)}>
+                    Retry
+                  </button>
+                </>
+              )}
             </td>
           </tr>
         ))}

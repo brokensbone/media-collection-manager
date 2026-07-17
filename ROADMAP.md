@@ -88,9 +88,10 @@ Everything that makes it a coherent app, and the end-to-end proof.
 
 ## P2 — Live
 
-### D10 · Deploy to blink + Postgres on partridge  *(§8b)*
+### D10 · Deploy  *(§8b)*
 Make it real. (Independent of dev — can land as soon as the blink→nix conversion is ready; nothing above is blocked on it.)
-- Multi-stage image; compose service on blink behind Traefik/TLS; dedicated DB + writer role on partridge; register the Spotify redirect URI; point at the real beets library.
+- **D10a · Local disposable deploy — ✅ done (pending CI).** A `deploy/` stack: multi-stage image (Node builds the SPA → Python image serves it + the API on one origin), `docker compose` with Postgres + `init` (migrate + create an empty beets library) + `api` + `worker`, all on local volumes. Proves the config surface (`deploy/.env.example`) and that it runs end-to-end against an empty beets db. Flushed out one real bug: `httpx` was a runtime dep miscategorised as dev (only surfaced under `--no-dev`). See [`deploy/README.md`](deploy/README.md).
+- **D10b · Real deploy — pending blink.** Compose service on blink behind Traefik/TLS; dedicated DB + writer role on partridge; register the Spotify redirect URI; point `WANTLIST_BEETS_CONFIG` at the **existing** beets library/config. Reuses the D10a image + compose.
 - **Done when:** the app is reachable at its real URL, connected to real Spotify + real beets, and the first real wants are flowing through the worklists. *("running for real")*
 
 ---
@@ -185,6 +186,24 @@ for and how to use each worklist — so it's self-explanatory without re-reading
 - **As built:** a `Guide` React view toggled from the top bar (no router dep — a small view
   switch), static content styled with the existing theme tokens; component test asserts the
   worklists + reconnect guidance, and an App test covers the top-bar toggle.
+
+### D20 · Async imports with persistent status  *(§12/§13 — from live testing)*  — ✅ done (pending CI)
+Clicking Import used to block on the unpack + `beet import` and then the row vanished, with
+no confirmation. Now importing is a background task list.
+- New `queued` state; the click enqueues (`detected → queued`), a worker job imports queued
+  items (`queued → imported/failed`), the Import screen keeps every row with a live status and
+  polls, failed rows offer Retry, and the dashboard counts the active ones.
+- **Done when:** clicking Import enqueues instantly, the worker completes it in the background,
+  the row persists showing imported/failed, and a failed import can be retried. ✅
+
+### D21 · Reverse-match imports to owned  *(§4/§5 — from live testing)*  — ✅ done (pending CI)
+An import that matched no want used to land only in beets — invisible in the app.
+- On a successful **unmatched** import (identified by a beets before/after diff), search Spotify
+  for the album, and record it as **owned** with cover art + Spotify id (dedupes a later save);
+  no Spotify match still creates the owned entry from the beets tags (no art).
+- **Scoped to app-imported albums only** — never mirrors the whole existing beets library.
+- **Done when:** importing an album with no matching want makes it appear in Owned (with art
+  when Spotify has it); an album a want already covers is left to reconcile, not duplicated. ✅
 
 ---
 

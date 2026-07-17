@@ -55,4 +55,11 @@ def test_dashboard_counts(clean_album_tables: sessionmaker[Session]) -> None:
     )
 
     body = TestClient(app).get("/dashboard").json()
-    assert body == {"decide": 1, "acquire": 2, "owned": 1, "dismissed": 0, "saved": 1}
+    assert body == {
+        "releases": 0,
+        "decide": 1,
+        "acquire": 2,
+        "import": 0,
+        "owned": 1,
+        "dismissed": 0,
+    }

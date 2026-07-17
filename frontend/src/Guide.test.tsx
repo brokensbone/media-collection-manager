@@ -18,6 +18,13 @@ describe('Guide', () => {
     expect(screen.getByText(/not a recommender/)).toBeTruthy()
   })
 
+  it('documents the Decide keyboard shortcuts', () => {
+    const { container } = render(<Guide />)
+    const text = container.textContent ?? ''
+    expect(text).toContain('the cursor')
+    expect(text).toMatch(/keeps.*drops.*snoozes/)
+  })
+
   it('covers reconnecting to Spotify and why it matters', () => {
     render(<Guide />)
     expect(screen.getByRole('heading', { name: /Staying connected to Spotify/ })).toBeTruthy()

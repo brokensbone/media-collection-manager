@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Protocol
 
 from .adapters.album_repo import AlbumRepo, ImportRecord
+from .adapters.beets import BeetsAlbum
 from .adapters.unpack import dispose, unpack
 from .domain.match import MatchTarget, best_match
 from .models import ImportSource, ImportState
@@ -13,6 +14,7 @@ from .ports.clock import Clock
 from .ports.file_transfer import FileTransfer
 from .ports.tags import TagReader
 from .ports.transmission import TransmissionClient
+from .reverse_match import ReverseMatcher
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +23,13 @@ class BeetsImporter(Protocol):
     """The beets import seam we depend on (a subset of BeetsClient, SPEC §5/§12)."""
 
     def import_dir(self, path: str) -> None: ...
+
+
+class LibraryCatalog(Protocol):
+    """The beets catalogue seam — used to diff the library before/after an import so a
+    directly-imported album can be identified for reverse-match (D21)."""
+
+    def all_albums(self) -> list[BeetsAlbum]: ...
 
 
 @dataclass
@@ -33,6 +42,7 @@ class ImportItem:
     id: int
     source: str
     name: str
+    state: str  # detected | queued | imported | failed — drives the status shown per row
     matched_album_id: int | None
     matched: str | None  # "Artist — Title" of the matched want, or None for the no-match tail
 
@@ -184,18 +194,23 @@ class ImportRunner:
         stagers: dict[ImportSource, Stager],
         beets: BeetsImporter,
         inbox: str,
+        catalog: LibraryCatalog | None = None,
+        reverse_matcher: ReverseMatcher | None = None,
     ):
         self._repo = repo
         self._stagers = stagers
         self._beets = beets
         self._inbox = inbox
+        self._catalog = catalog
+        self._reverse_matcher = reverse_matcher
 
     def run(self, import_id: int) -> None:
         rec = self._repo.get_pending_import(import_id)
-        if rec is None or rec.state != ImportState.detected.value:
-            return
+        if rec is None or rec.state != ImportState.queued.value:
+            return  # only queued imports are processed (the click/retry enqueues them)
         stager = self._stagers[ImportSource(rec.source)]
 
+        before = self._album_ids()  # snapshot to identify what this import adds (D21)
         staging = Path(self._inbox) / str(rec.id)  # unique per import; no name-collisions
         try:
             stager.stage(rec, str(staging))
@@ -212,13 +227,42 @@ class ImportRunner:
         except Exception:
             log.warning("import %s: finalize/dispose failed", import_id, exc_info=True)
 
+        self._reverse_match(rec, before)
+
+    def _album_ids(self) -> set[str]:
+        return {a.beets_id for a in self._catalog.all_albums()} if self._catalog else set()
+
+    def _reverse_match(self, rec: ImportRecord, before: set[str]) -> None:
+        # Only an *unmatched* import needs this — a matched one flips its want to owned via
+        # reconcile. Best-effort: a failure here mustn't undo a successful import.
+        if self._reverse_matcher is None or self._catalog is None:
+            return
+        if rec.matched_album_id is not None:
+            return
+        try:
+            new = [a for a in self._catalog.all_albums() if a.beets_id not in before]
+            self._reverse_matcher.claim(new)
+        except Exception:
+            log.warning("import %s: reverse-match failed", rec.id, exc_info=True)
+
+    def run_queued(self) -> int:
+        """Process every queued import (worker job). One failure never blocks the rest — the
+        runner marks it failed; the operator can retry it from the Import screen."""
+        ids = self._repo.queued_import_ids()
+        for import_id in ids:
+            try:
+                self.run(import_id)
+            except Exception:
+                log.warning("import %s failed", import_id)  # already marked failed in run()
+        return len(ids)
+
 
 class ImportsService:
-    """The Import worklist (§12/§13): detected acquisitions awaiting a one-click import."""
+    """The Import worklist (§12/§13). Clicking Import just enqueues; the worker imports in the
+    background so the operator can tick a batch and come back. Rows persist with their status."""
 
-    def __init__(self, *, repo: AlbumRepo, runner: ImportRunner):
+    def __init__(self, *, repo: AlbumRepo) -> None:
         self._repo = repo
-        self._runner = runner
 
     def queue(self) -> list[ImportItem]:
         return [
@@ -226,14 +270,15 @@ class ImportsService:
                 id=r.id,
                 source=r.source,
                 name=r.name,
+                state=r.state,
                 matched_album_id=r.matched_album_id,
                 matched=f"{r.matched_artist} — {r.matched_title}" if r.matched_album_id else None,
             )
-            for r in self._repo.pending_imports()
+            for r in self._repo.list_imports()
         ]
 
-    def run_import(self, import_id: int) -> None:
-        self._runner.run(import_id)
+    def enqueue(self, import_id: int) -> None:
+        self._repo.queue_import(import_id)
 
 
 def _match_targets(repo: AlbumRepo) -> list[MatchTarget]:

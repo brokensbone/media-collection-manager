@@ -1,9 +1,9 @@
 from pathlib import Path
 
-import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
 from wantlist.adapters.album_repo import AlbumRepo
+from wantlist.adapters.beets import BeetsAlbum
 from wantlist.imports import (
     ImportDetectionService,
     ImportRunner,
@@ -11,9 +11,18 @@ from wantlist.imports import (
     TransmissionStager,
 )
 from wantlist.models import Album, AlbumState, ImportSource, ImportState, Provenance
+from wantlist.ports.spotify_api import SavedAlbum
 from wantlist.ports.transmission import Torrent
+from wantlist.reverse_match import ReverseMatcher
 
-from .fakes import FakeFileTransfer, RecordingBeetsClient, StubTransmissionClient
+from .fakes import (
+    FakeBeetsLibrary,
+    FakeFileTransfer,
+    RecordingBeetsClient,
+    StubSpotifyApiClient,
+    StubTokens,
+    StubTransmissionClient,
+)
 
 
 def _add_wanted(sf: sessionmaker[Session], *, artist: str, title: str) -> int:
@@ -59,20 +68,19 @@ def test_detection_matches_and_dedupes_by_hash(
     assert service.poll().detected == 2
     assert service.poll().detected == 0  # source keys already known → nothing new
 
-    rows = {r.name: r for r in AlbumRepo(sf).pending_imports()}
+    rows = {r.name: r for r in AlbumRepo(sf).list_imports()}
     assert rows["Patrick_Wolf-Lupercalia-2011"].matched_album_id == album_id
-    assert rows["Patrick_Wolf-Lupercalia-2011"].source == "transmission"
+    assert rows["Patrick_Wolf-Lupercalia-2011"].state == "detected"
     assert rows["Nothing We Want"].matched_album_id is None  # the no-match tail is still recorded
 
 
-def test_import_runner_copies_leaving_source_untouched_and_tidies(
+def test_clicking_import_enqueues_and_worker_processes_it(
     clean_album_tables: sessionmaker[Session], tmp_path: Path
 ) -> None:
     sf = clean_album_tables
     download_dir = tmp_path / "downloads" / "Album"  # the "seedbox" dir with real files
     download_dir.mkdir(parents=True)
     (download_dir / "01.flac").write_text("track one")
-    (download_dir / "02.flac").write_text("track two")
     inbox = tmp_path / "inbox"
     inbox.mkdir()
 
@@ -82,26 +90,26 @@ def test_import_runner_copies_leaving_source_untouched_and_tidies(
         source_key="h1",
         name="Album",
         download_dir=str(download_dir),
-        files=["01.flac", "02.flac"],
+        files=["01.flac"],
         matched_album_id=None,
     )
-    import_id = repo.pending_imports()[0].id
+    service = ImportsService(repo=repo)
+    import_id = service.queue()[0].id
 
-    beets = RecordingBeetsClient()
-    _transmission_runner(repo, beets, str(inbox)).run(import_id)
+    # the "click" only enqueues — the row stays, now marked queued (no blocking import)
+    service.enqueue(import_id)
+    assert service.queue()[0].state == "queued"
+    assert repo.count_active_imports() == 1
 
-    assert len(beets.imported) == 1
-    staged = Path(beets.imported[0])
-    # seedbox originals untouched (seeding-safe, §12)...
-    assert (download_dir / "01.flac").read_text() == "track one"
-    assert (download_dir / "02.flac").read_text() == "track two"
-    # ...staging tidied, record marked imported.
-    assert not staged.exists()
-    assert repo.pending_imports() == []
-    assert repo.get_pending_import(import_id).state == ImportState.imported.value  # type: ignore[union-attr]
+    # the worker then processes queued imports in the background
+    processed = _transmission_runner(repo, RecordingBeetsClient(), str(inbox)).run_queued()
+    assert processed == 1
+    assert (download_dir / "01.flac").read_text() == "track one"  # source untouched (§12)
+    assert service.queue()[0].state == "imported"  # row persists, now shows success
+    assert repo.count_active_imports() == 0
 
 
-def test_import_runner_marks_failed_and_reraises(
+def test_run_marks_failed_and_can_be_retried(
     clean_album_tables: sessionmaker[Session], tmp_path: Path
 ) -> None:
     sf = clean_album_tables
@@ -120,17 +128,84 @@ def test_import_runner_marks_failed_and_reraises(
         files=["x.flac"],
         matched_album_id=None,
     )
-    import_id = repo.pending_imports()[0].id
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
 
     class BoomBeets:
         def import_dir(self, path: str) -> None:
             raise RuntimeError("beets blew up")
 
-    with pytest.raises(RuntimeError, match="beets blew up"):
-        _transmission_runner(repo, BoomBeets(), str(inbox)).run(import_id)
-
+    # run_queued swallows the failure (marks it failed) so a batch isn't blocked
+    _transmission_runner(repo, BoomBeets(), str(inbox)).run_queued()
     assert repo.get_pending_import(import_id).state == ImportState.failed.value  # type: ignore[union-attr]
     assert not (inbox / str(import_id)).exists()  # staging still tidied on failure
+
+    # a failed import can be retried (re-queued), then succeeds
+    repo.queue_import(import_id)
+    _transmission_runner(repo, RecordingBeetsClient(), str(inbox)).run_queued()
+    assert repo.get_pending_import(import_id).state == ImportState.imported.value  # type: ignore[union-attr]
+
+
+def test_run_ignores_not_yet_queued(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    sf = clean_album_tables
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="d",
+        download_dir="/d",
+        files=["x.flac"],
+        matched_album_id=None,
+    )
+    import_id = repo.list_imports()[0].id
+    beets = RecordingBeetsClient()
+    _transmission_runner(repo, beets, str(tmp_path)).run(import_id)  # still 'detected'
+    assert beets.imported == []  # nothing imported until it's queued
+
+
+def test_unmatched_import_reverse_matches_to_owned(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    sf = clean_album_tables
+    download_dir = tmp_path / "Album"
+    download_dir.mkdir()
+    (download_dir / "01.flac").write_text("x")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="Mclusky - The World",
+        download_dir=str(download_dir),
+        files=["01.flac"],
+        matched_album_id=None,  # no want → should reverse-match after import
+    )
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
+
+    # beets "gains" this album on import; Spotify search finds it for enrichment
+    beets = FakeBeetsLibrary(adds_on_import=BeetsAlbum("b1", "Mclusky", "The World", "rg1"))
+    found = SavedAlbum("sp1", "Mclusky", None, "The World", None, None, "http://art.jpg")
+    reverse = ReverseMatcher(
+        repo=repo,
+        api=StubSpotifyApiClient(search={"Mclusky The World": found}),  # type: ignore[arg-type]
+        tokens=StubTokens(),  # type: ignore[arg-type]
+    )
+    ImportRunner(
+        repo=repo,
+        stagers={ImportSource.transmission: TransmissionStager(FakeFileTransfer())},
+        beets=beets,
+        inbox=str(inbox),
+        catalog=beets,
+        reverse_matcher=reverse,
+    ).run(import_id)
+
+    owned = AlbumRepo(sf).list_albums("owned")
+    assert [(a.artist, a.title, a.owned) for a in owned] == [("Mclusky", "The World", True)]
 
 
 def test_imports_service_queue_labels_match(
@@ -154,11 +229,8 @@ def test_imports_service_queue_labels_match(
         archive_path="/w/Mystery.zip",
         matched_album_id=None,
     )
-    service = ImportsService(
-        repo=repo, runner=_transmission_runner(repo, RecordingBeetsClient(), "/x")
-    )
 
-    queue = {i.name: i for i in service.queue()}
+    queue = {i.name: i for i in ImportsService(repo=repo).queue()}
     assert queue["Burial-Untrue"].matched == "Burial — Untrue"
     assert queue["Burial-Untrue"].source == "transmission"
     assert queue["Mystery.zip"].matched is None

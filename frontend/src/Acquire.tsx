@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Cover } from './Cover'
+import { matchesQuery } from './filter'
 
 type Item = {
   id: number
@@ -18,7 +20,7 @@ type Candidate = {
   score: number
 }
 
-export function Acquire() {
+export function Acquire({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
   const [items, setItems] = useState<Item[] | null>(null)
   const [linking, setLinking] = useState<number | null>(null)
   const [candidates, setCandidates] = useState<Candidate[] | null>(null)
@@ -36,10 +38,10 @@ export function Acquire() {
 
   const order = useCallback(
     (id: number) => {
-      fetch(`/albums/${id}/order`, { method: 'POST' })
+      fetch(`/albums/${id}/order`, { method: 'POST' }).then(() => onChange?.())
       remove(id)
     },
-    [remove],
+    [remove, onChange],
   )
 
   const markOwned = useCallback(
@@ -48,12 +50,12 @@ export function Acquire() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ beets_id: beetsId ?? null }),
-      })
+      }).then(() => onChange?.())
       setLinking(null)
       setCandidates(null)
       remove(id)
     },
-    [remove],
+    [remove, onChange],
   )
 
   const startLinking = useCallback((id: number) => {
@@ -68,11 +70,14 @@ export function Acquire() {
   if (!items) return <p>Loading…</p>
   if (items.length === 0) return <p>Nothing to acquire.</p>
 
+  const shown = items.filter((it) => matchesQuery(`${it.artist} ${it.title}`, query))
+
   return (
     <table>
       <tbody>
-        {items.map((it) => (
+        {shown.map((it) => (
           <tr key={it.id}>
+            <Cover id={it.id} hasArt={it.has_art} />
             <td>{it.artist}</td>
             <td>
               {it.title}
@@ -80,10 +85,10 @@ export function Acquire() {
             </td>
             <td>
               <a href={it.bandcamp_url} target="_blank" rel="noreferrer">
-                Buy on Bandcamp
+                Bandcamp
               </a>
             </td>
-            <td>
+            <td className="nowrap">
               <button type="button" onClick={() => order(it.id)}>
                 Mark ordered
               </button>

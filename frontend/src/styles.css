@@ -60,13 +60,29 @@ h2 {
   gap: 20px;
   padding: 12px 0;
   font-size: 13px;
+}
+.stat {
+  border: none;
+  background: none;
+  font: inherit;
   color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+}
+.stat:hover {
+  color: var(--text);
+}
+.stat.active {
+  color: var(--accent);
 }
 .stat b {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--text);
   font-weight: 500;
+}
+.stat.active b {
+  color: var(--accent);
 }
 table {
   width: 100%;
@@ -76,6 +92,29 @@ table {
 td {
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
+}
+th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: lowercase;
+  color: var(--muted);
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.cover-cell {
+  width: 44px;
+  padding: 4px 8px 4px 0;
+}
+.cover {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  display: block;
+}
+.cover-empty {
+  background: var(--surface);
+  border: 1px solid var(--border);
 }
 tr.sel td {
   background: var(--surface);
@@ -99,6 +138,24 @@ a {
 }
 .muted {
   color: var(--muted);
+}
+.nowrap {
+  white-space: nowrap;
+}
+.filter {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 4px 0 8px;
+  padding: 6px 8px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  font: inherit;
+}
+.filter:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 .candidates {
   display: flex;

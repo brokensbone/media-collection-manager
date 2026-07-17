@@ -28,8 +28,8 @@ export function SpotifyStatus() {
   const countdown = status.reauth_in_days !== null ? ` · reauth in ${status.reauth_in_days}d` : ''
 
   return (
-    <span>
-      {`Spotify: connected${countdown}`}
+    <span title={`Connected${countdown}`}>
+      Spotify
       {status.reauth_due && (
         <>
           {' · '}

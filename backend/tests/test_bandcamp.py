@@ -3,7 +3,7 @@ from wantlist.domain.bandcamp import bandcamp_search_url
 
 def test_bandcamp_search_url_encodes_artist_and_title() -> None:
     url = bandcamp_search_url("Floating Points", "Cascade")
-    assert url == "https://bandcamp.com/search?q=Floating+Points+Cascade"
+    assert url == "https://bandcamp.com/search?q=Floating+Points+Cascade&item_type=a"
 
 
 def test_bandcamp_search_url_escapes_specials() -> None:

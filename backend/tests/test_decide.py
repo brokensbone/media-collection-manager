@@ -69,7 +69,7 @@ def test_forgotten_trigger_surfaces_old_saves(clean_album_tables: sessionmaker[S
     _add(sf, title="recent", saved_days_ago=5)  # not old, not played
     queue = _svc(sf).queue()
     assert [i.title for i in queue] == ["old"]
-    assert queue[0].reason == "saved 30d ago"
+    assert queue[0].reason == "30d"
 
 
 def test_listened_trigger_surfaces_recent_but_played(
@@ -81,7 +81,7 @@ def test_listened_trigger_surfaces_recent_but_played(
         _play(sf, "fresh-but-played", f"t{i}", days_ago=2)
     queue = _svc(sf).queue()
     assert [i.title for i in queue] == ["fresh-but-played"]
-    assert queue[0].reason == "played 4 tracks"
+    assert queue[0].reason == "4 plays"
 
 
 def test_not_surfaced_when_neither_trigger_fires(

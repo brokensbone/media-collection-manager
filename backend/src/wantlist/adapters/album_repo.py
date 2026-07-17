@@ -371,6 +371,45 @@ class AlbumRepo:
             )
             session.commit()
 
+    def tracked_release_group_ids(self) -> set[str]:
+        """Release-group ids already on some album row — so a reverse-matched import (D21)
+        doesn't duplicate an album a want already covers (reconcile owns those)."""
+        with self._sf() as session:
+            rows = session.scalars(
+                select(Album.mb_releasegroup_id).where(Album.mb_releasegroup_id.is_not(None))
+            )
+            return {r for r in rows if r is not None}
+
+    def add_owned_import(
+        self,
+        *,
+        artist: str,
+        title: str,
+        mb_releasegroup_id: str | None,
+        beets_id: str,
+        spotify_id: str | None,
+        art_url: str | None,
+    ) -> None:
+        """Record a directly-imported album as owned (D21 reverse-match), so it shows in Owned.
+        Sticky manual link (reconcile never clobbers it); art back-fills via the art job. If the
+        spotify_id is already tracked, do nothing (a save/import for it already exists)."""
+        with self._sf() as session:
+            stmt = pg_insert(Album).values(
+                spotify_id=spotify_id,
+                artist=artist,
+                title=title,
+                mb_releasegroup_id=mb_releasegroup_id,
+                art_url=art_url,
+                state=AlbumState.owned,
+                provenance=Provenance.manual,
+                owned_beets_id=beets_id,
+                owned_link_source=LinkSource.manual,
+            )
+            if spotify_id is not None:
+                stmt = stmt.on_conflict_do_nothing(index_elements=["spotify_id"])
+            session.execute(stmt)
+            session.commit()
+
     # --- releases / artist-watch (§6b) -----------------------------------------------
 
     def suggested_queue(self) -> list[SuggestedRow]:
@@ -488,8 +527,11 @@ class AlbumRepo:
             )
             session.commit()
 
-    def pending_imports(self) -> list[ImportRow]:
-        """Detected acquisitions awaiting the operator's Import click, newest first."""
+    def list_imports(self) -> list[ImportRow]:
+        """All recent acquisitions with their status, so the Import screen shows a task list
+        that persists (detected → queued → imported/failed) rather than rows vanishing on
+        click. Active ones (detected/queued) first, then the rest, each by download name."""
+        active = (ImportState.detected, ImportState.queued)
         with self._sf() as session:
             rows = session.execute(
                 select(
@@ -502,10 +544,47 @@ class AlbumRepo:
                     Album.title,
                 )
                 .outerjoin(Album, Album.id == PendingImport.matched_album_id)
-                .where(PendingImport.state == ImportState.detected)
-                .order_by(PendingImport.created_at.desc())
+                .order_by(
+                    PendingImport.state.in_(active).desc(),  # active first
+                    func.lower(PendingImport.name),
+                )
             )
             return [ImportRow(r[0], r[1].value, r[2], r[3].value, r[4], r[5], r[6]) for r in rows]
+
+    def count_active_imports(self) -> int:
+        """Imports awaiting a click or still processing — the dashboard's Import count."""
+        active = (ImportState.detected, ImportState.queued)
+        with self._sf() as session:
+            return int(
+                session.scalar(
+                    select(func.count())
+                    .select_from(PendingImport)
+                    .where(PendingImport.state.in_(active))
+                )
+                or 0
+            )
+
+    def queue_import(self, import_id: int) -> None:
+        """Mark an import for background processing. Allowed from detected (the Import click)
+        or failed (a retry); ignored otherwise so a double-click can't re-run a done import."""
+        with self._sf() as session:
+            session.execute(
+                update(PendingImport)
+                .where(
+                    PendingImport.id == import_id,
+                    PendingImport.state.in_((ImportState.detected, ImportState.failed)),
+                )
+                .values(state=ImportState.queued)
+            )
+            session.commit()
+
+    def queued_import_ids(self) -> list[int]:
+        with self._sf() as session:
+            return list(
+                session.scalars(
+                    select(PendingImport.id).where(PendingImport.state == ImportState.queued)
+                )
+            )
 
     def get_pending_import(self, import_id: int) -> ImportRecord | None:
         with self._sf() as session:

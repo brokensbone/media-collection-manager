@@ -115,6 +115,7 @@ class SeenRelease(Base):
 
 class ImportState(StrEnum):
     detected = "detected"  # awaiting the operator's Import click
+    queued = "queued"  # clicked; awaiting background processing by the worker
     imported = "imported"
     failed = "failed"
 

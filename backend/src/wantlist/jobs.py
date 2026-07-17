@@ -14,6 +14,7 @@ from .factories import (
     build_auth_service,
     build_decide_service,
     build_import_detection_service,
+    build_import_runner,
     build_ingest_service,
     build_ownership_reconciler,
     build_play_history_service,
@@ -110,6 +111,17 @@ def poll_transmission_once(settings: Settings | None = None) -> None:
         log.info("transmission: detected=%s", result.detected)
 
 
+def run_imports_once(settings: Settings | None = None) -> None:
+    """Process queued imports in the background (§12/§13), so the operator can tick a batch
+    on the Import screen and come back — each moves to imported/failed on its own."""
+    settings = settings or Settings()
+    session_factory = _session_factory(settings)
+    with heartbeat(session_factory, "imports"):
+        processed = build_import_runner(settings, session_factory).run_queued()
+        if processed:
+            log.info("imports: processed=%s", processed)
+
+
 def poll_watchdir_once(settings: Settings | None = None) -> None:
     """One watch-dir scan — detect settled drops and match them to wants (§13). Disabled when
     no watch path is configured."""
@@ -143,4 +155,5 @@ if __name__ == "__main__":
     watch_artists_once()
     poll_transmission_once()
     poll_watchdir_once()
+    run_imports_once()
     alerts_once()

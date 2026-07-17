@@ -73,7 +73,7 @@ def test_watchdir_matches_by_tags_and_dedupes(
     assert detector.poll().detected == 2
     assert detector.poll().detected == 0  # source keys known → nothing new
 
-    rows = {r.name: r for r in AlbumRepo(sf).pending_imports()}
+    rows = {r.name: r for r in AlbumRepo(sf).list_imports()}
     assert set(rows) == {"pw_lup_2011.zip", "unknown.zip"}
     assert rows["pw_lup_2011.zip"].matched_album_id == album_id  # matched via embedded tags
     assert rows["pw_lup_2011.zip"].source == "watchdir"
@@ -113,7 +113,8 @@ def test_watchdir_import_unpacks_and_archives_original(
         archive_path=str(zip_path),
         matched_album_id=None,
     )
-    import_id = repo.pending_imports()[0].id
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
 
     beets = RecordingBeetsClient()
     runner = ImportRunner(
@@ -156,7 +157,8 @@ def test_watchdir_import_delete_disposition(
         archive_path=str(zip_path),
         matched_album_id=None,
     )
-    import_id = repo.pending_imports()[0].id
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
 
     ImportRunner(
         repo=repo,

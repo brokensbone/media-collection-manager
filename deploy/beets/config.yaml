@@ -1,0 +1,13 @@
+# Disposable local beets config (D10). The real deploy points WANTLIST_BEETS_CONFIG at your
+# existing beets config instead — nothing here is special. library.db + music live on a
+# mounted volume (/beets) so they survive `docker compose restart` but are thrown away with
+# `docker compose down -v`.
+directory: /beets/music
+library: /beets/library.db
+
+# Non-interactive import (§12/§13): the app runs `beet import -q`. Without this, a drop that
+# beets can't confidently autotag would be *skipped* in quiet mode; `asis` imports it anyway
+# (keeping its existing tags) so the Import action always lands something.
+import:
+  quiet_fallback: asis
+  write: yes

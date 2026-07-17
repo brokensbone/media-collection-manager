@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Cover } from './Cover'
+import { matchesQuery } from './filter'
 
 type Item = { id: number; artist: string; title: string; reason: string; has_art: boolean }
 type Action = 'keep' | 'drop' | 'snooze'
 
-export function Decide() {
+export function Decide({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
   const [items, setItems] = useState<Item[] | null>(null)
   const [sel, setSel] = useState(0)
 
@@ -14,51 +16,69 @@ export function Decide() {
       .catch(() => setItems([]))
   }, [])
 
-  const act = useCallback((index: number, action: Action) => {
-    setItems((list) => {
-      if (!list?.[index]) return list
-      fetch(`/albums/${list[index].id}/${action}`, { method: 'POST' })
-      const next = list.filter((_, i) => i !== index)
-      setSel((s) => Math.max(0, Math.min(s, next.length - 1)))
-      return next
-    })
-  }, [])
+  const act = useCallback(
+    (id: number, action: Action) => {
+      fetch(`/albums/${id}/${action}`, { method: 'POST' }).then(() => onChange?.())
+      setItems((list) => (list ? list.filter((it) => it.id !== id) : list))
+    },
+    [onChange],
+  )
 
+  // Keyboard triage operates on the currently-shown (filtered) rows.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (!items || items.length === 0) return
+      const el = e.target as HTMLElement | null
+      // don't hijack keystrokes while the user is typing in a field (e.g. the filter box)
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable))
+        return
+      const shown = (items ?? []).filter((it) => matchesQuery(`${it.artist} ${it.title}`, query))
+      if (shown.length === 0) return
       const k = e.key.toLowerCase()
-      if (k === 'j' || k === 'arrowdown') setSel((s) => Math.min(s + 1, items.length - 1))
-      else if (k === 'k' || k === 'arrowup') setSel((s) => Math.max(s - 1, 0))
-      else if (k === 'y') act(sel, 'keep')
-      else if (k === 'x') act(sel, 'drop')
-      else if (k === 's') act(sel, 'snooze')
+      const cur = Math.min(sel, shown.length - 1)
+      if (k === 'j' || k === 'arrowdown') setSel(Math.min(cur + 1, shown.length - 1))
+      else if (k === 'k' || k === 'arrowup') setSel(Math.max(cur - 1, 0))
+      else if (k === 'y') act(shown[cur].id, 'keep')
+      else if (k === 'x') act(shown[cur].id, 'drop')
+      else if (k === 's') act(shown[cur].id, 'snooze')
       else return
       e.preventDefault()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [items, sel, act])
+  }, [items, sel, query, act])
 
   if (!items) return <p>Loading…</p>
   if (items.length === 0) return <p>Nothing to judge.</p>
 
+  const shown = items.filter((it) => matchesQuery(`${it.artist} ${it.title}`, query))
+  const cur = Math.min(sel, shown.length - 1)
+
   return (
     <table>
+      <thead>
+        <tr>
+          <th className="cover-cell" />
+          <th>artist</th>
+          <th>title</th>
+          <th>why</th>
+          <th />
+        </tr>
+      </thead>
       <tbody>
-        {items.map((it, i) => (
-          <tr key={it.id} className={i === sel ? 'sel' : undefined}>
+        {shown.map((it, i) => (
+          <tr key={it.id} className={i === cur ? 'sel' : undefined}>
+            <Cover id={it.id} hasArt={it.has_art} />
             <td>{it.artist}</td>
             <td>{it.title}</td>
-            <td>{it.reason}</td>
-            <td>
-              <button type="button" onClick={() => act(i, 'keep')}>
+            <td className="nowrap">{it.reason}</td>
+            <td className="nowrap">
+              <button type="button" onClick={() => act(it.id, 'keep')}>
                 Keep
               </button>
-              <button type="button" onClick={() => act(i, 'drop')}>
+              <button type="button" onClick={() => act(it.id, 'drop')}>
                 Drop
               </button>
-              <button type="button" onClick={() => act(i, 'snooze')}>
+              <button type="button" onClick={() => act(it.id, 'snooze')}>
                 Snooze
               </button>
             </td>
