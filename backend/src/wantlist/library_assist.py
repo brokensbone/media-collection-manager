@@ -5,10 +5,10 @@ from .adapters.album_repo import AlbumRepo
 from .adapters.beets import BeetsAlbum
 from .domain.match import Candidate, edition_match, rank
 
-# Fuzzy is safe for candidates (a human confirms the pick), so the floor is generous. The
+# Fuzzy is safe for search results (a human confirms the pick), so the floor is generous. The
 # "possibly already owned?" hint fires unprompted, so it uses strict token containment.
-_CANDIDATE_FLOOR = 0.3
-_CANDIDATE_LIMIT = 5
+_SEARCH_FLOOR = 0.3
+_SEARCH_LIMIT = 8
 
 
 class LibraryCatalog(Protocol):
@@ -38,17 +38,18 @@ class LibraryAssistService:
         self._repo = repo
         self._catalog = catalog
 
-    def link_candidates(self, album_id: int) -> list[LinkCandidate]:
-        want = self._repo.album_artist_title(album_id)
-        if want is None:
+    def search(self, query: str) -> list[LinkCandidate]:
+        """Rank the beets library against a free-text query (the Mark-owned search box), so the
+        operator can find the exact album to link. Empty query returns nothing."""
+        if not query.strip():
             return []
         albums = self._catalog.all_albums()
         by_id = {a.beets_id: a for a in albums}
         ranked = rank(
-            f"{want[0]} {want[1]}",
+            query,
             [Candidate(a.beets_id, a.artist, a.title) for a in albums],
-            limit=_CANDIDATE_LIMIT,
-            floor=_CANDIDATE_FLOOR,
+            limit=_SEARCH_LIMIT,
+            floor=_SEARCH_FLOOR,
         )
         return [
             LinkCandidate(

@@ -48,16 +48,18 @@ export function Guide() {
       <h2>Acquire</h2>
       <p>
         Your buy list — the albums you've decided you want but don't own yet. Each has a{' '}
-        <strong>Buy on Bandcamp</strong> search link. When you've ordered something, hit{' '}
-        <strong>Mark ordered</strong> and it drops out of the list (you can undo that).
+        <strong>Bandcamp</strong> search link to go buy it. Once you've bought and imported it,
+        it moves to Owned on its own (reconcile spots it in your library) — there's no separate
+        "ordered" step to track.
       </p>
       <p>
-        When an album lands in your library, wantlist normally notices on its own. But editions
+        When an album lands in your library wantlist normally notices by itself. But editions
         differ — you might own the deluxe when Spotify had the standard — so{' '}
-        <strong>Mark owned…</strong> lets you link a want directly to the matching album in your
-        library. It even suggests likely matches so it's one click. If a want looks like something
-        you already own, Acquire flags it (<em>possibly owned</em>) so you don't re-buy. This is why
-        the loop can always be closed, even for albums MusicBrainz doesn't know.
+        <strong>Mark owned…</strong> opens a box to <strong>search your library</strong> and link
+        the want to the exact album (a sticky link reconcile won't undo), or mark it owned without
+        a link if it's not in beets. If a want looks like something you already own, Acquire flags
+        it (<em>possibly owned</em>) so you don't re-buy. This is why the loop can always be closed,
+        even for albums MusicBrainz doesn't know.
       </p>
 
       <h2>Releases</h2>

@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from .adapters.album_repo import AlbumRepo
 from .domain.bandcamp import bandcamp_search_url
 from .library_assist import LibraryAssistService, LinkCandidate
-from .ports.clock import Clock
 
 
 @dataclass
@@ -13,18 +12,17 @@ class AcquireItem:
     title: str
     has_art: bool
     bandcamp_url: str
-    possibly_owned: bool  # D17: a same-artist/similar-title edition already sits in beets
+    possibly_owned: bool  # a same-artist/similar-title edition already sits in beets (§7)
     owned_hint: str | None
 
 
 class AcquireService:
-    """The Acquire worklist (§7/§8d): `wanted` albums with buy-assist, plus the ordered and
-    manual-owned transitions that keep the loop always closable. D17 adds a "possibly already
-    owned?" hint and one-click library link candidates for the manual-owned link."""
+    """The Acquire worklist (§7): `wanted` albums with a Bandcamp buy link, a "possibly already
+    owned?" hint, and marking a want owned — optionally linked to a beets album the operator
+    finds via library search (the sticky manual link that keeps the loop closable)."""
 
-    def __init__(self, *, repo: AlbumRepo, clock: Clock, assist: LibraryAssistService) -> None:
+    def __init__(self, *, repo: AlbumRepo, assist: LibraryAssistService) -> None:
         self._repo = repo
-        self._clock = clock
         self._assist = assist
 
     def queue(self) -> list[AcquireItem]:
@@ -43,14 +41,8 @@ class AcquireService:
             for row in rows
         ]
 
-    def link_candidates(self, album_id: int) -> list[LinkCandidate]:
-        return self._assist.link_candidates(album_id)
-
-    def mark_ordered(self, album_id: int) -> None:
-        self._repo.mark_ordered(album_id, self._clock.now())
-
-    def cancel_order(self, album_id: int) -> None:
-        self._repo.cancel_order(album_id)
+    def search_library(self, query: str) -> list[LinkCandidate]:
+        return self._assist.search(query)
 
     def mark_owned(self, album_id: int, beets_id: str | None = None) -> None:
         self._repo.mark_owned_manual(album_id, beets_id)

@@ -50,7 +50,6 @@ def test_dashboard_counts(clean_album_tables: sessionmaker[Session]) -> None:
     )
     app.state.acquire_service = AcquireService(
         repo=AlbumRepo(sf),
-        clock=FrozenClock(NOW),
         assist=LibraryAssistService(repo=AlbumRepo(sf), catalog=StubLibraryCatalog()),
     )
 

@@ -328,7 +328,7 @@ class AlbumRepo:
     # --- acquire (§7) ----------------------------------------------------------------
 
     def acquire_queue(self) -> list[AcquireRow]:
-        """`wanted` albums to buy — `acquiring` (ordered) ones have dropped out."""
+        """`wanted` albums to buy."""
         with self._sf() as session:
             has_art = exists().where(AlbumArt.album_id == Album.id)
             rows = session.execute(
@@ -337,24 +337,6 @@ class AlbumRepo:
                 .order_by(Album.artist, Album.title)
             )
             return [AcquireRow(r[0], r[1], r[2], r[3]) for r in rows]
-
-    def mark_ordered(self, album_id: int, ordered_at: datetime) -> None:
-        with self._sf() as session:
-            session.execute(
-                update(Album)
-                .where(Album.id == album_id, Album.state == AlbumState.wanted)
-                .values(state=AlbumState.acquiring, ordered_at=ordered_at)
-            )
-            session.commit()
-
-    def cancel_order(self, album_id: int) -> None:
-        with self._sf() as session:
-            session.execute(
-                update(Album)
-                .where(Album.id == album_id, Album.state == AlbumState.acquiring)
-                .values(state=AlbumState.wanted, ordered_at=None)
-            )
-            session.commit()
 
     def mark_owned_manual(self, album_id: int, beets_id: str | None) -> None:
         """A sticky manual ownership link (§4/§5) — reconcile never clobbers it. Closes the
@@ -491,14 +473,6 @@ class AlbumRepo:
                 select(Album.id, Album.artist, Album.title).where(Album.state.in_(targets))
             )
             return [WantedForMatch(*row) for row in rows]
-
-    def album_artist_title(self, album_id: int) -> tuple[str, str] | None:
-        """(artist, title) for one album — used to query the library for link candidates (§5)."""
-        with self._sf() as session:
-            row = session.execute(
-                select(Album.artist, Album.title).where(Album.id == album_id)
-            ).one_or_none()
-            return (row[0], row[1]) if row else None
 
     def add_pending_import(
         self,

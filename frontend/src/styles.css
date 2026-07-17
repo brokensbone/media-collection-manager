@@ -160,9 +160,46 @@ a {
 .candidates {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 4px;
   margin-top: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.candidates button {
+  text-align: left;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10vh 16px;
+  z-index: 10;
+}
+.modal {
+  position: static;
+  margin: 0;
+  inset: auto;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 14px;
+  width: 100%;
+  max-width: 520px;
+}
+.modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.modal-actions {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
 }
 .topbar-right {
   display: flex;

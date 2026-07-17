@@ -208,7 +208,6 @@ def build_acquire_service(
 ) -> AcquireService:
     return AcquireService(
         repo=AlbumRepo(session_factory),
-        clock=SystemClock(),
         assist=build_library_assist_service(settings, session_factory),
     )
 

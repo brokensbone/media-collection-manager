@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Cover } from './Cover'
+import { Modal } from './Modal'
 import { matchesQuery } from './filter'
 
 type Item = {
@@ -22,8 +23,9 @@ type Candidate = {
 
 export function Acquire({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
   const [items, setItems] = useState<Item[] | null>(null)
-  const [linking, setLinking] = useState<number | null>(null)
-  const [candidates, setCandidates] = useState<Candidate[] | null>(null)
+  const [owning, setOwning] = useState<Item | null>(null) // the album being marked owned
+  const [q, setQ] = useState('')
+  const [results, setResults] = useState<Candidate[] | null>(null)
 
   useEffect(() => {
     fetch('/acquire')
@@ -32,17 +34,28 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
       .catch(() => setItems([]))
   }, [])
 
+  // Search the library while the Mark-owned modal is open.
+  useEffect(() => {
+    if (!owning) return
+    let cancelled = false
+    fetch(`/library/search?q=${encodeURIComponent(q)}`)
+      .then((r) => r.json())
+      .then((r) => !cancelled && setResults(r))
+      .catch(() => !cancelled && setResults([]))
+    return () => {
+      cancelled = true
+    }
+  }, [owning, q])
+
   const remove = useCallback((id: number) => {
     setItems((list) => (list ? list.filter((it) => it.id !== id) : list))
   }, [])
 
-  const order = useCallback(
-    (id: number) => {
-      fetch(`/albums/${id}/order`, { method: 'POST' }).then(() => onChange?.())
-      remove(id)
-    },
-    [remove, onChange],
-  )
+  const openOwn = useCallback((it: Item) => {
+    setOwning(it)
+    setQ(`${it.artist} ${it.title}`)
+    setResults(null)
+  }, [])
 
   const markOwned = useCallback(
     (id: number, beetsId?: string) => {
@@ -51,21 +64,11 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ beets_id: beetsId ?? null }),
       }).then(() => onChange?.())
-      setLinking(null)
-      setCandidates(null)
       remove(id)
+      setOwning(null)
     },
     [remove, onChange],
   )
-
-  const startLinking = useCallback((id: number) => {
-    setLinking(id)
-    setCandidates(null)
-    fetch(`/albums/${id}/link-candidates`)
-      .then((r) => r.json())
-      .then(setCandidates)
-      .catch(() => setCandidates([]))
-  }, [])
 
   if (!items) return <p>Loading…</p>
   if (items.length === 0) return <p>Nothing to acquire.</p>
@@ -73,54 +76,70 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
   const shown = items.filter((it) => matchesQuery(`${it.artist} ${it.title}`, query))
 
   return (
-    <table>
-      <tbody>
-        {shown.map((it) => (
-          <tr key={it.id}>
-            <Cover id={it.id} hasArt={it.has_art} />
-            <td>{it.artist}</td>
-            <td>
-              {it.title}
-              {it.possibly_owned && <div className="muted">possibly owned: {it.owned_hint}</div>}
-            </td>
-            <td>
-              <a href={it.bandcamp_url} target="_blank" rel="noreferrer">
-                Bandcamp
-              </a>
-            </td>
-            <td className="nowrap">
-              <button type="button" onClick={() => order(it.id)}>
-                Mark ordered
-              </button>
-              <button type="button" onClick={() => startLinking(it.id)}>
-                Mark owned…
-              </button>
-              {linking === it.id && (
-                <div className="candidates">
-                  {candidates === null ? (
-                    <span className="muted">Searching library…</span>
-                  ) : (
-                    <>
-                      {candidates.map((c) => (
-                        <button
-                          key={c.beets_id}
-                          type="button"
-                          onClick={() => markOwned(it.id, c.beets_id)}
-                        >
-                          Link: {c.artist} — {c.title}
-                        </button>
-                      ))}
-                      <button type="button" onClick={() => markOwned(it.id)}>
-                        Mark owned (no link)
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <>
+      <table>
+        <tbody>
+          {shown.map((it) => (
+            <tr key={it.id}>
+              <Cover id={it.id} hasArt={it.has_art} />
+              <td>{it.artist}</td>
+              <td>
+                {it.title}
+                {it.possibly_owned && <div className="muted">possibly owned: {it.owned_hint}</div>}
+              </td>
+              <td>
+                <a href={it.bandcamp_url} target="_blank" rel="noreferrer">
+                  Bandcamp
+                </a>
+              </td>
+              <td className="nowrap">
+                <button type="button" onClick={() => openOwn(it)}>
+                  Mark owned…
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {owning && (
+        <Modal
+          title={`Mark owned: ${owning.artist} — ${owning.title}`}
+          onClose={() => setOwning(null)}
+        >
+          <input
+            type="search"
+            className="filter"
+            ref={(el) => el?.focus()}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="search your library…"
+          />
+          <div className="candidates">
+            {results === null ? (
+              <span className="muted">Searching…</span>
+            ) : results.length === 0 ? (
+              <span className="muted">No library matches — try a different search.</span>
+            ) : (
+              results.map((c) => (
+                <button
+                  key={c.beets_id}
+                  type="button"
+                  onClick={() => markOwned(owning.id, c.beets_id)}
+                >
+                  {c.artist} — {c.title}
+                  {!c.has_release_group && <span className="muted"> · no MB id</span>}
+                </button>
+              ))
+            )}
+          </div>
+          <div className="modal-actions">
+            <button type="button" onClick={() => markOwned(owning.id)}>
+              Mark owned without a link
+            </button>
+          </div>
+        </Modal>
+      )}
+    </>
   )
 }
