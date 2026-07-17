@@ -167,7 +167,7 @@ Prometheus metrics so Grafana (already on partridge) can alert.
   and depend only on things that exist by D8 — worth pulling earlier than the tail work if
   you start running it for real (D10) before then.
 
-### D19 · In-app user guide  *(§17)*
+### D19 · In-app user guide  *(§17)*  — ✅ done (pending CI)
 A friendly **Guide** page in the web app that explains, in plain language, what the app is
 for and how to use each worklist — so it's self-explanatory without re-reading the spec.
 - **A `Guide` view** in the React app (own route/tab, linked from the top bar), theme-aware
@@ -182,6 +182,9 @@ for and how to use each worklist — so it's self-explanatory without re-reading
   asserting it lists the worklists and reconnect guidance. *("the app explains itself")*
 - **Best done last** (it's here at the end deliberately): it should describe the app as it
   actually ends up, so writing it after the worklists settle avoids rework.
+- **As built:** a `Guide` React view toggled from the top bar (no router dep — a small view
+  switch), static content styled with the existing theme tokens; component test asserts the
+  worklists + reconnect guidance, and an App test covers the top-bar toggle.
 
 ---
 
