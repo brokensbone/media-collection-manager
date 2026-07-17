@@ -3,6 +3,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session, sessionmaker
 
 from wantlist.adapters.album_repo import AlbumRepo
+from wantlist.adapters.beets import BeetsAlbum
 from wantlist.imports import (
     ImportDetectionService,
     ImportRunner,
@@ -10,9 +11,18 @@ from wantlist.imports import (
     TransmissionStager,
 )
 from wantlist.models import Album, AlbumState, ImportSource, ImportState, Provenance
+from wantlist.ports.spotify_api import SavedAlbum
 from wantlist.ports.transmission import Torrent
+from wantlist.reverse_match import ReverseMatcher
 
-from .fakes import FakeFileTransfer, RecordingBeetsClient, StubTransmissionClient
+from .fakes import (
+    FakeBeetsLibrary,
+    FakeFileTransfer,
+    RecordingBeetsClient,
+    StubSpotifyApiClient,
+    StubTokens,
+    StubTransmissionClient,
+)
 
 
 def _add_wanted(sf: sessionmaker[Session], *, artist: str, title: str) -> int:
@@ -153,6 +163,49 @@ def test_run_ignores_not_yet_queued(
     beets = RecordingBeetsClient()
     _transmission_runner(repo, beets, str(tmp_path)).run(import_id)  # still 'detected'
     assert beets.imported == []  # nothing imported until it's queued
+
+
+def test_unmatched_import_reverse_matches_to_owned(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    sf = clean_album_tables
+    download_dir = tmp_path / "Album"
+    download_dir.mkdir()
+    (download_dir / "01.flac").write_text("x")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="Mclusky - The World",
+        download_dir=str(download_dir),
+        files=["01.flac"],
+        matched_album_id=None,  # no want → should reverse-match after import
+    )
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
+
+    # beets "gains" this album on import; Spotify search finds it for enrichment
+    beets = FakeBeetsLibrary(adds_on_import=BeetsAlbum("b1", "Mclusky", "The World", "rg1"))
+    found = SavedAlbum("sp1", "Mclusky", None, "The World", None, None, "http://art.jpg")
+    reverse = ReverseMatcher(
+        repo=repo,
+        api=StubSpotifyApiClient(search={"Mclusky The World": found}),  # type: ignore[arg-type]
+        tokens=StubTokens(),  # type: ignore[arg-type]
+    )
+    ImportRunner(
+        repo=repo,
+        stagers={ImportSource.transmission: TransmissionStager(FakeFileTransfer())},
+        beets=beets,
+        inbox=str(inbox),
+        catalog=beets,
+        reverse_matcher=reverse,
+    ).run(import_id)
+
+    owned = AlbumRepo(sf).list_albums("owned")
+    assert [(a.artist, a.title, a.owned) for a in owned] == [("Mclusky", "The World", True)]
 
 
 def test_imports_service_queue_labels_match(

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Protocol
 
 from .adapters.album_repo import AlbumRepo, ImportRecord
+from .adapters.beets import BeetsAlbum
 from .adapters.unpack import dispose, unpack
 from .domain.match import MatchTarget, best_match
 from .models import ImportSource, ImportState
@@ -13,6 +14,7 @@ from .ports.clock import Clock
 from .ports.file_transfer import FileTransfer
 from .ports.tags import TagReader
 from .ports.transmission import TransmissionClient
+from .reverse_match import ReverseMatcher
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +23,13 @@ class BeetsImporter(Protocol):
     """The beets import seam we depend on (a subset of BeetsClient, SPEC §5/§12)."""
 
     def import_dir(self, path: str) -> None: ...
+
+
+class LibraryCatalog(Protocol):
+    """The beets catalogue seam — used to diff the library before/after an import so a
+    directly-imported album can be identified for reverse-match (D21)."""
+
+    def all_albums(self) -> list[BeetsAlbum]: ...
 
 
 @dataclass
@@ -185,11 +194,15 @@ class ImportRunner:
         stagers: dict[ImportSource, Stager],
         beets: BeetsImporter,
         inbox: str,
+        catalog: LibraryCatalog | None = None,
+        reverse_matcher: ReverseMatcher | None = None,
     ):
         self._repo = repo
         self._stagers = stagers
         self._beets = beets
         self._inbox = inbox
+        self._catalog = catalog
+        self._reverse_matcher = reverse_matcher
 
     def run(self, import_id: int) -> None:
         rec = self._repo.get_pending_import(import_id)
@@ -197,6 +210,7 @@ class ImportRunner:
             return  # only queued imports are processed (the click/retry enqueues them)
         stager = self._stagers[ImportSource(rec.source)]
 
+        before = self._album_ids()  # snapshot to identify what this import adds (D21)
         staging = Path(self._inbox) / str(rec.id)  # unique per import; no name-collisions
         try:
             stager.stage(rec, str(staging))
@@ -212,6 +226,24 @@ class ImportRunner:
             stager.finalize(rec)  # dispose the source; a hiccup here mustn't cause a re-import
         except Exception:
             log.warning("import %s: finalize/dispose failed", import_id, exc_info=True)
+
+        self._reverse_match(rec, before)
+
+    def _album_ids(self) -> set[str]:
+        return {a.beets_id for a in self._catalog.all_albums()} if self._catalog else set()
+
+    def _reverse_match(self, rec: ImportRecord, before: set[str]) -> None:
+        # Only an *unmatched* import needs this — a matched one flips its want to owned via
+        # reconcile. Best-effort: a failure here mustn't undo a successful import.
+        if self._reverse_matcher is None or self._catalog is None:
+            return
+        if rec.matched_album_id is not None:
+            return
+        try:
+            new = [a for a in self._catalog.all_albums() if a.beets_id not in before]
+            self._reverse_matcher.claim(new)
+        except Exception:
+            log.warning("import %s: reverse-match failed", rec.id, exc_info=True)
 
     def run_queued(self) -> int:
         """Process every queued import (worker job). One failure never blocks the rest — the

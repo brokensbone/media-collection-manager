@@ -187,6 +187,24 @@ for and how to use each worklist — so it's self-explanatory without re-reading
   switch), static content styled with the existing theme tokens; component test asserts the
   worklists + reconnect guidance, and an App test covers the top-bar toggle.
 
+### D20 · Async imports with persistent status  *(§12/§13 — from live testing)*  — ✅ done (pending CI)
+Clicking Import used to block on the unpack + `beet import` and then the row vanished, with
+no confirmation. Now importing is a background task list.
+- New `queued` state; the click enqueues (`detected → queued`), a worker job imports queued
+  items (`queued → imported/failed`), the Import screen keeps every row with a live status and
+  polls, failed rows offer Retry, and the dashboard counts the active ones.
+- **Done when:** clicking Import enqueues instantly, the worker completes it in the background,
+  the row persists showing imported/failed, and a failed import can be retried. ✅
+
+### D21 · Reverse-match imports to owned  *(§4/§5 — from live testing)*  — ✅ done (pending CI)
+An import that matched no want used to land only in beets — invisible in the app.
+- On a successful **unmatched** import (identified by a beets before/after diff), search Spotify
+  for the album, and record it as **owned** with cover art + Spotify id (dedupes a later save);
+  no Spotify match still creates the owned entry from the beets tags (no art).
+- **Scoped to app-imported albums only** — never mirrors the whole existing beets library.
+- **Done when:** importing an album with no matching want makes it appear in Owned (with art
+  when Spotify has it); an album a want already covers is left to reconcile, not duplicated. ✅
+
 ---
 
 ## Critical path & notes

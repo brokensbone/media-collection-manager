@@ -371,6 +371,45 @@ class AlbumRepo:
             )
             session.commit()
 
+    def tracked_release_group_ids(self) -> set[str]:
+        """Release-group ids already on some album row — so a reverse-matched import (D21)
+        doesn't duplicate an album a want already covers (reconcile owns those)."""
+        with self._sf() as session:
+            rows = session.scalars(
+                select(Album.mb_releasegroup_id).where(Album.mb_releasegroup_id.is_not(None))
+            )
+            return {r for r in rows if r is not None}
+
+    def add_owned_import(
+        self,
+        *,
+        artist: str,
+        title: str,
+        mb_releasegroup_id: str | None,
+        beets_id: str,
+        spotify_id: str | None,
+        art_url: str | None,
+    ) -> None:
+        """Record a directly-imported album as owned (D21 reverse-match), so it shows in Owned.
+        Sticky manual link (reconcile never clobbers it); art back-fills via the art job. If the
+        spotify_id is already tracked, do nothing (a save/import for it already exists)."""
+        with self._sf() as session:
+            stmt = pg_insert(Album).values(
+                spotify_id=spotify_id,
+                artist=artist,
+                title=title,
+                mb_releasegroup_id=mb_releasegroup_id,
+                art_url=art_url,
+                state=AlbumState.owned,
+                provenance=Provenance.manual,
+                owned_beets_id=beets_id,
+                owned_link_source=LinkSource.manual,
+            )
+            if spotify_id is not None:
+                stmt = stmt.on_conflict_do_nothing(index_elements=["spotify_id"])
+            session.execute(stmt)
+            session.commit()
+
     # --- releases / artist-watch (§6b) -----------------------------------------------
 
     def suggested_queue(self) -> list[SuggestedRow]:

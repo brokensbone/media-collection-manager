@@ -1,3 +1,4 @@
+import urllib.parse
 from collections.abc import Iterable, Iterator
 from datetime import datetime
 from typing import Any
@@ -23,6 +24,15 @@ class HttpxSpotifyApiClient:
             page = resp.json()
             yield from self._parse_page(page)
             url = page.get("next")
+
+    def search_album(self, access_token: str, query: str) -> SavedAlbum | None:
+        """Find an album by free text (D21 reverse-match): enrich a directly-imported album
+        with its Spotify id + cover art. Returns the top hit, or None if nothing matches."""
+        headers = {"Authorization": f"Bearer {access_token}"}
+        q = urllib.parse.quote(query)
+        data = self._get_json(f"{self._api_url}/search?type=album&limit=1&q={q}", headers)
+        items = data.get("albums", {}).get("items", [])
+        return self._to_saved(items[0], added_at=None) if items else None
 
     def album_isrcs(self, access_token: str, album_id: str) -> list[str]:
         """Fetch an album's track ISRCs (Tier-2 resolution input, §5). ISRCs live on the

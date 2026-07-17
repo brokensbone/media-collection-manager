@@ -32,6 +32,7 @@ from .play_history import PlayHistoryService
 from .reconcile import OwnershipReconciler
 from .releases import ReleasesService
 from .resolution import ResolutionService
+from .reverse_match import ReverseMatcher
 
 
 def build_auth_service(settings: Settings, session_factory: sessionmaker[Session]) -> AuthService:
@@ -174,14 +175,22 @@ def build_import_runner(settings: Settings, session_factory: sessionmaker[Sessio
         disposition=settings.watchdir_disposition,
         archive_subdir=settings.watchdir_archive_subdir,
     )
+    beets = BeetsClient(settings.beets_config)
+    reverse_matcher = ReverseMatcher(
+        repo=AlbumRepo(session_factory),
+        api=HttpxSpotifyApiClient(settings.spotify_api_url, settings.art_target_px),
+        tokens=build_auth_service(settings, session_factory),
+    )
     return ImportRunner(
         repo=AlbumRepo(session_factory),
         stagers={
             ImportSource.transmission: transmission,
             ImportSource.watchdir: watchdir,
         },
-        beets=BeetsClient(settings.beets_config),
+        beets=beets,
         inbox=settings.import_inbox_path,
+        catalog=beets,
+        reverse_matcher=reverse_matcher,
     )
 
 

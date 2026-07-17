@@ -28,15 +28,20 @@ class StubSpotifyApiClient:
         plays: Iterable[Play] = (),
         followed: Iterable[str] = (),
         artist_albums: dict[str, list[SavedAlbum]] | None = None,
+        search: dict[str, SavedAlbum] | None = None,
     ) -> None:
         self._albums = list(albums)
         self._plays = list(plays)
         self._followed = list(followed)
         self._artist_albums = artist_albums or {}
+        self._search = search or {}
         self.saved_calls: list[str] = []
 
     def saved_albums(self, access_token: str) -> Iterable[SavedAlbum]:
         return list(self._albums)
+
+    def search_album(self, access_token: str, query: str) -> SavedAlbum | None:
+        return self._search.get(query)
 
     def album_isrcs(self, access_token: str, album_id: str) -> list[str]:
         return []
@@ -98,6 +103,24 @@ class RecordingBeetsClient:
 
     def import_dir(self, path: str) -> None:
         self.imported.append(path)
+
+
+class FakeBeetsLibrary:
+    """Both the import seam and the catalogue: import_dir 'adds' a preset album to the library
+    so before/after diffs work in tests (used for the D21 reverse-match)."""
+
+    def __init__(self, adds_on_import: BeetsAlbum | None = None) -> None:
+        self._albums: list[BeetsAlbum] = []
+        self._adds = adds_on_import
+        self.imported: list[str] = []
+
+    def import_dir(self, path: str) -> None:
+        self.imported.append(path)
+        if self._adds is not None:
+            self._albums.append(self._adds)
+
+    def all_albums(self) -> list[BeetsAlbum]:
+        return list(self._albums)
 
 
 class FakeFileTransfer:
