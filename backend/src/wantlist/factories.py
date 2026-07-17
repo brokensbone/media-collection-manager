@@ -76,6 +76,7 @@ def build_resolution_service(
         ),
         repo=AlbumRepo(session_factory),
         tokens=build_auth_service(settings, session_factory),
+        max_per_run=settings.resolution_max_per_run,
     )
 
 

@@ -81,3 +81,4 @@ class Settings(BaseSettings):
     musicbrainz_user_agent: str = "wantlist/0.1 ( https://github.com/EdwardSalkeld )"
     musicbrainz_min_interval: float = 1.1  # MB asks for <= 1 req/sec
     musicbrainz_text_min_score: int = 90  # Tier-3 fuzzy accept threshold
+    resolution_max_per_run: int = 100  # cap MB lookups per reconcile (cold-start politeness)

@@ -1,4 +1,6 @@
 import logging
+from collections.abc import Callable
+from datetime import datetime
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 
@@ -17,81 +19,34 @@ log = logging.getLogger(__name__)
 
 
 def build_scheduler(settings: Settings) -> BlockingScheduler:
+    # Jobs run on a thread pool and each also fires immediately at startup (next_run_time=now),
+    # so a slow poller (e.g. a cold-start reconcile hammering MusicBrainz) runs concurrently
+    # and never blocks the others — the earlier serial startup burst did exactly that.
     scheduler = BlockingScheduler()
-    scheduler.add_job(
-        ingest_once,
-        "interval",
-        seconds=settings.saves_poll_seconds,
-        args=[settings],
-        id="ingest_saves",
-    )
-    scheduler.add_job(
-        reconcile_once,
-        "interval",
-        seconds=settings.saves_poll_seconds,
-        args=[settings],
-        id="reconcile",
-    )
-    scheduler.add_job(
-        poll_plays_once,
-        "interval",
-        seconds=settings.recently_played_poll_seconds,
-        args=[settings],
-        id="play_history",
-    )
-    scheduler.add_job(
-        watch_artists_once,
-        "interval",
-        seconds=settings.artist_watch_poll_seconds,
-        args=[settings],
-        id="artist_watch",
-    )
+    now = datetime.now()
+
+    def every(job: Callable[[Settings], None], seconds: int, job_id: str) -> None:
+        scheduler.add_job(
+            job, "interval", seconds=seconds, args=[settings], id=job_id, next_run_time=now
+        )
+
+    every(ingest_once, settings.saves_poll_seconds, "ingest_saves")
+    every(reconcile_once, settings.saves_poll_seconds, "reconcile")
+    every(poll_plays_once, settings.recently_played_poll_seconds, "play_history")
+    every(watch_artists_once, settings.artist_watch_poll_seconds, "artist_watch")
     if settings.transmission_rpc_url:
-        scheduler.add_job(
-            poll_transmission_once,
-            "interval",
-            seconds=settings.transmission_poll_seconds,
-            args=[settings],
-            id="transmission",
-        )
+        every(poll_transmission_once, settings.transmission_poll_seconds, "transmission")
     if settings.watchdir_path:
-        scheduler.add_job(
-            poll_watchdir_once,
-            "interval",
-            seconds=settings.watchdir_poll_seconds,
-            args=[settings],
-            id="watchdir",
-        )
-    scheduler.add_job(
-        alerts_once,
-        "interval",
-        seconds=settings.alerts_poll_seconds,
-        args=[settings],
-        id="alerts",
-    )
+        every(poll_watchdir_once, settings.watchdir_poll_seconds, "watchdir")
+    every(alerts_once, settings.alerts_poll_seconds, "alerts")
     return scheduler
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-    settings = Settings()
-    # Run each job once at startup, then on the intervals. Guard each: a transient failure
-    # (e.g. a MusicBrainz 503 during reconcile) must not stop the scheduler from starting —
-    # otherwise one flaky upstream call kills every poller. The scheduled run retries later.
-    for job in (
-        ingest_once,
-        reconcile_once,
-        poll_plays_once,
-        watch_artists_once,
-        poll_transmission_once,
-        poll_watchdir_once,
-        alerts_once,
-    ):
-        try:
-            job(settings)
-        except Exception:
-            log.exception("startup run of %s failed; continuing", job.__name__)
-    build_scheduler(settings).start()
+    # Each job fires immediately (and then on its interval) on the scheduler's thread pool,
+    # so startup runs happen concurrently and a slow/failing one can't block the rest.
+    build_scheduler(Settings()).start()
 
 
 if __name__ == "__main__":
