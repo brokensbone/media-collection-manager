@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from wantlist.adapters.album_repo import AlbumRepo
 from wantlist.app import create_app
 from wantlist.config import Settings
-from wantlist.imports import ImportRunner, ImportsService
+from wantlist.imports import ImportRunner, ImportsService, TransmissionStager
+from wantlist.models import ImportSource
 
 from .fakes import FakeFileTransfer, RecordingBeetsClient
 
@@ -22,8 +23,9 @@ def test_import_queue_then_one_click_import(
     inbox.mkdir()
 
     repo = AlbumRepo(sf)
-    repo.add_download_import(
-        torrent_hash="h1",
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
         name="Album",
         download_dir=str(download_dir),
         files=["01.flac"],
@@ -34,7 +36,12 @@ def test_import_queue_then_one_click_import(
     app = create_app(Settings())
     app.state.imports_service = ImportsService(
         repo=repo,
-        runner=ImportRunner(repo=repo, transfer=FakeFileTransfer(), beets=beets, inbox=str(inbox)),
+        runner=ImportRunner(
+            repo=repo,
+            stagers={ImportSource.transmission: TransmissionStager(FakeFileTransfer())},
+            beets=beets,
+            inbox=str(inbox),
+        ),
     )
     client = TestClient(app)
 

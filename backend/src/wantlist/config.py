@@ -63,6 +63,15 @@ class Settings(BaseSettings):
     transmission_poll_seconds: int = 3600
     import_match_threshold: float = 0.5
 
+    # Watch-dir import (§13, D15). Empty path = disabled. Bandcamp zips / dropped folders are
+    # scanned, matched by embedded tags, and one-click imported; the drop is ours, so it's
+    # disposed after import (archive default / delete / leave).
+    watchdir_path: str = ""
+    watchdir_poll_seconds: int = 300
+    watchdir_settle_seconds: int = 60  # skip drops modified more recently (still copying)
+    watchdir_disposition: str = "archive"  # archive | delete | leave
+    watchdir_archive_subdir: str = "done"
+
     # MusicBrainz resolution (§5, §11). Base URL overridable for tests/E2E (§14).
     musicbrainz_url: str = "https://musicbrainz.org/ws/2"
     musicbrainz_user_agent: str = "wantlist/0.1 ( https://github.com/EdwardSalkeld )"
