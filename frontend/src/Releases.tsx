@@ -33,7 +33,7 @@ export function Releases() {
             <Cover id={it.id} hasArt={it.has_art} />
             <td>{it.artist}</td>
             <td>{it.title}</td>
-            <td>
+            <td className="nowrap">
               <button type="button" onClick={() => act(it.id, 'save')}>
                 Save
               </button>

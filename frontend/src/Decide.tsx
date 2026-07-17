@@ -52,8 +52,8 @@ export function Decide() {
             <Cover id={it.id} hasArt={it.has_art} />
             <td>{it.artist}</td>
             <td>{it.title}</td>
-            <td>{it.reason}</td>
-            <td>
+            <td className="nowrap">{it.reason}</td>
+            <td className="nowrap">
               <button type="button" onClick={() => act(i, 'keep')}>
                 Keep
               </button>

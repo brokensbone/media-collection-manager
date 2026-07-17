@@ -85,7 +85,7 @@ export function Acquire() {
                 Buy on Bandcamp
               </a>
             </td>
-            <td>
+            <td className="nowrap">
               <button type="button" onClick={() => order(it.id)}>
                 Mark ordered
               </button>

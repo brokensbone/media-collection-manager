@@ -114,6 +114,9 @@ a {
 .muted {
   color: var(--muted);
 }
+.nowrap {
+  white-space: nowrap;
+}
 .candidates {
   display: flex;
   flex-direction: column;
