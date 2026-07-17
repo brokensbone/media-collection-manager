@@ -130,14 +130,17 @@ The D0 spike showed the unresolved tail is **MB-absent / not-real-albums, not
 fuzzy-matchable**, so an LLM can't move the number. Superseded by the tail-handling in
 D17. Revisit only if edition-disambiguation false positives later prove a distinct problem.
 
-### D17 · Assisted tail handling  *(§5 — replaces D16, post-MVP)*
+### D17 · Assisted tail handling  *(§5 — replaces D16, post-MVP)*  — ✅ done (pending CI)
 Make the ~14% tail low-effort. (The *minimal* manual link already ships in D7; this is the
 assistance on top.)
-- **Fuzzy-suggested link candidates** — when linking a want, match it against the beets
-  library so it's one click (fuzzy is safe here; a human confirms).
-- **"Possibly already owned?" hint** in Acquire — proactively surface likely edition
-  mismatches (same artist + similar title, different/no rgid) so you don't re-buy.
-- **Periodic re-resolve** — retry unresolved albums as MB grows; also catches new releases.
+- **Fuzzy-suggested link candidates** — `GET /albums/{id}/link-candidates` ranks the beets
+  library against the want (difflib); mark-owned takes the chosen `beets_id`. One click, human confirms.
+- **"Possibly already owned?" hint** in Acquire — flags wants whose title is contained in a
+  library album (edition mismatch: same artist, "…(Deluxe)") so you don't re-buy. Token
+  containment, not a ratio threshold (which misfires on short titles). Best-effort.
+- **Periodic re-resolve** — already provided by the scheduled resolution pass (it retries
+  every album lacking an rgid); D17 just adds a test proving one resolves once MB grows.
+- **Built on** a new `BeetsClient.all_albums()` catalogue seam + a `LibraryAssistService`.
 - **Done when:** linking a want offers correct candidates without manual search, likely-owned wants are flagged in Acquire, and re-resolve picks up a formerly-missing release once it exists in MB. *("the tail stops being a chore")*
 
 ### D18 · Metrics endpoint (Prometheus) + alerting hooks  *(§16, post-MVP)*

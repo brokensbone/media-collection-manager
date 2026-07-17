@@ -1,6 +1,7 @@
 from collections.abc import Iterable
 from datetime import datetime
 
+from wantlist.adapters.beets import BeetsAlbum
 from wantlist.adapters.token_store import StoredAuth
 from wantlist.ports.spotify import ReauthRequired, SpotifyTokens
 from wantlist.ports.spotify_api import Play, SavedAlbum
@@ -69,6 +70,16 @@ class StubOwnedReleaseGroups:
 
     def owned_release_group_ids(self) -> set[str]:
         return set(self._owned)
+
+
+class StubLibraryCatalog:
+    """A fake beets catalogue for the D17 link-candidate / possibly-owned assist."""
+
+    def __init__(self, albums: Iterable[BeetsAlbum] = ()) -> None:
+        self._albums = list(albums)
+
+    def all_albums(self) -> list[BeetsAlbum]:
+        return list(self._albums)
 
 
 class StubTransmissionClient:

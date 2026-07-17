@@ -2,12 +2,11 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from . import health
-from .acquire import AcquireService
 from .adapters.album_repo import AlbumRepo
-from .adapters.clock import SystemClock
 from .config import Settings
 from .db import make_engine, make_session_factory
 from .factories import (
+    build_acquire_service,
     build_auth_service,
     build_decide_service,
     build_import_runner,
@@ -35,7 +34,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.auth_service = build_auth_service(settings, session_factory)
     app.state.album_repo = AlbumRepo(session_factory)
     app.state.decide_service = build_decide_service(settings, session_factory)
-    app.state.acquire_service = AcquireService(repo=AlbumRepo(session_factory), clock=SystemClock())
+    app.state.acquire_service = build_acquire_service(settings, session_factory)
     app.state.releases_service = build_releases_service(settings, session_factory)
     app.state.imports_service = ImportsService(
         repo=AlbumRepo(session_factory),

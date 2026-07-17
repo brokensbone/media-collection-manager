@@ -235,11 +235,22 @@ raw SQLite anywhere.
   deluxe) and MB-absent albums (buy it → import to beets → link the want → owned). A
   *minimal* form of this ships in MVP — without it, those albums could never leave the
   buy list even once owned.
-- **Assisted tail handling — post-MVP (ROADMAP D17):** fuzzy-suggested link candidates
+- **Assisted tail handling — built (ROADMAP D17):** fuzzy-suggested link candidates
   (match the want against the beets library so linking is one click — fuzzy is safe here
   because a human confirms), a proactive "you might already own this (different edition)?"
   hint in Acquire, and a **periodic re-resolve** that retries unresolved albums as MB
   grows. No LLM needed — the tail isn't fuzzy-matchable, just sometimes absent.
+  - **As built (D17):** the beets seam gained `all_albums()` (id, artist, title, rgid) as
+    the catalogue behind both assists. **Link candidates** (`GET /albums/{id}/link-candidates`)
+    rank the library against the want by `difflib` ratio (generous floor; a human picks),
+    and **mark-owned** now takes an optional `beets_id` to record the chosen sticky link.
+    The **"possibly already owned?"** hint on the Acquire queue uses **token containment**
+    (every word of the want appears in a library title) rather than a ratio threshold —
+    ratios misfire on short titles with edition suffixes ("Want It" vs "Want It (Remaster)");
+    containment catches the "owned title = want + deluxe/remaster" shape cleanly. The hint is
+    best-effort (a beets hiccup yields no hint, never an error). **Re-resolve** needed no new
+    code: the scheduled resolution pass already retries every album lacking an rgid, so one
+    resolves as soon as MB grows to include it — now covered by a test.
 - **Beets is a bundled dependency; the app runs its own `beet`.** beets is a Python
   package (pinned in our deps), so we don't rely on an external binary being provided.
   It runs behind a small "beets query" seam — v1 needs essentially **one operation**,
@@ -507,8 +518,8 @@ releases → decide → acquire → import.
    `acquiring` (§4) — dropping it out until reconcile flips it `owned` (cancel-order
    returns it to `wanted`); and a **Link to library / mark owned** action — search beets
    and pick the album that satisfies this want (a sticky manual link, §4/§5) for edition
-   mismatches or MB-absent albums the rgid join can't catch. (D17 adds fuzzy-suggested
-   candidates + a "possibly already owned?" hint here.)
+   mismatches or MB-absent albums the rgid join can't catch. (D17 added fuzzy-suggested
+   link candidates on mark-owned + a "possibly already owned?" hint here.)
 4. **Import** — **built for both fronts: Transmission (§12, D14) and watch-dir (§13, D15).**
    Detected acquisitions awaiting the Import click. Item: source, name, matched want (or
    "no match"), **Import** button. Landing without this is fully manual — reconcile still

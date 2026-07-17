@@ -444,6 +444,14 @@ class AlbumRepo:
             )
             return [WantedForMatch(*row) for row in rows]
 
+    def album_artist_title(self, album_id: int) -> tuple[str, str] | None:
+        """(artist, title) for one album — used to query the library for link candidates (§5)."""
+        with self._sf() as session:
+            row = session.execute(
+                select(Album.artist, Album.title).where(Album.id == album_id)
+            ).one_or_none()
+            return (row[0], row[1]) if row else None
+
     def add_pending_import(
         self,
         *,
