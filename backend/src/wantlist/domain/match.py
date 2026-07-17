@@ -42,20 +42,22 @@ def _score(query: str, c: Candidate) -> float:
     return SequenceMatcher(None, query, _normalize(f"{c.artist} {c.title}")).ratio()
 
 
-def rank(
-    query: str, candidates: list[Candidate], *, limit: int, floor: float
-) -> list[tuple[Candidate, float]]:
-    """Rank library candidates against a want (SPEC §5, D17). Fuzzy is safe here because a
-    human confirms the pick — returns the best `limit` that clear `floor`, highest first."""
-    q = _normalize(query)
-    scored = [(c, _score(q, c)) for c in candidates]
-    scored = [(c, s) for c, s in scored if s >= floor]
-    scored.sort(key=lambda cs: cs[1], reverse=True)
-    return scored[:limit]
-
-
 def _tokens(text: str) -> set[str]:
     return set(_normalize(text).split())
+
+
+def token_search(query: str, candidates: list[Candidate], *, limit: int) -> list[Candidate]:
+    """Library search (D17/D21 Mark-owned box): substring, not fuzzy-ratio — every query token
+    must appear in the candidate's artist/title, so "mclusky" finds "mclusky — The World…" (a
+    ratio would score that short-query-vs-long-title below any useful floor). Best `limit`,
+    closest-by-ratio first."""
+    qtokens = _tokens(query)
+    if not qtokens:
+        return []
+    qn = _normalize(query)
+    matches = [c for c in candidates if qtokens <= _tokens(f"{c.artist} {c.title}")]
+    matches.sort(key=lambda c: _score(qn, c), reverse=True)
+    return matches[:limit]
 
 
 def edition_match(query: str, candidates: list[Candidate]) -> Candidate | None:

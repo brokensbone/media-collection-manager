@@ -49,6 +49,7 @@ export function Decide({ onChange, query = '' }: { onChange?: () => void; query?
   }, [items, sel, query, act])
 
   // Keep the selected row in view as it moves (holding ↓ shouldn't run off-screen).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: sel is the trigger, not read in the body
   useEffect(() => {
     selRef.current?.scrollIntoView({ block: 'nearest' })
   }, [sel])

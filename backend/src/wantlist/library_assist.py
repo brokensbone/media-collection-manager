@@ -3,11 +3,8 @@ from typing import Protocol
 
 from .adapters.album_repo import AlbumRepo
 from .adapters.beets import BeetsAlbum
-from .domain.match import Candidate, edition_match, rank
+from .domain.match import Candidate, edition_match, token_search
 
-# Fuzzy is safe for search results (a human confirms the pick), so the floor is generous. The
-# "possibly already owned?" hint fires unprompted, so it uses strict token containment.
-_SEARCH_FLOOR = 0.3
 _SEARCH_LIMIT = 8
 
 
@@ -21,7 +18,6 @@ class LinkCandidate:
     artist: str
     title: str
     has_release_group: bool
-    score: float
 
 
 @dataclass
@@ -45,11 +41,10 @@ class LibraryAssistService:
             return []
         albums = self._catalog.all_albums()
         by_id = {a.beets_id: a for a in albums}
-        ranked = rank(
+        matches = token_search(
             query,
             [Candidate(a.beets_id, a.artist, a.title) for a in albums],
             limit=_SEARCH_LIMIT,
-            floor=_SEARCH_FLOOR,
         )
         return [
             LinkCandidate(
@@ -57,9 +52,8 @@ class LibraryAssistService:
                 artist=c.artist,
                 title=c.title,
                 has_release_group=by_id[c.key].mb_releasegroup_id is not None,
-                score=round(score, 3),
             )
-            for c, score in ranked
+            for c in matches
         ]
 
     def owned_hints(self, wants: list[tuple[int, str, str]]) -> dict[int, OwnedHint]:

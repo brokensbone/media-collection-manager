@@ -100,6 +100,20 @@ def test_search_library_ranks_matches(clean_album_tables: sessionmaker[Session])
     assert "2" not in [c.beets_id for c in candidates]  # unrelated album filtered out
 
 
+def test_search_library_partial_query_finds_album(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    # A short query (one word of a long title) must still find the album — the old fuzzy-ratio
+    # search scored "mclusky" against "mclusky — The World Loves Us…" below any useful floor.
+    sf = clean_album_tables
+    catalog = [
+        BeetsAlbum("1", "mclusky", "The World Loves Us and Is Our Bitch", "rg-x"),
+        BeetsAlbum("2", "Someone Else", "Totally Different", None),
+    ]
+    candidates = _svc(sf, catalog).search_library("mclusky")
+    assert [c.beets_id for c in candidates] == ["1"]
+
+
 def test_search_library_empty_query_returns_nothing(
     clean_album_tables: sessionmaker[Session],
 ) -> None:

@@ -18,7 +18,6 @@ type Candidate = {
   artist: string
   title: string
   has_release_group: boolean
-  score: number
 }
 
 export function Acquire({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
