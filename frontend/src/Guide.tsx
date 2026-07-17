@@ -38,6 +38,12 @@ export function Guide() {
           <strong>Snooze</strong> — not sure yet: hides it for a while, then it comes back.
         </li>
       </ul>
+      <p>
+        For fast triage you can stay on the keyboard: the blue-marked row is the cursor —{' '}
+        <strong>j</strong>/<strong>↓</strong> and <strong>k</strong>/<strong>↑</strong> move it, and{' '}
+        <strong>y</strong> keeps, <strong>x</strong> drops, <strong>s</strong> snoozes. Dropping
+        only dismisses it here — it never removes anything from your Spotify saves or your library.
+      </p>
 
       <h2>Acquire</h2>
       <p>
