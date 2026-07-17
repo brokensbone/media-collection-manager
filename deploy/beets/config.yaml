@@ -1,0 +1,6 @@
+# Disposable local beets config (D10). The real deploy points WANTLIST_BEETS_CONFIG at your
+# existing beets config instead — nothing here is special. library.db + music live on a
+# mounted volume (/beets) so they survive `docker compose restart` but are thrown away with
+# `docker compose down -v`.
+directory: /beets/music
+library: /beets/library.db

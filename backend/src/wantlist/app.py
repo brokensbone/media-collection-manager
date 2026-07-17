@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from . import health
 from .adapters.album_repo import AlbumRepo
@@ -68,6 +69,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "checks": {"postgres": postgres, "beets": beets},
             },
         )
+
+    # Serve the built SPA last so it only catches paths the API routers didn't (D10). All
+    # frontend calls are same-origin relative paths, so this needs no proxy.
+    if settings.static_dir:
+        app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="spa")
 
     return app
 

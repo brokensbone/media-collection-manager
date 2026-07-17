@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     # Storage
     database_url: str = "postgresql+psycopg://localhost:5432/wantlist"
 
+    # Optional: serve the built frontend (SPA) from this directory at `/`, so a single
+    # container can serve both UI and API on one origin (D10). Empty = API only (dev uses Vite).
+    static_dir: str = ""
+
     # beets seam (§5): beets is bundled; this points at the beets config, whose
     # `library:`/`directory:` reference the mounted library.db + music.
     beets_config: str | None = None

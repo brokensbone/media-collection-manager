@@ -88,9 +88,10 @@ Everything that makes it a coherent app, and the end-to-end proof.
 
 ## P2 — Live
 
-### D10 · Deploy to blink + Postgres on partridge  *(§8b)*
+### D10 · Deploy  *(§8b)*
 Make it real. (Independent of dev — can land as soon as the blink→nix conversion is ready; nothing above is blocked on it.)
-- Multi-stage image; compose service on blink behind Traefik/TLS; dedicated DB + writer role on partridge; register the Spotify redirect URI; point at the real beets library.
+- **D10a · Local disposable deploy — ✅ done (pending CI).** A `deploy/` stack: multi-stage image (Node builds the SPA → Python image serves it + the API on one origin), `docker compose` with Postgres + `init` (migrate + create an empty beets library) + `api` + `worker`, all on local volumes. Proves the config surface (`deploy/.env.example`) and that it runs end-to-end against an empty beets db. Flushed out one real bug: `httpx` was a runtime dep miscategorised as dev (only surfaced under `--no-dev`). See [`deploy/README.md`](deploy/README.md).
+- **D10b · Real deploy — pending blink.** Compose service on blink behind Traefik/TLS; dedicated DB + writer role on partridge; register the Spotify redirect URI; point `WANTLIST_BEETS_CONFIG` at the **existing** beets library/config. Reuses the D10a image + compose.
 - **Done when:** the app is reachable at its real URL, connected to real Spotify + real beets, and the first real wants are flowing through the worklists. *("running for real")*
 
 ---

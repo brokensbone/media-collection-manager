@@ -1,0 +1,72 @@
+# Disposable local deploy (D10). Brings up Postgres + the app (API+SPA on one origin) + the
+# poller worker, all on local volumes. Run from this directory:
+#   cp .env.example .env      # then optionally add Spotify creds
+#   docker compose up --build
+# Then open http://localhost:8000  (health: /health, metrics: /metrics)
+# Tear down and wipe data:  docker compose down -v
+
+x-app: &app
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  image: wantlist-local:latest
+  env_file: .env
+  environment:
+    # --- infra wiring for this local deploy (the real deploy sets these to its own values) ---
+    WANTLIST_DATABASE_URL: postgresql+psycopg://wantlist:wantlist@postgres:5432/wantlist
+    WANTLIST_BEETS_CONFIG: /etc/beets/config.yaml
+    WANTLIST_IMPORT_INBOX_PATH: /beets/inbox
+    WANTLIST_STATIC_DIR: /app/frontend-dist  # api serves the SPA; worker ignores it
+  volumes:
+    - beetsdata:/beets
+    - ./beets/config.yaml:/etc/beets/config.yaml:ro
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: wantlist
+      POSTGRES_PASSWORD: wantlist
+      POSTGRES_DB: wantlist
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wantlist"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # One-shot: apply migrations and materialise an empty beets library, before api/worker start.
+  init:
+    <<: *app
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - "alembic upgrade head && mkdir -p /beets/music /beets/inbox && (beet -c /etc/beets/config.yaml ls >/dev/null 2>&1 || true)"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "wantlist.worker"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  beetsdata:
