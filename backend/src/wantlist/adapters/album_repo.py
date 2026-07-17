@@ -167,7 +167,7 @@ class AlbumRepo:
 
     def kept_artist_ids(self) -> set[str]:
         """Artist ids of albums that survived a keep-verdict — the 6b watch seed (§6b)."""
-        kept = (AlbumState.wanted, AlbumState.acquiring, AlbumState.owned)
+        kept = (AlbumState.wanted, AlbumState.owned)
         with self._sf() as session:
             rows = session.scalars(
                 select(Album.artist_id).where(Album.artist_id.is_not(None), Album.state.in_(kept))
@@ -466,8 +466,8 @@ class AlbumRepo:
             return set(session.scalars(select(PendingImport.source_key)))
 
     def wanted_for_matching(self) -> list[WantedForMatch]:
-        """`wanted`/`acquiring` albums an acquisition could be fulfilling (§12/§13 match)."""
-        targets = (AlbumState.wanted, AlbumState.acquiring)
+        """`wanted` albums an acquisition could be fulfilling (§12/§13 match)."""
+        targets = (AlbumState.wanted,)
         with self._sf() as session:
             rows = session.execute(
                 select(Album.id, Album.artist, Album.title).where(Album.state.in_(targets))

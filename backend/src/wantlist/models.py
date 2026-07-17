@@ -25,7 +25,6 @@ class AlbumState(StrEnum):
     suggested = "suggested"
     saved = "saved"
     wanted = "wanted"
-    acquiring = "acquiring"
     owned = "owned"
     dismissed = "dismissed"
 
@@ -33,7 +32,6 @@ class AlbumState(StrEnum):
 class Provenance(StrEnum):
     spotify_save = "spotify_save"
     artist_watch = "artist_watch"
-    backfill = "backfill"
     manual = "manual"
 
 
@@ -61,7 +59,6 @@ class Album(Base):
 
     saved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     verdict_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
-    ordered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     snoozed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
     owned_beets_id: Mapped[str | None] = mapped_column(default=None)
