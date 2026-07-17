@@ -1,6 +1,8 @@
 import logging
+import signal
 from collections.abc import Callable
 from datetime import datetime
+from types import FrameType
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 
@@ -48,7 +50,16 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
     # Each job fires immediately (and then on its interval) on the scheduler's thread pool,
     # so startup runs happen concurrently and a slow/failing one can't block the rest.
-    build_scheduler(Settings()).start()
+    scheduler = build_scheduler(Settings())
+
+    # BlockingScheduler only handles SIGINT; without this, `docker stop` sends SIGTERM, the
+    # process ignores it, and Docker SIGKILLs it after the timeout (exit 137). Shut down
+    # cleanly on SIGTERM so it exits 0.
+    def _stop(_signum: int, _frame: FrameType | None) -> None:
+        scheduler.shutdown(wait=False)
+
+    signal.signal(signal.SIGTERM, _stop)
+    scheduler.start()
 
 
 if __name__ == "__main__":
