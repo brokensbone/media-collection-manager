@@ -45,6 +45,34 @@ def test_resolution_sets_release_group_and_leaves_tail(
     assert (second.resolved, second.unresolved) == (0, 1)
 
 
+def test_reresolve_picks_up_release_once_it_appears_in_mb(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    """D17 periodic re-resolve: an album MB couldn't place stays a first-class want and is
+    retried each pass — and resolves once MB grows to include it."""
+    sf = clean_album_tables
+    _saved(sf, spotify_id="s1", title="Later")
+
+    empty_mb = ResolutionService(
+        api=StubSpotifyApiClient([]),  # type: ignore[arg-type]
+        resolver=StubMusicBrainzResolver({}),  # MB doesn't know it yet  # type: ignore[arg-type]
+        repo=AlbumRepo(sf),
+        tokens=StubTokens(),  # type: ignore[arg-type]
+    )
+    assert empty_mb.resolve_unresolved().resolved == 0
+
+    grown_mb = ResolutionService(
+        api=StubSpotifyApiClient([]),  # type: ignore[arg-type]
+        resolver=StubMusicBrainzResolver(
+            {"Later": "rg-later"}
+        ),  # MB now has it  # type: ignore[arg-type]
+        repo=AlbumRepo(sf),
+        tokens=StubTokens(),  # type: ignore[arg-type]
+    )
+    assert grown_mb.resolve_unresolved().resolved == 1
+    assert AlbumRepo(sf).albums_needing_resolution() == []  # no longer in the tail
+
+
 def test_resolution_pauses_on_reauth(clean_album_tables: sessionmaker[Session]) -> None:
     sf = clean_album_tables
     _saved(sf, spotify_id="s1", title="X")

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from .adapters.album_repo import AlbumRepo
 from .domain.bandcamp import bandcamp_search_url
+from .library_assist import LibraryAssistService, LinkCandidate
 from .ports.clock import Clock
 
 
@@ -12,17 +13,23 @@ class AcquireItem:
     title: str
     has_art: bool
     bandcamp_url: str
+    possibly_owned: bool  # D17: a same-artist/similar-title edition already sits in beets
+    owned_hint: str | None
 
 
 class AcquireService:
     """The Acquire worklist (§7/§8d): `wanted` albums with buy-assist, plus the ordered and
-    manual-owned transitions that keep the loop always closable."""
+    manual-owned transitions that keep the loop always closable. D17 adds a "possibly already
+    owned?" hint and one-click library link candidates for the manual-owned link."""
 
-    def __init__(self, *, repo: AlbumRepo, clock: Clock) -> None:
+    def __init__(self, *, repo: AlbumRepo, clock: Clock, assist: LibraryAssistService) -> None:
         self._repo = repo
         self._clock = clock
+        self._assist = assist
 
     def queue(self) -> list[AcquireItem]:
+        rows = self._repo.acquire_queue()
+        hints = self._assist.owned_hints([(r.id, r.artist, r.title) for r in rows])
         return [
             AcquireItem(
                 id=row.id,
@@ -30,9 +37,14 @@ class AcquireService:
                 title=row.title,
                 has_art=row.has_art,
                 bandcamp_url=bandcamp_search_url(row.artist, row.title),
+                possibly_owned=row.id in hints,
+                owned_hint=hints[row.id].owned_hint if row.id in hints else None,
             )
-            for row in self._repo.acquire_queue()
+            for row in rows
         ]
+
+    def link_candidates(self, album_id: int) -> list[LinkCandidate]:
+        return self._assist.link_candidates(album_id)
 
     def mark_ordered(self, album_id: int) -> None:
         self._repo.mark_ordered(album_id, self._clock.now())

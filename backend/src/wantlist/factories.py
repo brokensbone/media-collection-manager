@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session, sessionmaker
 
+from .acquire import AcquireService
 from .adapters.album_repo import AlbumRepo
 from .adapters.art_fetcher import fetch_image
 from .adapters.beets import BeetsClient
@@ -25,6 +26,7 @@ from .imports import (
     WatchdirStager,
 )
 from .ingest import IngestService
+from .library_assist import LibraryAssistService
 from .models import ImportSource
 from .play_history import PlayHistoryService
 from .reconcile import OwnershipReconciler
@@ -179,6 +181,25 @@ def build_import_runner(settings: Settings, session_factory: sessionmaker[Sessio
         },
         beets=BeetsClient(settings.beets_config),
         inbox=settings.import_inbox_path,
+    )
+
+
+def build_library_assist_service(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> LibraryAssistService:
+    return LibraryAssistService(
+        repo=AlbumRepo(session_factory),
+        catalog=BeetsClient(settings.beets_config),
+    )
+
+
+def build_acquire_service(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> AcquireService:
+    return AcquireService(
+        repo=AlbumRepo(session_factory),
+        clock=SystemClock(),
+        assist=build_library_assist_service(settings, session_factory),
     )
 
 

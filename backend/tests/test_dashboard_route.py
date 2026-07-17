@@ -8,9 +8,10 @@ from wantlist.adapters.album_repo import AlbumRepo
 from wantlist.app import create_app
 from wantlist.config import Settings
 from wantlist.decide import DecideService
+from wantlist.library_assist import LibraryAssistService
 from wantlist.models import Album, AlbumState, Provenance
 
-from .fakes import FrozenClock
+from .fakes import FrozenClock, StubLibraryCatalog
 
 NOW = datetime(2026, 7, 16, tzinfo=UTC)
 
@@ -47,7 +48,11 @@ def test_dashboard_counts(clean_album_tables: sessionmaker[Session]) -> None:
         listened_tracks=4,
         listened_days=3,
     )
-    app.state.acquire_service = AcquireService(repo=AlbumRepo(sf), clock=FrozenClock(NOW))
+    app.state.acquire_service = AcquireService(
+        repo=AlbumRepo(sf),
+        clock=FrozenClock(NOW),
+        assist=LibraryAssistService(repo=AlbumRepo(sf), catalog=StubLibraryCatalog()),
+    )
 
     body = TestClient(app).get("/dashboard").json()
     assert body == {"decide": 1, "acquire": 2, "owned": 1, "dismissed": 0, "saved": 1}
