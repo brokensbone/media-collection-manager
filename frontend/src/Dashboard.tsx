@@ -1,17 +1,22 @@
 import { useEffect, useState } from 'react'
 
 type Counts = {
+  releases: number
   decide: number
   acquire: number
+  import: number
   owned: number
   dismissed: number
-  saved: number
 }
 
+// One tile per worklist section, in the same order and wording as the page below.
 const TILES: { key: keyof Counts; label: string }[] = [
-  { key: 'decide', label: 'to judge' },
-  { key: 'acquire', label: 'to buy' },
+  { key: 'releases', label: 'releases' },
+  { key: 'decide', label: 'decide' },
+  { key: 'acquire', label: 'acquire' },
+  { key: 'import', label: 'import' },
   { key: 'owned', label: 'owned' },
+  { key: 'dismissed', label: 'dismissed' },
 ]
 
 export function Dashboard() {
