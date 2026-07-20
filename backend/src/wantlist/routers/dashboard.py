@@ -9,6 +9,7 @@ def dashboard(request: Request) -> dict[str, int]:
     releases/decide/acquire/import are live queue sizes; owned/dismissed are state totals."""
     state = request.app.state
     counts = state.album_repo.count_by_state()
+    resolved, unresolved = state.album_repo.resolution_counts()
     return {
         "releases": counts.get("suggested", 0),
         "decide": len(state.decide_service.queue()),
@@ -16,4 +17,7 @@ def dashboard(request: Request) -> dict[str, int]:
         "import": state.album_repo.count_active_imports(),
         "owned": counts.get("owned", 0),
         "dismissed": counts.get("dismissed", 0),
+        # cold-start resolution progress (§5): how many albums have a MusicBrainz release-group
+        "resolved": resolved,
+        "unresolved": unresolved,
     }

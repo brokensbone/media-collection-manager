@@ -61,4 +61,6 @@ def test_dashboard_counts(clean_album_tables: sessionmaker[Session]) -> None:
         "import": 0,
         "owned": 1,
         "dismissed": 0,
+        "resolved": 0,  # none of these have a release-group yet
+        "unresolved": 4,  # all four non-dismissed albums await resolution
     }
