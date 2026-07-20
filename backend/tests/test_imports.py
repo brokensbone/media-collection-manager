@@ -39,6 +39,55 @@ def _add_wanted(sf: sessionmaker[Session], *, artist: str, title: str) -> int:
         return album.id
 
 
+def _add(sf: sessionmaker[Session], *, artist: str, title: str, state: AlbumState) -> int:
+    with sf() as session:
+        album = Album(
+            spotify_id=f"{artist}:{title}",
+            artist=artist,
+            title=title,
+            state=state,
+            provenance=Provenance.spotify_save,
+        )
+        session.add(album)
+        session.commit()
+        return album.id
+
+
+def test_detection_matches_an_album_still_in_decide(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    # A drop for an album you haven't triaged yet (still `saved`, i.e. in Decide) should match:
+    # reconcile will flip it to owned by release-group anyway, so the label should reflect that.
+    sf = clean_album_tables
+    album_id = _add(sf, artist="Patrick Wolf", title="Lupercalia", state=AlbumState.saved)
+    transmission = StubTransmissionClient(
+        [Torrent(hash="h1", name="Patrick_Wolf-Lupercalia-2011", download_dir="/d", files=["a"])]
+    )
+    ImportDetectionService(
+        transmission=transmission, repo=AlbumRepo(sf), match_threshold=0.5
+    ).poll()
+
+    rows = {r.name: r for r in AlbumRepo(sf).list_imports()}
+    assert rows["Patrick_Wolf-Lupercalia-2011"].matched_album_id == album_id
+
+
+def test_detection_ignores_already_owned_albums(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    # An owned album is not a match target — no point labelling a drop as fulfilling it.
+    sf = clean_album_tables
+    _add(sf, artist="Patrick Wolf", title="Lupercalia", state=AlbumState.owned)
+    transmission = StubTransmissionClient(
+        [Torrent(hash="h1", name="Patrick_Wolf-Lupercalia-2011", download_dir="/d", files=["a"])]
+    )
+    ImportDetectionService(
+        transmission=transmission, repo=AlbumRepo(sf), match_threshold=0.5
+    ).poll()
+
+    rows = {r.name: r for r in AlbumRepo(sf).list_imports()}
+    assert rows["Patrick_Wolf-Lupercalia-2011"].matched_album_id is None
+
+
 def _transmission_runner(repo: AlbumRepo, beets: object, inbox: str) -> ImportRunner:
     return ImportRunner(
         repo=repo,

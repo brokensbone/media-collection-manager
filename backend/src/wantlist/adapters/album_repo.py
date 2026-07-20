@@ -70,7 +70,7 @@ class SuggestedRow:
 
 
 @dataclass
-class WantedForMatch:
+class MatchCandidate:
     id: int
     artist: str
     title: str
@@ -465,14 +465,18 @@ class AlbumRepo:
         with self._sf() as session:
             return set(session.scalars(select(PendingImport.source_key)))
 
-    def wanted_for_matching(self) -> list[WantedForMatch]:
-        """`wanted` albums an acquisition could be fulfilling (§12/§13 match)."""
-        targets = (AlbumState.wanted,)
+    def unowned_for_matching(self) -> list[MatchCandidate]:
+        """Every not-yet-owned album an acquisition could correspond to (§12/§13 match). Not
+        just `wanted`: a drop for something still in Decide (`saved`) or freshly `suggested`
+        is a valid match too — reconcile will flip it to owned by release-group regardless, so
+        the detection-time name match should surface the same albums."""
         with self._sf() as session:
             rows = session.execute(
-                select(Album.id, Album.artist, Album.title).where(Album.state.in_(targets))
+                select(Album.id, Album.artist, Album.title).where(
+                    Album.state != AlbumState.owned
+                )
             )
-            return [WantedForMatch(*row) for row in rows]
+            return [MatchCandidate(*row) for row in rows]
 
     def add_pending_import(
         self,

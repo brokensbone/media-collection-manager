@@ -283,7 +283,8 @@ class ImportsService:
 
 def _match_targets(repo: AlbumRepo) -> list[MatchTarget]:
     return [
-        MatchTarget(id=w.id, artist=w.artist, title=w.title) for w in repo.wanted_for_matching()
+        MatchTarget(id=c.id, artist=c.artist, title=c.title)
+        for c in repo.unowned_for_matching()
     ]
 
 
