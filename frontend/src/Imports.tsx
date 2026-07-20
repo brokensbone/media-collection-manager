@@ -46,7 +46,7 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
     [onChange],
   )
 
-  const remove = useCallback(
+  const discard = useCallback(
     (id: number) => {
       setItems((list) => list?.filter((it) => it.id !== id) ?? list)
       fetch(`/imports/${id}`, { method: 'DELETE' }).then(() => onChange?.())
@@ -71,16 +71,21 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
               {it.missing ? (
                 <>
                   <span className="muted">file no longer in watch folder</span>{' '}
-                  <button type="button" onClick={() => remove(it.id)}>
-                    Remove
+                  <button type="button" onClick={() => discard(it.id)}>
+                    Discard
                   </button>
                 </>
               ) : (
                 <>
                   {it.state === 'detected' && (
-                    <button type="button" onClick={() => enqueue(it.id)}>
-                      Import
-                    </button>
+                    <>
+                      <button type="button" onClick={() => enqueue(it.id)}>
+                        Import
+                      </button>{' '}
+                      <button type="button" onClick={() => discard(it.id)}>
+                        Discard
+                      </button>
+                    </>
                   )}
                   {it.state === 'queued' && <span className="muted">{STATUS.queued}</span>}
                   {it.state === 'imported' && <span className="muted">{STATUS.imported}</span>}
@@ -90,8 +95,8 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
                       <button type="button" onClick={() => enqueue(it.id)}>
                         Retry
                       </button>{' '}
-                      <button type="button" onClick={() => remove(it.id)}>
-                        Remove
+                      <button type="button" onClick={() => discard(it.id)}>
+                        Discard
                       </button>
                     </>
                   )}

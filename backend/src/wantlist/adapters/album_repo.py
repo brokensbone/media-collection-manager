@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import delete, exists, func, select, update
+from sqlalchemy import exists, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -504,9 +504,10 @@ class AlbumRepo:
             session.commit()
 
     def list_imports(self) -> list[ImportRow]:
-        """All recent acquisitions with their status, so the Import screen shows a task list
-        that persists (detected → queued → imported/failed) rather than rows vanishing on
-        click. Active ones (detected/queued) first, then the rest, each by download name."""
+        """Recent acquisitions with their status, so the Import screen shows a task list that
+        persists (detected → queued → imported/failed) rather than rows vanishing on click.
+        Active ones (detected/queued) first, then the rest, each by download name. Dismissed
+        rows are hidden — kept only so their source-key stays in the seen-ledger."""
         active = (ImportState.detected, ImportState.queued)
         with self._sf() as session:
             rows = session.execute(
@@ -521,6 +522,7 @@ class AlbumRepo:
                     PendingImport.archive_path,
                 )
                 .outerjoin(Album, Album.id == PendingImport.matched_album_id)
+                .where(PendingImport.state != ImportState.dismissed)
                 .order_by(
                     PendingImport.state.in_(active).desc(),  # active first
                     func.lower(PendingImport.name),
@@ -587,12 +589,17 @@ class AlbumRepo:
             )
             session.commit()
 
-    def delete_pending_import(self, import_id: int) -> None:
-        """Drop an import row entirely — the operator dismissing a dead entry (e.g. a watch-dir
-        drop they've since removed). Its source_key leaves the seen ledger too, so re-dropping
-        the same file would be detected afresh."""
+    def dismiss_import(self, import_id: int) -> None:
+        """Discard an import the operator doesn't want (non-music that slipped through, a
+        re-download of something already owned). Sticky: the row is kept as `dismissed` so its
+        source_key stays in the seen-ledger and a still-seeding torrent isn't re-detected next
+        poll. Hidden from the Import list."""
         with self._sf() as session:
-            session.execute(delete(PendingImport).where(PendingImport.id == import_id))
+            session.execute(
+                update(PendingImport)
+                .where(PendingImport.id == import_id)
+                .values(state=ImportState.dismissed)
+            )
             session.commit()
 
     # --- notification dedup flags (§8d) ----------------------------------------------

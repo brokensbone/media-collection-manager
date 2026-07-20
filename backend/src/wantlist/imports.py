@@ -64,8 +64,16 @@ class ImportDetectionService:
         self._threshold = match_threshold
 
     def poll(self) -> DetectResult:
+        # The client is shared with all the operator's torrents, so on first connect there are
+        # hundreds already complete and plenty are non-music. We surface (and match) every music
+        # torrent — a torrent counts as music only if it contains audio files, which keeps
+        # movies/ISOs out — and the operator discards any they don't want.
         known = self._repo.known_source_keys()
-        fresh = [t for t in self._transmission.completed_torrents() if t.hash not in known]
+        fresh = [
+            t
+            for t in self._transmission.completed_torrents()
+            if t.hash not in known and _has_audio(t.files)
+        ]
         if not fresh:
             return DetectResult(detected=0)
 
@@ -298,8 +306,20 @@ class ImportsService:
     def enqueue(self, import_id: int) -> None:
         self._repo.queue_import(import_id)
 
-    def remove(self, import_id: int) -> None:
-        self._repo.delete_pending_import(import_id)
+    def discard(self, import_id: int) -> None:
+        self._repo.dismiss_import(import_id)
+
+
+_AUDIO_EXTS = frozenset(
+    {".flac", ".mp3", ".m4a", ".aac", ".ogg", ".opus", ".wav", ".aiff", ".aif",
+     ".wma", ".alac", ".ape", ".wv", ".dsf", ".dff", ".mpc"}
+)
+
+
+def _has_audio(files: list[str]) -> bool:
+    """A torrent is music only if it carries at least one audio file — the filter that keeps
+    a shared Transmission client's movies/software/ISOs out of the Import list (§12)."""
+    return any(Path(f).suffix.lower() in _AUDIO_EXTS for f in files)
 
 
 def _match_targets(repo: AlbumRepo) -> list[MatchTarget]:

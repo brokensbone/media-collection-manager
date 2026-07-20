@@ -20,5 +20,5 @@ def run_import(import_id: int, request: Request) -> None:
 
 
 @router.delete("/imports/{import_id}", status_code=204)
-def remove_import(import_id: int, request: Request) -> None:
-    _service(request).remove(import_id)
+def discard_import(import_id: int, request: Request) -> None:
+    _service(request).discard(import_id)  # sticky: kept as dismissed so it isn't re-detected

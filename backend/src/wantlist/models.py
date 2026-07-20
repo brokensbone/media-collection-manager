@@ -115,6 +115,7 @@ class ImportState(StrEnum):
     queued = "queued"  # clicked; awaiting background processing by the worker
     imported = "imported"
     failed = "failed"
+    dismissed = "dismissed"  # operator discarded it; kept so its source-key stays in the ledger
 
 
 class ImportSource(StrEnum):

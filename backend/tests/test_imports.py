@@ -61,7 +61,11 @@ def test_detection_matches_an_album_still_in_decide(
     sf = clean_album_tables
     album_id = _add(sf, artist="Patrick Wolf", title="Lupercalia", state=AlbumState.saved)
     transmission = StubTransmissionClient(
-        [Torrent(hash="h1", name="Patrick_Wolf-Lupercalia-2011", download_dir="/d", files=["a"])]
+        [
+            Torrent(
+                hash="h1", name="Patrick_Wolf-Lupercalia-2011", download_dir="/d", files=["01.flac"]
+            )
+        ]
     )
     ImportDetectionService(
         transmission=transmission, repo=AlbumRepo(sf), match_threshold=0.5
@@ -79,7 +83,11 @@ def test_detection_matches_an_already_owned_album(
     sf = clean_album_tables
     album_id = _add(sf, artist="Patrick Wolf", title="Lupercalia", state=AlbumState.owned)
     transmission = StubTransmissionClient(
-        [Torrent(hash="h1", name="Patrick_Wolf-Lupercalia-2011", download_dir="/d", files=["a"])]
+        [
+            Torrent(
+                hash="h1", name="Patrick_Wolf-Lupercalia-2011", download_dir="/d", files=["01.flac"]
+            )
+        ]
     )
     ImportDetectionService(
         transmission=transmission, repo=AlbumRepo(sf), match_threshold=0.5
@@ -337,16 +345,26 @@ def test_queue_flags_watchdir_drop_whose_file_is_gone(
     here = tmp_path / "Here.zip"
     here.write_bytes(b"z")
     repo.add_pending_import(
-        source=ImportSource.watchdir, source_key="k1", name="Here.zip",
-        archive_path=str(here), matched_album_id=None,
+        source=ImportSource.watchdir,
+        source_key="k1",
+        name="Here.zip",
+        archive_path=str(here),
+        matched_album_id=None,
     )
     repo.add_pending_import(
-        source=ImportSource.watchdir, source_key="k2", name="Gone.zip",
-        archive_path=str(tmp_path / "Gone.zip"), matched_album_id=None,
+        source=ImportSource.watchdir,
+        source_key="k2",
+        name="Gone.zip",
+        archive_path=str(tmp_path / "Gone.zip"),
+        matched_album_id=None,
     )
     repo.add_pending_import(
-        source=ImportSource.transmission, source_key="h1", name="Torrent",
-        download_dir="/d", files=["a"], matched_album_id=None,
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="Torrent",
+        download_dir="/d",
+        files=["a"],
+        matched_album_id=None,
     )
 
     queue = {i.name: i for i in ImportsService(repo=repo).queue()}
@@ -355,14 +373,42 @@ def test_queue_flags_watchdir_drop_whose_file_is_gone(
     assert queue["Torrent"].missing is False  # transmission has no local file to check
 
 
-def test_remove_deletes_the_import_row(clean_album_tables: sessionmaker[Session]) -> None:
+def test_discard_hides_the_row_but_keeps_its_source_key(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    # Discard must be sticky: the row leaves the list but its source_key stays in the ledger,
+    # so a still-present source (a seeding torrent) isn't re-detected on the next poll.
     sf = clean_album_tables
     repo = AlbumRepo(sf)
     repo.add_pending_import(
-        source=ImportSource.watchdir, source_key="k1", name="Gone.zip",
-        archive_path="/w/Gone.zip", matched_album_id=None,
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="Unwanted",
+        download_dir="/d",
+        files=["a.flac"],
+        matched_album_id=None,
     )
     service = ImportsService(repo=repo)
     import_id = service.queue()[0].id
-    service.remove(import_id)
-    assert service.queue() == []
+    service.discard(import_id)
+    assert service.queue() == []  # hidden from the list
+    assert "h1" in repo.known_source_keys()  # still known → won't re-detect
+
+
+def test_transmission_detection_ignores_non_music_torrents(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    sf = clean_album_tables
+    transmission = StubTransmissionClient(
+        [
+            Torrent(hash="a", name="Some Album", download_dir="/d", files=["01.flac", "cover.jpg"]),
+            Torrent(hash="b", name="A Movie 2160p", download_dir="/d", files=["movie.mkv"]),
+            Torrent(hash="c", name="Some.App", download_dir="/d", files=["setup.exe"]),
+        ]
+    )
+    ImportDetectionService(
+        transmission=transmission, repo=AlbumRepo(sf), match_threshold=0.5
+    ).poll()
+
+    names = {r.name for r in AlbumRepo(sf).list_imports()}
+    assert names == {"Some Album"}  # only the torrent with audio files surfaced
