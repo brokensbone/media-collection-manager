@@ -61,6 +61,17 @@ describe('Imports', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
   })
 
+  it('flags a match that is already owned', async () => {
+    mockApi([
+      item({ id: 5, name: 'Dup', matched: 'Burial — Untrue', matched_owned: true }),
+      item({ id: 6, name: 'New', matched: 'Someone — Thing', matched_owned: false }),
+    ])
+    render(<Imports />)
+    expect(await screen.findByText('already owned')).toBeTruthy()
+    // only the owned match is flagged
+    expect(screen.getAllByText('already owned')).toHaveLength(1)
+  })
+
   it('discards a detected row via DELETE and drops it from the list', async () => {
     const fetchMock = mockApi([item({ id: 7, name: 'Unwanted' })])
     render(<Imports />)

@@ -73,6 +73,8 @@ def test_detection_matches_an_album_still_in_decide(
 
     rows = {r.name: r for r in AlbumRepo(sf).list_imports()}
     assert rows["Patrick_Wolf-Lupercalia-2011"].matched_album_id == album_id
+    item = ImportsService(repo=AlbumRepo(sf)).queue()[0]
+    assert item.matched_owned is False  # matched a Decide album, not owned
 
 
 def test_detection_matches_an_already_owned_album(
@@ -95,6 +97,9 @@ def test_detection_matches_an_already_owned_album(
 
     rows = {r.name: r for r in AlbumRepo(sf).list_imports()}
     assert rows["Patrick_Wolf-Lupercalia-2011"].matched_album_id == album_id
+    # the row must flag that the match is already owned, so the operator knows to discard it
+    item = ImportsService(repo=AlbumRepo(sf)).queue()[0]
+    assert item.matched_owned is True
 
 
 def _transmission_runner(repo: AlbumRepo, beets: object, inbox: str) -> ImportRunner:

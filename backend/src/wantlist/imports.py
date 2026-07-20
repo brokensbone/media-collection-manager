@@ -9,7 +9,7 @@ from .adapters.album_repo import AlbumRepo, ImportRecord
 from .adapters.beets import BeetsAlbum
 from .adapters.unpack import dispose, unpack
 from .domain.match import MatchTarget, best_match
-from .models import ImportSource, ImportState
+from .models import AlbumState, ImportSource, ImportState
 from .ports.clock import Clock
 from .ports.file_transfer import FileTransfer
 from .ports.tags import TagReader
@@ -45,6 +45,7 @@ class ImportItem:
     state: str  # detected | queued | imported | failed — drives the status shown per row
     matched_album_id: int | None
     matched: str | None  # "Artist — Title" of the matched want, or None for the no-match tail
+    matched_owned: bool  # the matched album is already owned — importing would just duplicate it
     missing: bool  # the watch-dir file backing this drop is gone — offer removal, not import
 
 
@@ -296,6 +297,7 @@ class ImportsService:
                 state=r.state,
                 matched_album_id=r.matched_album_id,
                 matched=f"{r.matched_artist} — {r.matched_title}" if r.matched_album_id else None,
+                matched_owned=r.matched_state == AlbumState.owned.value,
                 missing=self._is_missing(r.state, r.archive_path),
             )
             for r in self._repo.list_imports()

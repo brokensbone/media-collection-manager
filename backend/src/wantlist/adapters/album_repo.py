@@ -85,6 +85,7 @@ class ImportRow:
     matched_album_id: int | None
     matched_artist: str | None
     matched_title: str | None
+    matched_state: str | None  # the matched album's state, so the UI can flag "already owned"
     archive_path: str | None
 
 
@@ -521,6 +522,7 @@ class AlbumRepo:
                     PendingImport.matched_album_id,
                     Album.artist,
                     Album.title,
+                    Album.state,
                     PendingImport.archive_path,
                 )
                 .outerjoin(Album, Album.id == PendingImport.matched_album_id)
@@ -531,7 +533,18 @@ class AlbumRepo:
                 )
             )
             return [
-                ImportRow(r[0], r[1].value, r[2], r[3].value, r[4], r[5], r[6], r[7]) for r in rows
+                ImportRow(
+                    id=r[0],
+                    source=r[1].value,
+                    name=r[2],
+                    state=r[3].value,
+                    matched_album_id=r[4],
+                    matched_artist=r[5],
+                    matched_title=r[6],
+                    matched_state=r[7].value if r[7] is not None else None,
+                    archive_path=r[8],
+                )
+                for r in rows
             ]
 
     def count_active_imports(self) -> int:

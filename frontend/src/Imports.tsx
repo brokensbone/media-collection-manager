@@ -8,6 +8,7 @@ type Item = {
   state: 'detected' | 'queued' | 'imported' | 'failed'
   matched_album_id: number | null
   matched: string | null
+  matched_owned: boolean
   missing: boolean
 }
 
@@ -66,7 +67,10 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
           <tr key={it.id}>
             <td className="muted">{it.source}</td>
             <td>{it.name}</td>
-            <td>{it.matched ?? <span className="muted">no match</span>}</td>
+            <td>
+              {it.matched ?? <span className="muted">no match</span>}
+              {it.matched_owned && <span className="badge">already owned</span>}
+            </td>
             <td className="nowrap">
               {it.missing ? (
                 <>
