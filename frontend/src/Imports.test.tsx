@@ -41,7 +41,7 @@ describe('Imports', () => {
     expect(screen.getByText('no match')).toBeTruthy()
   })
 
-  it('import enqueues and the row persists showing pending, not vanishing', async () => {
+  it('import enqueues and the row persists showing queued, not vanishing', async () => {
     const fetchMock = mockApi([item({ id: 9, name: 'Only' })])
     render(<Imports />)
     await screen.findByText('Only')
@@ -49,9 +49,9 @@ describe('Imports', () => {
 
     const posted = fetchMock.mock.calls.find((c) => c[1]?.method === 'POST')
     expect(posted?.[0]).toBe('/imports/9/import')
-    // row stays, now showing pending status
+    // row stays, now showing queued status
     expect(screen.getByText('Only')).toBeTruthy()
-    await waitFor(() => expect(screen.getByText('pending…')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('queued')).toBeTruthy())
   })
 
   it('shows a Retry for a failed import', async () => {
@@ -81,6 +81,25 @@ describe('Imports', () => {
     const deleted = fetchMock.mock.calls.find((c) => c[1]?.method === 'DELETE')
     expect(deleted?.[0]).toBe('/imports/7')
     expect(screen.queryByText('Unwanted')).toBeNull()
+  })
+
+  it('summarises only active work, ignoring already-imported history', async () => {
+    mockApi([
+      item({ id: 1, name: 'A', state: 'imported' }), // history, must not inflate the summary
+      item({ id: 2, name: 'B', state: 'importing' }),
+      item({ id: 3, name: 'C', state: 'queued' }),
+    ])
+    render(<Imports />)
+    // summary reflects the active batch only: one importing, one queued
+    expect(await screen.findByText('Importing… · 1 queued')).toBeTruthy()
+  })
+
+  it('hides the progress summary when nothing is active', async () => {
+    mockApi([item({ id: 1, name: 'A', state: 'imported' })])
+    render(<Imports />)
+    await screen.findByText('A')
+    expect(screen.queryByText(/Importing/)).toBeNull()
+    expect(screen.queryByText(/queued/)).toBeNull()
   })
 
   it('shows imported status without an action', async () => {

@@ -5,7 +5,7 @@ type Item = {
   id: number
   source: string
   name: string
-  state: 'detected' | 'queued' | 'imported' | 'failed'
+  state: 'detected' | 'queued' | 'importing' | 'imported' | 'failed'
   matched_album_id: number | null
   matched: string | null
   matched_owned: boolean
@@ -14,7 +14,8 @@ type Item = {
 
 const STATUS: Record<Item['state'], string> = {
   detected: '',
-  queued: 'pending…',
+  queued: 'queued',
+  importing: 'importing…',
   imported: 'imported ✓',
   failed: 'failed',
 }
@@ -60,57 +61,71 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
 
   const shown = items.filter((it) => matchesQuery(`${it.name} ${it.matched ?? ''}`, query))
 
+  // Only reflect active work — imported rows persist in the list as history, so counting them
+  // would make a single import read as "3 of 3". Imports run one at a time (at most one active).
+  const importing = items.some((it) => it.state === 'importing')
+  const queued = items.filter((it) => it.state === 'queued').length
+  const progress = [importing ? 'Importing…' : null, queued > 0 ? `${queued} queued` : null]
+    .filter(Boolean)
+    .join(' · ')
+
   return (
-    <table>
-      <tbody>
-        {shown.map((it) => (
-          <tr key={it.id}>
-            <td className="muted">{it.source}</td>
-            <td>{it.name}</td>
-            <td>
-              {it.matched ?? <span className="muted">no match</span>}
-              {/* "already owned" is a pre-import warning; pointless once it's imported. */}
-              {it.matched_owned && it.state !== 'imported' && <span className="badge">owned</span>}
-            </td>
-            <td className="nowrap">
-              {it.missing ? (
-                <>
-                  <span className="muted">file no longer in watch folder</span>{' '}
-                  <button type="button" onClick={() => discard(it.id)}>
-                    Discard
-                  </button>
-                </>
-              ) : (
-                <>
-                  {it.state === 'detected' && (
-                    <>
-                      <button type="button" onClick={() => enqueue(it.id)}>
-                        Import
-                      </button>{' '}
-                      <button type="button" onClick={() => discard(it.id)}>
-                        Discard
-                      </button>
-                    </>
-                  )}
-                  {it.state === 'queued' && <span className="muted">{STATUS.queued}</span>}
-                  {it.state === 'imported' && <span className="muted">{STATUS.imported}</span>}
-                  {it.state === 'failed' && (
-                    <>
-                      <span className="muted">{STATUS.failed}</span>{' '}
-                      <button type="button" onClick={() => enqueue(it.id)}>
-                        Retry
-                      </button>{' '}
-                      <button type="button" onClick={() => discard(it.id)}>
-                        Discard
-                      </button>
-                    </>
-                  )}
-                </>
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <>
+      {progress && <p className="resolving">{progress}</p>}
+      <table>
+        <tbody>
+          {shown.map((it) => (
+            <tr key={it.id}>
+              <td className="muted">{it.source}</td>
+              <td>{it.name}</td>
+              <td>
+                {it.matched ?? <span className="muted">no match</span>}
+                {/* "already owned" is a pre-import warning; pointless once it's imported. */}
+                {it.matched_owned && it.state !== 'imported' && (
+                  <span className="badge">owned</span>
+                )}
+              </td>
+              <td className="nowrap">
+                {it.missing ? (
+                  <>
+                    <span className="muted">file no longer in watch folder</span>{' '}
+                    <button type="button" onClick={() => discard(it.id)}>
+                      Discard
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {it.state === 'detected' && (
+                      <>
+                        <button type="button" onClick={() => enqueue(it.id)}>
+                          Import
+                        </button>{' '}
+                        <button type="button" onClick={() => discard(it.id)}>
+                          Discard
+                        </button>
+                      </>
+                    )}
+                    {it.state === 'queued' && <span className="muted">{STATUS.queued}</span>}
+                    {it.state === 'importing' && <span className="muted">{STATUS.importing}</span>}
+                    {it.state === 'imported' && <span className="muted">{STATUS.imported}</span>}
+                    {it.state === 'failed' && (
+                      <>
+                        <span className="muted">{STATUS.failed}</span>{' '}
+                        <button type="button" onClick={() => enqueue(it.id)}>
+                          Retry
+                        </button>{' '}
+                        <button type="button" onClick={() => discard(it.id)}>
+                          Discard
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   )
 }
