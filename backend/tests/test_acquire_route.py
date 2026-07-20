@@ -1,5 +1,4 @@
 from collections.abc import Iterable
-from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
@@ -12,9 +11,7 @@ from wantlist.config import Settings
 from wantlist.library_assist import LibraryAssistService
 from wantlist.models import Album, AlbumState, Provenance
 
-from .fakes import FrozenClock, StubLibraryCatalog
-
-NOW = datetime(2026, 7, 16, tzinfo=UTC)
+from .fakes import StubLibraryCatalog
 
 
 def _client(
@@ -33,22 +30,8 @@ def _client(
         session.commit()
     app = create_app(Settings())
     assist = LibraryAssistService(repo=AlbumRepo(sf), catalog=StubLibraryCatalog(catalog))
-    app.state.acquire_service = AcquireService(
-        repo=AlbumRepo(sf), clock=FrozenClock(NOW), assist=assist
-    )
+    app.state.acquire_service = AcquireService(repo=AlbumRepo(sf), assist=assist)
     return TestClient(app), AlbumRepo(sf)
-
-
-def test_acquire_then_order_clears(clean_album_tables: sessionmaker[Session]) -> None:
-    client, repo = _client(clean_album_tables)
-    queue = client.get("/acquire").json()
-    assert len(queue) == 1
-    assert queue[0]["bandcamp_url"].startswith("https://bandcamp.com/search?q=")
-
-    resp = client.post(f"/albums/{queue[0]['id']}/order")
-    assert resp.status_code == 204
-    assert client.get("/acquire").json() == []
-    assert {a.title: a.state for a in repo.list_albums()} == {"Want It": "acquiring"}
 
 
 def test_mark_owned_endpoint(clean_album_tables: sessionmaker[Session]) -> None:
@@ -59,14 +42,14 @@ def test_mark_owned_endpoint(clean_album_tables: sessionmaker[Session]) -> None:
     assert {a.title: a.owned for a in repo.list_albums()} == {"Want It": True}
 
 
-def test_link_candidates_then_mark_owned_with_link(
+def test_search_library_then_mark_owned_with_link(
     clean_album_tables: sessionmaker[Session],
 ) -> None:
     catalog = [BeetsAlbum("beets-7", "A", "Want It", "rg-9")]
     client, repo = _client(clean_album_tables, catalog)
     album_id = client.get("/acquire").json()[0]["id"]
 
-    candidates = client.get(f"/albums/{album_id}/link-candidates").json()
+    candidates = client.get("/library/search", params={"q": "A Want It"}).json()
     assert candidates[0]["beets_id"] == "beets-7"
 
     resp = client.post(f"/albums/{album_id}/mark-owned", json={"beets_id": "beets-7"})

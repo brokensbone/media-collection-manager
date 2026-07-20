@@ -1,5 +1,4 @@
 from collections.abc import Iterable
-from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -10,9 +9,7 @@ from wantlist.library_assist import LibraryAssistService
 from wantlist.models import Album, AlbumState, Provenance
 from wantlist.reconcile import OwnershipReconciler
 
-from .fakes import FrozenClock, StubLibraryCatalog, StubOwnedReleaseGroups
-
-NOW = datetime(2026, 7, 16, tzinfo=UTC)
+from .fakes import StubLibraryCatalog, StubOwnedReleaseGroups
 
 
 def _add(
@@ -39,7 +36,7 @@ def _add(
 
 def _svc(sf: sessionmaker[Session], catalog: Iterable[BeetsAlbum] = ()) -> AcquireService:
     assist = LibraryAssistService(repo=AlbumRepo(sf), catalog=StubLibraryCatalog(catalog))
-    return AcquireService(repo=AlbumRepo(sf), clock=FrozenClock(NOW), assist=assist)
+    return AcquireService(repo=AlbumRepo(sf), assist=assist)
 
 
 def _id(sf: sessionmaker[Session], title: str) -> int:
@@ -58,18 +55,6 @@ def test_queue_lists_only_wanted_with_bandcamp_link(
     assert queue[0].bandcamp_url.startswith("https://bandcamp.com/search?q=")
 
 
-def test_mark_ordered_drops_out_then_cancel_restores(
-    clean_album_tables: sessionmaker[Session],
-) -> None:
-    sf = clean_album_tables
-    _add(sf, title="x", state=AlbumState.wanted)
-    svc = _svc(sf)
-    svc.mark_ordered(_id(sf, "x"))
-    assert svc.queue() == []  # acquiring drops out of the buy list
-    svc.cancel_order(_id(sf, "x"))
-    assert [i.title for i in svc.queue()] == ["x"]
-
-
 def test_mark_owned_survives_reconcile(clean_album_tables: sessionmaker[Session]) -> None:
     sf = clean_album_tables
     _add(sf, title="deluxe-i-own", state=AlbumState.wanted, rgid="rg-standard")
@@ -79,14 +64,14 @@ def test_mark_owned_survives_reconcile(clean_album_tables: sessionmaker[Session]
     assert {a.title: a.owned for a in AlbumRepo(sf).list_albums()} == {"deluxe-i-own": True}
 
 
-def test_reconcile_promotes_acquiring_to_owned(
+def test_reconcile_promotes_wanted_to_owned(
     clean_album_tables: sessionmaker[Session],
 ) -> None:
     sf = clean_album_tables
-    _add(sf, title="ordered", state=AlbumState.wanted, rgid="rg-1")
-    _svc(sf).mark_ordered(_id(sf, "ordered"))  # -> acquiring
+    _add(sf, title="bought", state=AlbumState.wanted, rgid="rg-1")
+    # once the files land in beets, reconcile flips the want to owned (no separate order step)
     OwnershipReconciler(beets=StubOwnedReleaseGroups({"rg-1"}), repo=AlbumRepo(sf)).reconcile()
-    assert {a.title: a.owned for a in AlbumRepo(sf).list_albums()} == {"ordered": True}
+    assert {a.title: a.owned for a in AlbumRepo(sf).list_albums()} == {"bought": True}
 
 
 def test_queue_flags_possibly_already_owned(clean_album_tables: sessionmaker[Session]) -> None:
@@ -102,17 +87,36 @@ def test_queue_flags_possibly_already_owned(clean_album_tables: sessionmaker[Ses
     assert by_title["Obscure Thing"].possibly_owned is False
 
 
-def test_link_candidates_ranks_library_matches(
-    clean_album_tables: sessionmaker[Session],
-) -> None:
+def test_search_library_ranks_matches(clean_album_tables: sessionmaker[Session]) -> None:
     sf = clean_album_tables
-    _add(sf, title="Lupercalia", state=AlbumState.wanted, artist="Patrick Wolf")
     catalog = [
         BeetsAlbum("1", "Patrick Wolf", "Lupercalia", "rg-x"),
         BeetsAlbum("2", "Someone Else", "Totally Different", None),
     ]
-    candidates = _svc(sf, catalog).link_candidates(_id(sf, "Lupercalia"))
+    candidates = _svc(sf, catalog).search_library("patrick wolf lupercalia")
 
     assert candidates[0].beets_id == "1"  # best match first
     assert candidates[0].has_release_group is True
     assert "2" not in [c.beets_id for c in candidates]  # unrelated album filtered out
+
+
+def test_search_library_partial_query_finds_album(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    # A short query (one word of a long title) must still find the album — the old fuzzy-ratio
+    # search scored "mclusky" against "mclusky — The World Loves Us…" below any useful floor.
+    sf = clean_album_tables
+    catalog = [
+        BeetsAlbum("1", "mclusky", "The World Loves Us and Is Our Bitch", "rg-x"),
+        BeetsAlbum("2", "Someone Else", "Totally Different", None),
+    ]
+    candidates = _svc(sf, catalog).search_library("mclusky")
+    assert [c.beets_id for c in candidates] == ["1"]
+
+
+def test_search_library_empty_query_returns_nothing(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    sf = clean_album_tables
+    catalog = [BeetsAlbum("1", "Patrick Wolf", "Lupercalia", "rg-x")]
+    assert _svc(sf, catalog).search_library("  ") == []

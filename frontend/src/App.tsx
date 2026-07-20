@@ -1,5 +1,5 @@
 import './styles.css'
-import { type ReactNode, useCallback, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { Acquire } from './Acquire'
 import { Dashboard, type Section } from './Dashboard'
 import { Decide } from './Decide'
@@ -11,10 +11,36 @@ import { SpotifyStatus } from './SpotifyStatus'
 
 type View = 'app' | 'guide'
 
+const SECTIONS: Section[] = ['all', 'releases', 'decide', 'acquire', 'import', 'owned', 'dismissed']
+
+// The active tab lives in the URL hash (#guide, #acquire, …) so a refresh or a
+// shared link restores the same view.
+function readHash(): { view: View; section: Section } {
+  const h = window.location.hash.replace(/^#/, '')
+  if (h === 'guide') return { view: 'guide', section: 'all' }
+  if ((SECTIONS as string[]).includes(h)) return { view: 'app', section: h as Section }
+  return { view: 'app', section: 'all' }
+}
+
 export default function App() {
-  const [view, setView] = useState<View>('app')
-  const [section, setSection] = useState<Section>('all')
+  const [view, setView] = useState<View>(() => readHash().view)
+  const [section, setSection] = useState<Section>(() => readHash().section)
   const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    const target = view === 'guide' ? 'guide' : section
+    if (window.location.hash.replace(/^#/, '') !== target) window.location.hash = target
+  }, [view, section])
+
+  useEffect(() => {
+    function onHash() {
+      const r = readHash()
+      setView(r.view)
+      setSection(r.section)
+    }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
   // Any worklist action bumps this; the count/browse views refetch when it changes.
   const [refresh, setRefresh] = useState(0)
   const bump = useCallback(() => setRefresh((n) => n + 1), [])

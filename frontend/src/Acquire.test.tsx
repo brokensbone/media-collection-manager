@@ -5,7 +5,7 @@ import { Acquire } from './Acquire'
 function mockApi(items: unknown, candidates: unknown = []) {
   const fetchMock = vi.fn((url: string, opts?: { method?: string }) => {
     if (opts?.method === 'POST') return Promise.resolve({ ok: true })
-    if (url.includes('/link-candidates'))
+    if (url.includes('/library/search'))
       return Promise.resolve({ json: () => Promise.resolve(candidates) })
     return Promise.resolve({ json: () => Promise.resolve(items) })
   })
@@ -39,6 +39,13 @@ describe('Acquire', () => {
     expect(link.getAttribute('href')).toBe('https://bandcamp.com/search?q=A+T1')
   })
 
+  it('has no Mark ordered action', async () => {
+    mockApi([item()])
+    render(<Acquire />)
+    await screen.findByText('T1')
+    expect(screen.queryByRole('button', { name: /ordered/i })).toBeNull()
+  })
+
   it('filters rows by the query across artist and title', async () => {
     mockApi([
       item({ id: 1, artist: 'Porridge Radio', title: 'Every Bad' }),
@@ -55,17 +62,7 @@ describe('Acquire', () => {
     expect(await screen.findByText(/possibly owned: A — T1 \(Deluxe\)/)).toBeTruthy()
   })
 
-  it('marks ordered: POSTs and removes the row', async () => {
-    const fetchMock = mockApi([item({ id: 9, title: 'Only' })])
-    render(<Acquire />)
-    await screen.findByText('Only')
-    fireEvent.click(screen.getByRole('button', { name: 'Mark ordered' }))
-    await screen.findByText(/Nothing to acquire/)
-    const posted = fetchMock.mock.calls.find((c) => c[1]?.method === 'POST')
-    expect(posted?.[0]).toBe('/albums/9/order')
-  })
-
-  it('links to a library candidate: fetches candidates then POSTs the chosen beets_id', async () => {
+  it('mark owned opens a modal, searches the library, and links the chosen album', async () => {
     const fetchMock = mockApi(
       [item({ id: 9, title: 'Only' })],
       [
@@ -81,8 +78,10 @@ describe('Acquire', () => {
     render(<Acquire />)
     await screen.findByText('Only')
     fireEvent.click(screen.getByRole('button', { name: 'Mark owned…' }))
-    const link = await screen.findByRole('button', { name: /Link: A — Only \(Remaster\)/ })
-    fireEvent.click(link)
+
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+    const result = await screen.findByRole('button', { name: /Only \(Remaster\)/ })
+    fireEvent.click(result)
     await screen.findByText(/Nothing to acquire/)
 
     const posted = fetchMock.mock.calls.find((c) => c[1]?.method === 'POST')
@@ -90,12 +89,12 @@ describe('Acquire', () => {
     expect(JSON.parse((posted?.[1] as { body: string }).body)).toEqual({ beets_id: 'b7' })
   })
 
-  it('marks owned with no link', async () => {
+  it('mark owned without a link posts a null beets_id', async () => {
     const fetchMock = mockApi([item({ id: 9, title: 'Only' })])
     render(<Acquire />)
     await screen.findByText('Only')
     fireEvent.click(screen.getByRole('button', { name: 'Mark owned…' }))
-    const noLink = await screen.findByRole('button', { name: 'Mark owned (no link)' })
+    const noLink = await screen.findByRole('button', { name: 'Mark owned without a link' })
     fireEvent.click(noLink)
     await screen.findByText(/Nothing to acquire/)
 
