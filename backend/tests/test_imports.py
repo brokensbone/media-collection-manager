@@ -285,3 +285,42 @@ def test_imports_service_queue_labels_match(
     assert queue["Burial-Untrue"].source == "transmission"
     assert queue["Mystery.zip"].matched is None
     assert queue["Mystery.zip"].source == "watchdir"
+
+
+def test_queue_flags_watchdir_drop_whose_file_is_gone(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    sf = clean_album_tables
+    repo = AlbumRepo(sf)
+    here = tmp_path / "Here.zip"
+    here.write_bytes(b"z")
+    repo.add_pending_import(
+        source=ImportSource.watchdir, source_key="k1", name="Here.zip",
+        archive_path=str(here), matched_album_id=None,
+    )
+    repo.add_pending_import(
+        source=ImportSource.watchdir, source_key="k2", name="Gone.zip",
+        archive_path=str(tmp_path / "Gone.zip"), matched_album_id=None,
+    )
+    repo.add_pending_import(
+        source=ImportSource.transmission, source_key="h1", name="Torrent",
+        download_dir="/d", files=["a"], matched_album_id=None,
+    )
+
+    queue = {i.name: i for i in ImportsService(repo=repo).queue()}
+    assert queue["Here.zip"].missing is False  # file present
+    assert queue["Gone.zip"].missing is True  # file removed → offer removal, not import
+    assert queue["Torrent"].missing is False  # transmission has no local file to check
+
+
+def test_remove_deletes_the_import_row(clean_album_tables: sessionmaker[Session]) -> None:
+    sf = clean_album_tables
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.watchdir, source_key="k1", name="Gone.zip",
+        archive_path="/w/Gone.zip", matched_album_id=None,
+    )
+    service = ImportsService(repo=repo)
+    import_id = service.queue()[0].id
+    service.remove(import_id)
+    assert service.queue() == []

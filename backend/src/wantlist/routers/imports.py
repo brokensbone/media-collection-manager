@@ -17,3 +17,8 @@ def import_queue(request: Request) -> list[ImportItem]:
 @router.post("/imports/{import_id}/import", status_code=204)
 def run_import(import_id: int, request: Request) -> None:
     _service(request).enqueue(import_id)  # queued; the worker imports it in the background
+
+
+@router.delete("/imports/{import_id}", status_code=204)
+def remove_import(import_id: int, request: Request) -> None:
+    _service(request).remove(import_id)

@@ -45,6 +45,7 @@ class ImportItem:
     state: str  # detected | queued | imported | failed — drives the status shown per row
     matched_album_id: int | None
     matched: str | None  # "Artist — Title" of the matched want, or None for the no-match tail
+    missing: bool  # the watch-dir file backing this drop is gone — offer removal, not import
 
 
 # --- detection: one service per front (§12 Transmission / §13 watch-dir) --------------
@@ -273,12 +274,26 @@ class ImportsService:
                 state=r.state,
                 matched_album_id=r.matched_album_id,
                 matched=f"{r.matched_artist} — {r.matched_title}" if r.matched_album_id else None,
+                missing=self._is_missing(r.state, r.archive_path),
             )
             for r in self._repo.list_imports()
         ]
 
+    @staticmethod
+    def _is_missing(state: str, archive_path: str | None) -> bool:
+        """A watch-dir drop whose file has since been removed (§13). Only meaningful before it's
+        imported — an `imported` row's file is disposed on purpose; transmission rows have no
+        local file to check (archive_path is None)."""
+        checkable = (ImportState.detected.value, ImportState.failed.value)
+        if archive_path is None or state not in checkable:
+            return False
+        return not Path(archive_path).exists()
+
     def enqueue(self, import_id: int) -> None:
         self._repo.queue_import(import_id)
+
+    def remove(self, import_id: int) -> None:
+        self._repo.delete_pending_import(import_id)
 
 
 def _match_targets(repo: AlbumRepo) -> list[MatchTarget]:

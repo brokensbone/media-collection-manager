@@ -8,6 +8,7 @@ type Item = {
   state: 'detected' | 'queued' | 'imported' | 'failed'
   matched_album_id: number | null
   matched: string | null
+  missing: boolean
 }
 
 const STATUS: Record<Item['state'], string> = {
@@ -45,6 +46,14 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
     [onChange],
   )
 
+  const remove = useCallback(
+    (id: number) => {
+      setItems((list) => list?.filter((it) => it.id !== id) ?? list)
+      fetch(`/imports/${id}`, { method: 'DELETE' }).then(() => onChange?.())
+    },
+    [onChange],
+  )
+
   if (!items) return <p>Loading…</p>
   if (items.length === 0) return <p>No downloads to import.</p>
 
@@ -59,19 +68,33 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
             <td>{it.name}</td>
             <td>{it.matched ?? <span className="muted">no match</span>}</td>
             <td className="nowrap">
-              {it.state === 'detected' && (
-                <button type="button" onClick={() => enqueue(it.id)}>
-                  Import
-                </button>
-              )}
-              {it.state === 'queued' && <span className="muted">{STATUS.queued}</span>}
-              {it.state === 'imported' && <span className="muted">{STATUS.imported}</span>}
-              {it.state === 'failed' && (
+              {it.missing ? (
                 <>
-                  <span className="muted">{STATUS.failed}</span>{' '}
-                  <button type="button" onClick={() => enqueue(it.id)}>
-                    Retry
+                  <span className="muted">file no longer in watch folder</span>{' '}
+                  <button type="button" onClick={() => remove(it.id)}>
+                    Remove
                   </button>
+                </>
+              ) : (
+                <>
+                  {it.state === 'detected' && (
+                    <button type="button" onClick={() => enqueue(it.id)}>
+                      Import
+                    </button>
+                  )}
+                  {it.state === 'queued' && <span className="muted">{STATUS.queued}</span>}
+                  {it.state === 'imported' && <span className="muted">{STATUS.imported}</span>}
+                  {it.state === 'failed' && (
+                    <>
+                      <span className="muted">{STATUS.failed}</span>{' '}
+                      <button type="button" onClick={() => enqueue(it.id)}>
+                        Retry
+                      </button>{' '}
+                      <button type="button" onClick={() => remove(it.id)}>
+                        Remove
+                      </button>
+                    </>
+                  )}
                 </>
               )}
             </td>

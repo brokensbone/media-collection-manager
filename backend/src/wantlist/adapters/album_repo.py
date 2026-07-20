@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import exists, func, select, update
+from sqlalchemy import delete, exists, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -85,6 +85,7 @@ class ImportRow:
     matched_album_id: int | None
     matched_artist: str | None
     matched_title: str | None
+    archive_path: str | None
 
 
 @dataclass
@@ -517,6 +518,7 @@ class AlbumRepo:
                     PendingImport.matched_album_id,
                     Album.artist,
                     Album.title,
+                    PendingImport.archive_path,
                 )
                 .outerjoin(Album, Album.id == PendingImport.matched_album_id)
                 .order_by(
@@ -524,7 +526,9 @@ class AlbumRepo:
                     func.lower(PendingImport.name),
                 )
             )
-            return [ImportRow(r[0], r[1].value, r[2], r[3].value, r[4], r[5], r[6]) for r in rows]
+            return [
+                ImportRow(r[0], r[1].value, r[2], r[3].value, r[4], r[5], r[6], r[7]) for r in rows
+            ]
 
     def count_active_imports(self) -> int:
         """Imports awaiting a click or still processing — the dashboard's Import count."""
@@ -581,6 +585,14 @@ class AlbumRepo:
             session.execute(
                 update(PendingImport).where(PendingImport.id == import_id).values(state=state)
             )
+            session.commit()
+
+    def delete_pending_import(self, import_id: int) -> None:
+        """Drop an import row entirely — the operator dismissing a dead entry (e.g. a watch-dir
+        drop they've since removed). Its source_key leaves the seen ledger too, so re-dropping
+        the same file would be detected afresh."""
+        with self._sf() as session:
+            session.execute(delete(PendingImport).where(PendingImport.id == import_id))
             session.commit()
 
     # --- notification dedup flags (§8d) ----------------------------------------------
