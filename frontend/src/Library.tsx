@@ -40,7 +40,9 @@ export function Library({
             <Cover id={a.id} hasArt={a.has_art} />
             <td>{a.artist}</td>
             <td>{a.title}</td>
-            <td>{a.owned ? 'owned' : a.state}</td>
+            {/* The state is redundant in a single-state view (Owned/Dismissed); only show it
+                in a mixed list. */}
+            {!state && <td>{a.owned ? 'owned' : a.state}</td>}
           </tr>
         ))}
       </tbody>
