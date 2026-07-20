@@ -68,17 +68,29 @@ def test_torrents_lists_all_seen_including_non_music(
     sf = clean_album_tables
     repo = AlbumRepo(sf)
     repo.add_pending_import(
-        source=ImportSource.transmission, source_key="a", name="An Album",
-        download_dir="/d", files=["01.flac"], matched_album_id=None, has_audio=True,
+        source=ImportSource.transmission,
+        source_key="a",
+        name="An Album",
+        download_dir="/d",
+        files=["01.flac"],
+        matched_album_id=None,
+        has_audio=True,
     )
     repo.add_pending_import(
-        source=ImportSource.transmission, source_key="b", name="A Movie",
-        matched_album_id=None, state=ImportState.dismissed, has_audio=False,
+        source=ImportSource.transmission,
+        source_key="b",
+        name="A Movie",
+        matched_album_id=None,
+        state=ImportState.dismissed,
+        has_audio=False,
     )
     # a watch-dir row must not appear on the Transmission page
     repo.add_pending_import(
-        source=ImportSource.watchdir, source_key="w", name="drop.zip",
-        archive_path="/w/drop.zip", matched_album_id=None,
+        source=ImportSource.watchdir,
+        source_key="w",
+        name="drop.zip",
+        archive_path="/w/drop.zip",
+        matched_album_id=None,
     )
 
     rows = {r.name: r for r in _svc(sf).torrents()}

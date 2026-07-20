@@ -263,9 +263,7 @@ class ImportRunner:
         try:
             new = [a for a in self._catalog.all_albums() if a.beets_id not in before]
             if rec.matched_album_id is not None:
-                self._repo.mark_owned_manual(
-                    rec.matched_album_id, new[0].beets_id if new else None
-                )
+                self._repo.mark_owned_manual(rec.matched_album_id, new[0].beets_id if new else None)
             elif self._reverse_matcher is not None:
                 owned_ids = self._reverse_matcher.claim(new)
                 if owned_ids:  # link the row to what it produced, so it isn't stuck at "no match"
@@ -334,8 +332,24 @@ class ImportsService:
 
 
 _AUDIO_EXTS = frozenset(
-    {".flac", ".mp3", ".m4a", ".aac", ".ogg", ".opus", ".wav", ".aiff", ".aif",
-     ".wma", ".alac", ".ape", ".wv", ".dsf", ".dff", ".mpc"}
+    {
+        ".flac",
+        ".mp3",
+        ".m4a",
+        ".aac",
+        ".ogg",
+        ".opus",
+        ".wav",
+        ".aiff",
+        ".aif",
+        ".wma",
+        ".alac",
+        ".ape",
+        ".wv",
+        ".dsf",
+        ".dff",
+        ".mpc",
+    }
 )
 
 
@@ -347,8 +361,7 @@ def _has_audio(files: list[str]) -> bool:
 
 def _match_targets(repo: AlbumRepo) -> list[MatchTarget]:
     return [
-        MatchTarget(id=c.id, artist=c.artist, title=c.title)
-        for c in repo.albums_for_matching()
+        MatchTarget(id=c.id, artist=c.artist, title=c.title) for c in repo.albums_for_matching()
     ]
 
 
