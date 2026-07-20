@@ -1,13 +1,13 @@
 # Disposable local deploy (D10). Brings up Postgres + the app (API+SPA on one origin) + the
-# poller worker, all on local volumes. Run from this directory:
+# poller worker, all on local volumes. Run from this directory (deploy/local):
 #   cp .env.example .env      # then optionally add Spotify creds
-#   docker compose up --build
+#   docker compose up -d --build
 # Then open http://localhost:8000  (health: /health, metrics: /metrics)
 # Tear down and wipe data:  docker compose down -v
 
 x-app: &app
   build:
-    context: ..
+    context: ../..
     dockerfile: deploy/Dockerfile
   image: wantlist-local:latest
   env_file: .env
