@@ -195,6 +195,27 @@ class AlbumRepo:
             )
             return [(album_id, url) for album_id, url in rows if url is not None]
 
+    def owned_without_art(self) -> list[MatchCandidate]:
+        """Owned albums with no cover at all — no source URL and no stored blob. Candidates for a
+        Spotify art lookup (e.g. imported via Transmission/beets with no Spotify match, or while
+        Spotify was disconnected)."""
+        with self._sf() as session:
+            rows = session.execute(
+                select(Album.id, Album.artist, Album.title)
+                .outerjoin(AlbumArt, AlbumArt.album_id == Album.id)
+                .where(
+                    Album.state == AlbumState.owned,
+                    Album.art_url.is_(None),
+                    AlbumArt.album_id.is_(None),
+                )
+            )
+            return [MatchCandidate(*row) for row in rows]
+
+    def set_art_url(self, album_id: int, art_url: str) -> None:
+        with self._sf() as session:
+            session.execute(update(Album).where(Album.id == album_id).values(art_url=art_url))
+            session.commit()
+
     def save_art(self, album_id: int, content_type: str, data: bytes) -> None:
         with self._sf() as session:
             session.merge(

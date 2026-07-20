@@ -49,13 +49,15 @@ def ingest_once(settings: Settings | None = None) -> None:
     with heartbeat(session_factory, "ingest"):
         service = build_ingest_service(settings, session_factory)
         result = service.ingest_saves()
+        backfilled = service.backfill_owned_art()  # find covers for owned albums that lack one
         art = service.fetch_missing_art()
         log.info(
-            "ingest: added=%s skipped=%s paused=%s art=%s",
+            "ingest: added=%s skipped=%s paused=%s art=%s backfilled=%s",
             result.added,
             result.skipped,
             result.paused,
             art,
+            backfilled,
         )
 
 

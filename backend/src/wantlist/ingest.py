@@ -58,6 +58,23 @@ class IngestService:
             added += 1
         return IngestResult(added=added, skipped=skipped, paused=False)
 
+    def backfill_owned_art(self) -> int:
+        """Look owned albums that still have no cover up on Spotify to get an art_url, so the
+        next fetch stores the cover. Reaches albums that arrived via Transmission/beets without
+        a Spotify match (or while Spotify was disconnected). Token per item so a long run can't
+        outlive it; if Spotify isn't connected, stop and retry next pass."""
+        found = 0
+        for album in self._repo.owned_without_art():
+            try:
+                token = self._tokens.valid_access_token()
+            except ReauthRequired:
+                break
+            result = self._api.search_album(token, f"{album.artist} {album.title}")
+            if result and result.art_url:
+                self._repo.set_art_url(album.id, result.art_url)
+                found += 1
+        return found
+
     def fetch_missing_art(self) -> int:
         stored = 0
         for album_id, url in self._repo.albums_missing_art():
