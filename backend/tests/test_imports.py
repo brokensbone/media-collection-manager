@@ -215,6 +215,48 @@ def test_run_ignores_not_yet_queued(
     assert beets.imported == []  # nothing imported until it's queued
 
 
+def test_matched_import_links_owned_even_without_a_release_group(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    # The download was matched to a known album, but beets imported it as-is (no MB release
+    # group), so reconcile can never link it. The match itself must flip the album to owned.
+    sf = clean_album_tables
+    download_dir = tmp_path / "Album"
+    download_dir.mkdir()
+    (download_dir / "01.flac").write_text("x")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+
+    repo = AlbumRepo(sf)
+    album_id = _add(sf, artist="Pye Corner Audio", title="No Tomorrow", state=AlbumState.saved)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="Pye Corner Audio - No Tomorrow",
+        download_dir=str(download_dir),
+        files=["01.flac"],
+        matched_album_id=album_id,
+    )
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
+
+    # beets gains the album but with NO release-group id (as-is import)
+    added = BeetsAlbum("b9", "Pye Corner Audio", "No Tomorrow", None)
+    beets = FakeBeetsLibrary(adds_on_import=added)
+    ImportRunner(
+        repo=repo,
+        stagers={ImportSource.transmission: TransmissionStager(FakeFileTransfer())},
+        beets=beets,
+        inbox=str(inbox),
+        catalog=beets,
+    ).run(import_id)
+
+    owned = {a.id: a for a in AlbumRepo(sf).list_albums("owned")}
+    assert album_id in owned  # linked owned by the match, not by reconcile
+    with sf() as session:
+        assert session.get(Album, album_id).owned_beets_id == "b9"  # linked to the import
+
+
 def test_unmatched_import_reverse_matches_to_owned(
     clean_album_tables: sessionmaker[Session], tmp_path: Path
 ) -> None:

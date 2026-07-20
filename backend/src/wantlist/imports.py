@@ -228,23 +228,29 @@ class ImportRunner:
         except Exception:
             log.warning("import %s: finalize/dispose failed", import_id, exc_info=True)
 
-        self._reverse_match(rec, before)
+        self._claim_ownership(rec, before)
 
     def _album_ids(self) -> set[str]:
         return {a.beets_id for a in self._catalog.all_albums()} if self._catalog else set()
 
-    def _reverse_match(self, rec: ImportRecord, before: set[str]) -> None:
-        # Only an *unmatched* import needs this — a matched one flips its want to owned via
-        # reconcile. Best-effort: a failure here mustn't undo a successful import.
-        if self._reverse_matcher is None or self._catalog is None:
-            return
-        if rec.matched_album_id is not None:
+    def _claim_ownership(self, rec: ImportRecord, before: set[str]) -> None:
+        """Turn a completed import into an owned album. A *matched* import already knows which
+        album it is, so link it owned directly to the freshly-imported beets album — don't wait
+        for reconcile, which keys on a MusicBrainz release-group that a quiet as-is beets import
+        won't have attached. An *unmatched* import is reverse-matched against Spotify (D21).
+        Best-effort: a failure here mustn't undo the successful import."""
+        if self._catalog is None:
             return
         try:
             new = [a for a in self._catalog.all_albums() if a.beets_id not in before]
-            self._reverse_matcher.claim(new)
+            if rec.matched_album_id is not None:
+                self._repo.mark_owned_manual(
+                    rec.matched_album_id, new[0].beets_id if new else None
+                )
+            elif self._reverse_matcher is not None:
+                self._reverse_matcher.claim(new)
         except Exception:
-            log.warning("import %s: reverse-match failed", rec.id, exc_info=True)
+            log.warning("import %s: ownership claim failed", rec.id, exc_info=True)
 
     def run_queued(self) -> int:
         """Process every queued import (worker job). One failure never blocks the rest — the
