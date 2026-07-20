@@ -486,6 +486,7 @@ class AlbumRepo:
         files: list[str] | None = None,
         archive_path: str | None = None,
         matched_album_id: int | None,
+        state: ImportState = ImportState.detected,
     ) -> None:
         with self._sf() as session:
             session.execute(
@@ -498,6 +499,7 @@ class AlbumRepo:
                     files=files or [],
                     archive_path=archive_path,
                     matched_album_id=matched_album_id,
+                    state=state,
                 )
                 .on_conflict_do_nothing(index_elements=["source_key"])
             )

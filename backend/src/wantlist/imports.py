@@ -65,29 +65,37 @@ class ImportDetectionService:
 
     def poll(self) -> DetectResult:
         # The client is shared with all the operator's torrents, so on first connect there are
-        # hundreds already complete and plenty are non-music. We surface (and match) every music
-        # torrent — a torrent counts as music only if it contains audio files, which keeps
-        # movies/ISOs out — and the operator discards any they don't want.
+        # hundreds already complete and plenty are non-music. Each hash is screened once: a
+        # torrent with audio is surfaced (and matched) for the operator; one without is recorded
+        # as `dismissed` so its hash stays in the ledger and we never screen it again. Either way
+        # the hash is now known, so a re-poll skips it on the hash check alone.
         known = self._repo.known_source_keys()
-        fresh = [
-            t
-            for t in self._transmission.completed_torrents()
-            if t.hash not in known and _has_audio(t.files)
-        ]
+        fresh = [t for t in self._transmission.completed_torrents() if t.hash not in known]
         if not fresh:
             return DetectResult(detected=0)
 
         targets = _match_targets(self._repo)
+        detected = 0
         for t in fresh:
-            self._repo.add_pending_import(
-                source=ImportSource.transmission,
-                source_key=t.hash,
-                name=t.name,
-                download_dir=t.download_dir,
-                files=t.files,
-                matched_album_id=best_match(t.name, targets, self._threshold),
-            )
-        return DetectResult(detected=len(fresh))
+            if _has_audio(t.files):
+                self._repo.add_pending_import(
+                    source=ImportSource.transmission,
+                    source_key=t.hash,
+                    name=t.name,
+                    download_dir=t.download_dir,
+                    files=t.files,
+                    matched_album_id=best_match(t.name, targets, self._threshold),
+                )
+                detected += 1
+            else:
+                self._repo.add_pending_import(  # not music: ledger the hash, never screen it again
+                    source=ImportSource.transmission,
+                    source_key=t.hash,
+                    name=t.name,
+                    matched_album_id=None,
+                    state=ImportState.dismissed,
+                )
+        return DetectResult(detected=detected)
 
 
 class WatchdirDetectionService:

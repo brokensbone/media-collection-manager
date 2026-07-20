@@ -406,9 +406,13 @@ def test_transmission_detection_ignores_non_music_torrents(
             Torrent(hash="c", name="Some.App", download_dir="/d", files=["setup.exe"]),
         ]
     )
-    ImportDetectionService(
+    service = ImportDetectionService(
         transmission=transmission, repo=AlbumRepo(sf), match_threshold=0.5
-    ).poll()
+    )
+    assert service.poll().detected == 1  # only the audio torrent is surfaced
 
     names = {r.name for r in AlbumRepo(sf).list_imports()}
-    assert names == {"Some Album"}  # only the torrent with audio files surfaced
+    assert names == {"Some Album"}  # movie/app hidden (recorded as dismissed)
+    # every hash is now ledgered, so a re-poll screens nothing again
+    assert AlbumRepo(sf).known_source_keys() == {"a", "b", "c"}
+    assert service.poll().detected == 0
