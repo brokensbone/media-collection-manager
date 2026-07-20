@@ -465,17 +465,14 @@ class AlbumRepo:
         with self._sf() as session:
             return set(session.scalars(select(PendingImport.source_key)))
 
-    def unowned_for_matching(self) -> list[MatchCandidate]:
-        """Every not-yet-owned album an acquisition could correspond to (§12/§13 match). Not
-        just `wanted`: a drop for something still in Decide (`saved`) or freshly `suggested`
-        is a valid match too — reconcile will flip it to owned by release-group regardless, so
-        the detection-time name match should surface the same albums."""
+    def albums_for_matching(self) -> list[MatchCandidate]:
+        """Every album an acquisition could correspond to (§12/§13 match) — the whole funnel,
+        not just `wanted`. A drop for something in Decide (`saved`) or freshly `suggested` is a
+        valid match, and so is one for an album you *already own* (a re-download worth flagging,
+        and matching it skips the reverse-match that would otherwise mint a duplicate owned
+        entry). Ownership is still decided by reconcile via release-group; this only labels."""
         with self._sf() as session:
-            rows = session.execute(
-                select(Album.id, Album.artist, Album.title).where(
-                    Album.state != AlbumState.owned
-                )
-            )
+            rows = session.execute(select(Album.id, Album.artist, Album.title))
             return [MatchCandidate(*row) for row in rows]
 
     def add_pending_import(

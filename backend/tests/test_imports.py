@@ -71,12 +71,13 @@ def test_detection_matches_an_album_still_in_decide(
     assert rows["Patrick_Wolf-Lupercalia-2011"].matched_album_id == album_id
 
 
-def test_detection_ignores_already_owned_albums(
+def test_detection_matches_an_already_owned_album(
     clean_album_tables: sessionmaker[Session],
 ) -> None:
-    # An owned album is not a match target — no point labelling a drop as fulfilling it.
+    # A drop for an album you already own is a re-download worth flagging — and matching it
+    # keeps reverse-match from minting a duplicate owned entry off Spotify.
     sf = clean_album_tables
-    _add(sf, artist="Patrick Wolf", title="Lupercalia", state=AlbumState.owned)
+    album_id = _add(sf, artist="Patrick Wolf", title="Lupercalia", state=AlbumState.owned)
     transmission = StubTransmissionClient(
         [Torrent(hash="h1", name="Patrick_Wolf-Lupercalia-2011", download_dir="/d", files=["a"])]
     )
@@ -85,7 +86,7 @@ def test_detection_ignores_already_owned_albums(
     ).poll()
 
     rows = {r.name: r for r in AlbumRepo(sf).list_imports()}
-    assert rows["Patrick_Wolf-Lupercalia-2011"].matched_album_id is None
+    assert rows["Patrick_Wolf-Lupercalia-2011"].matched_album_id == album_id
 
 
 def _transmission_runner(repo: AlbumRepo, beets: object, inbox: str) -> ImportRunner:
