@@ -11,6 +11,9 @@ type Counts = {
 
 export type Section = 'all' | keyof Counts
 
+// The counts payload also carries cold-start resolution progress, which isn't a section.
+type Dash = Counts & { resolved: number; unresolved: number }
+
 // One tile per worklist section, in the same order and wording as the page below.
 const TILES: { key: keyof Counts; label: string }[] = [
   { key: 'releases', label: 'releases' },
@@ -28,7 +31,7 @@ type Props = {
 }
 
 export function Dashboard({ refreshKey = 0, active = 'all', onSelect }: Props) {
-  const [counts, setCounts] = useState<Counts | null>(null)
+  const [counts, setCounts] = useState<Dash | null>(null)
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey is a manual refetch trigger
   useEffect(() => {
@@ -41,24 +44,32 @@ export function Dashboard({ refreshKey = 0, active = 'all', onSelect }: Props) {
   if (!counts) return null
 
   return (
-    <div className="dashboard">
-      <button
-        type="button"
-        className={active === 'all' ? 'stat active' : 'stat'}
-        onClick={() => onSelect?.('all')}
-      >
-        all
-      </button>
-      {TILES.map((t) => (
+    <>
+      <div className="dashboard">
         <button
-          key={t.key}
           type="button"
-          className={active === t.key ? 'stat active' : 'stat'}
-          onClick={() => onSelect?.(t.key)}
+          className={active === 'all' ? 'stat active' : 'stat'}
+          onClick={() => onSelect?.('all')}
         >
-          <b>{counts[t.key]}</b> {t.label}
+          all
         </button>
-      ))}
-    </div>
+        {TILES.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            className={active === t.key ? 'stat active' : 'stat'}
+            onClick={() => onSelect?.(t.key)}
+          >
+            <b>{counts[t.key]}</b> {t.label}
+          </button>
+        ))}
+      </div>
+      {counts.unresolved > 0 && (
+        <div className="muted resolving">
+          Resolving to MusicBrainz: {counts.resolved}/{counts.resolved + counts.unresolved} albums
+          matched
+        </div>
+      )}
+    </>
   )
 }

@@ -49,6 +49,13 @@ class MetricsService:
             "Albums with a source art URL but no stored cover blob yet.",
             [("", self._repo.count_missing_art())],
         )
+        resolved, unresolved = self._repo.resolution_counts()
+        _gauge(
+            lines,
+            "wantlist_albums_resolution",
+            "Albums by MusicBrainz release-group resolution state (cold-start progress).",
+            [('state="resolved"', resolved), ('state="unresolved"', unresolved)],
+        )
 
         runs = self._repo.job_runs()
         _gauge(

@@ -700,6 +700,20 @@ class AlbumRepo:
             rows = session.execute(select(Album.state, func.count()).group_by(Album.state))
             return {state.value: count for state, count in rows}
 
+    def resolution_counts(self) -> tuple[int, int]:
+        """(resolved, unresolved) — albums with a MusicBrainz release-group vs the non-dismissed
+        ones still awaiting one. Drives the cold-start resolution-progress indicator."""
+        with self._sf() as session:
+            resolved = session.scalar(
+                select(func.count()).select_from(Album).where(Album.mb_releasegroup_id.is_not(None))
+            )
+            unresolved = session.scalar(
+                select(func.count())
+                .select_from(Album)
+                .where(Album.mb_releasegroup_id.is_(None), Album.state != AlbumState.dismissed)
+            )
+            return int(resolved or 0), int(unresolved or 0)
+
     def count_missing_art(self) -> int:
         """Albums with a source art URL but no stored blob — a §16 backlog gauge."""
         with self._sf() as session:

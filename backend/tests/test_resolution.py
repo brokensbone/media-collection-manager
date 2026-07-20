@@ -77,3 +77,34 @@ def test_resolution_pauses_on_reauth(clean_album_tables: sessionmaker[Session]) 
     sf = clean_album_tables
     _saved(sf, spotify_id="s1", title="X")
     assert _service(sf, fail_auth=True).resolve_unresolved().paused is True
+
+
+def test_refreshes_the_token_per_album(clean_album_tables: sessionmaker[Session]) -> None:
+    # The token must be fetched per album, not once per pass — else a long MB-throttled batch
+    # outlives the token and 401s partway through.
+    sf = clean_album_tables
+    _saved(sf, spotify_id="s1", title="Resolvable")
+    _saved(sf, spotify_id="s2", title="Resolvable")
+    tokens = StubTokens()
+    ResolutionService(
+        api=StubSpotifyApiClient([]),  # type: ignore[arg-type]
+        resolver=StubMusicBrainzResolver({"Resolvable": "rg-1"}),  # type: ignore[arg-type]
+        repo=AlbumRepo(sf),
+        tokens=tokens,  # type: ignore[arg-type]
+    ).resolve_unresolved()
+    assert tokens.calls == 2  # one fresh token per album
+
+
+def test_pauses_when_reauth_hits_mid_batch(clean_album_tables: sessionmaker[Session]) -> None:
+    # If the refresh token dies partway through, resolve what we can and pause the rest.
+    sf = clean_album_tables
+    _saved(sf, spotify_id="s1", title="Resolvable")
+    _saved(sf, spotify_id="s2", title="Resolvable")
+    result = ResolutionService(
+        api=StubSpotifyApiClient([]),  # type: ignore[arg-type]
+        resolver=StubMusicBrainzResolver({"Resolvable": "rg-1"}),  # type: ignore[arg-type]
+        repo=AlbumRepo(sf),
+        tokens=StubTokens(fail_after=1),  # type: ignore[arg-type]
+    ).resolve_unresolved()
+    assert result.paused is True
+    assert result.resolved == 1  # the first album resolved before the token died
