@@ -11,6 +11,7 @@ from .factories import (
     build_auth_service,
     build_decide_service,
     build_releases_service,
+    build_transmission_service,
 )
 from .imports import ImportsService
 from .metrics import MetricsService
@@ -23,6 +24,7 @@ from .routers import imports as imports_router
 from .routers import library as library_router
 from .routers import metrics as metrics_router
 from .routers import releases as releases_router
+from .routers import transmission as transmission_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -39,6 +41,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.acquire_service = build_acquire_service(settings, session_factory)
     app.state.releases_service = build_releases_service(settings, session_factory)
     app.state.imports_service = ImportsService(repo=AlbumRepo(session_factory))
+    app.state.transmission_service = build_transmission_service(settings, session_factory)
     app.state.metrics_service = MetricsService(
         repo=AlbumRepo(session_factory),
         auth=build_auth_service(settings, session_factory),
@@ -51,6 +54,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(dashboard_router.router)
     app.include_router(releases_router.router)
     app.include_router(imports_router.router)
+    app.include_router(transmission_router.router)
     app.include_router(metrics_router.router)
 
     @app.get("/health")

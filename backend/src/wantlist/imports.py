@@ -86,6 +86,7 @@ class ImportDetectionService:
                     download_dir=t.download_dir,
                     files=t.files,
                     matched_album_id=best_match(t.name, targets, self._threshold),
+                    has_audio=True,
                 )
                 detected += 1
             else:
@@ -95,6 +96,7 @@ class ImportDetectionService:
                     name=t.name,
                     matched_album_id=None,
                     state=ImportState.dismissed,
+                    has_audio=False,
                 )
         return DetectResult(detected=detected)
 

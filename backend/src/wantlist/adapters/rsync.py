@@ -14,6 +14,26 @@ class RsyncTransfer:
         self._user = user
         self._ssh_key = ssh_key
 
+    def test(self) -> None:
+        """Open an SSH session to the seedbox and run `true` — the Transmission page's SSH
+        connection check. Same options as fetch() so it exercises the real auth path. Raises
+        CalledProcessError (with stderr) or TimeoutExpired on failure."""
+        argv = [
+            "ssh",
+            "-p",
+            str(self._port),
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-o",
+            "ConnectTimeout=10",
+        ]
+        if self._ssh_key:
+            argv += ["-i", self._ssh_key]
+        argv += [f"{self._user}@{self._host}", "true"]
+        subprocess.run(argv, capture_output=True, text=True, check=True, timeout=20)
+
     def fetch(self, *, download_dir: str, files: list[str], dest: str) -> None:
         Path(dest).mkdir(parents=True, exist_ok=True)
         # BatchMode: never prompt (fail fast instead of hanging). accept-new: trust the

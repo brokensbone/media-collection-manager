@@ -90,6 +90,15 @@ class ImportRow:
 
 
 @dataclass
+class TransmissionRow:
+    id: int
+    name: str
+    state: str
+    matched: str | None  # "Artist — Title" of the matched album, if any
+    has_audio: bool | None  # False = skipped as non-music; None = not screened
+
+
+@dataclass
 class ImportRecord:
     id: int
     source: str
@@ -494,6 +503,7 @@ class AlbumRepo:
         archive_path: str | None = None,
         matched_album_id: int | None,
         state: ImportState = ImportState.detected,
+        has_audio: bool | None = None,
     ) -> None:
         with self._sf() as session:
             session.execute(
@@ -507,6 +517,7 @@ class AlbumRepo:
                     archive_path=archive_path,
                     matched_album_id=matched_album_id,
                     state=state,
+                    has_audio=has_audio,
                 )
                 .on_conflict_do_nothing(index_elements=["source_key"])
             )
@@ -549,6 +560,35 @@ class AlbumRepo:
                     matched_title=r[6],
                     matched_state=r[7].value if r[7] is not None else None,
                     archive_path=r[8],
+                )
+                for r in rows
+            ]
+
+    def transmission_ledger(self) -> list[TransmissionRow]:
+        """Every Transmission torrent the app has seen, whatever its state — including ones
+        skipped as non-music (dismissed with has_audio=False). Powers the Transmission page's
+        full list; newest first."""
+        with self._sf() as session:
+            rows = session.execute(
+                select(
+                    PendingImport.id,
+                    PendingImport.name,
+                    PendingImport.state,
+                    Album.artist,
+                    Album.title,
+                    PendingImport.has_audio,
+                )
+                .outerjoin(Album, Album.id == PendingImport.matched_album_id)
+                .where(PendingImport.source == ImportSource.transmission)
+                .order_by(PendingImport.created_at.desc(), func.lower(PendingImport.name))
+            )
+            return [
+                TransmissionRow(
+                    id=r[0],
+                    name=r[1],
+                    state=r[2].value,
+                    matched=f"{r[3]} — {r[4]}" if r[3] is not None else None,
+                    has_audio=r[5],
                 )
                 for r in rows
             ]
