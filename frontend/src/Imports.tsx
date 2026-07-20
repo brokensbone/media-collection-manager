@@ -69,7 +69,10 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
             <td>{it.name}</td>
             <td>
               {it.matched ?? <span className="muted">no match</span>}
-              {it.matched_owned && <span className="badge">already owned</span>}
+              {/* "already owned" is a pre-import warning; pointless once it's imported. */}
+              {it.matched_owned && it.state !== 'imported' && (
+                <span className="badge">already owned</span>
+              )}
             </td>
             <td className="nowrap">
               {it.missing ? (

@@ -312,6 +312,11 @@ def test_unmatched_import_reverse_matches_to_owned(
     owned = AlbumRepo(sf).list_albums("owned")
     assert [(a.artist, a.title, a.owned) for a in owned] == [("Mclusky", "The World", True)]
 
+    # the import row is linked to the album it produced, not left showing "no match"
+    item = ImportsService(repo=AlbumRepo(sf)).queue()[0]
+    assert item.matched == "Mclusky — The World"
+    assert item.matched_album_id == owned[0].id
+
 
 def test_imports_service_queue_labels_match(
     clean_album_tables: sessionmaker[Session],

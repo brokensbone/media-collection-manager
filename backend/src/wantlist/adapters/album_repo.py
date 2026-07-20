@@ -373,10 +373,11 @@ class AlbumRepo:
         beets_id: str,
         spotify_id: str | None,
         art_url: str | None,
-    ) -> None:
+    ) -> int | None:
         """Record a directly-imported album as owned (D21 reverse-match), so it shows in Owned.
         Sticky manual link (reconcile never clobbers it); art back-fills via the art job. If the
-        spotify_id is already tracked, do nothing (a save/import for it already exists)."""
+        spotify_id is already tracked, do nothing (a save/import for it already exists). Returns
+        the album id (created, or the existing one on conflict) so the import row can link to it."""
         with self._sf() as session:
             stmt = pg_insert(Album).values(
                 spotify_id=spotify_id,
@@ -391,8 +392,13 @@ class AlbumRepo:
             )
             if spotify_id is not None:
                 stmt = stmt.on_conflict_do_nothing(index_elements=["spotify_id"])
-            session.execute(stmt)
+            new_id = session.scalar(stmt.returning(Album.id))
             session.commit()
+            if new_id is not None:
+                return int(new_id)
+            if spotify_id is not None:  # conflicted with an existing row
+                return session.scalar(select(Album.id).where(Album.spotify_id == spotify_id))
+            return None
 
     # --- releases / artist-watch (§6b) -----------------------------------------------
 
@@ -601,6 +607,17 @@ class AlbumRepo:
         with self._sf() as session:
             session.execute(
                 update(PendingImport).where(PendingImport.id == import_id).values(state=state)
+            )
+            session.commit()
+
+    def set_import_match(self, import_id: int, album_id: int) -> None:
+        """Point an import row at the album it produced — used after a reverse-match creates an
+        owned album, so the row shows that album instead of a stale 'no match'."""
+        with self._sf() as session:
+            session.execute(
+                update(PendingImport)
+                .where(PendingImport.id == import_id)
+                .values(matched_album_id=album_id)
             )
             session.commit()
 

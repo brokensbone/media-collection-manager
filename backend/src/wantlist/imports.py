@@ -265,7 +265,9 @@ class ImportRunner:
                     rec.matched_album_id, new[0].beets_id if new else None
                 )
             elif self._reverse_matcher is not None:
-                self._reverse_matcher.claim(new)
+                owned_ids = self._reverse_matcher.claim(new)
+                if owned_ids:  # link the row to what it produced, so it isn't stuck at "no match"
+                    self._repo.set_import_match(rec.id, owned_ids[0])
         except Exception:
             log.warning("import %s: ownership claim failed", rec.id, exc_info=True)
 
