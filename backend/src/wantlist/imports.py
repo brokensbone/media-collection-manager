@@ -321,6 +321,15 @@ class ImportsService:
         self._repo.queue_import(import_id)
 
     def discard(self, import_id: int) -> None:
+        rec = self._repo.get_pending_import(import_id)
+        # A discarded watch-dir drop shouldn't linger in the folder. A transmission row's source
+        # lives on the seedbox and is never touched (seeding-safe, §12) — just dismiss it.
+        if rec and rec.source == ImportSource.watchdir.value and rec.archive_path:
+            path = Path(rec.archive_path)
+            if path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                path.unlink(missing_ok=True)
         self._repo.dismiss_import(import_id)
 
 

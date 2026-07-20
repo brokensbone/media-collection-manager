@@ -67,9 +67,9 @@ describe('Imports', () => {
       item({ id: 6, name: 'New', matched: 'Someone — Thing', matched_owned: false }),
     ])
     render(<Imports />)
-    expect(await screen.findByText('already owned')).toBeTruthy()
+    expect(await screen.findByText('owned')).toBeTruthy()
     // only the owned match is flagged
-    expect(screen.getAllByText('already owned')).toHaveLength(1)
+    expect(screen.getAllByText('owned')).toHaveLength(1)
   })
 
   it('discards a detected row via DELETE and drops it from the list', async () => {

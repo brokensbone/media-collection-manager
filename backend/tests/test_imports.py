@@ -405,6 +405,26 @@ def test_discard_hides_the_row_but_keeps_its_source_key(
     assert "h1" in repo.known_source_keys()  # still known → won't re-detect
 
 
+def test_discarding_a_watchdir_drop_deletes_its_file(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    sf = clean_album_tables
+    repo = AlbumRepo(sf)
+    drop = tmp_path / "Drop.zip"
+    drop.write_bytes(b"z")
+    repo.add_pending_import(
+        source=ImportSource.watchdir,
+        source_key="k1",
+        name="Drop.zip",
+        archive_path=str(drop),
+        matched_album_id=None,
+    )
+    service = ImportsService(repo=repo)
+    service.discard(service.queue()[0].id)
+    assert not drop.exists()  # a discarded drop is removed from the watch folder
+    assert service.queue() == []
+
+
 def test_transmission_detection_ignores_non_music_torrents(
     clean_album_tables: sessionmaker[Session],
 ) -> None:
