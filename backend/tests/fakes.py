@@ -11,13 +11,18 @@ from wantlist.ports.transmission import Torrent
 class StubTokens:
     """Access-token provider double. `fail=True` simulates the 6-month re-auth."""
 
-    def __init__(self, token: str = "tok", fail: bool = False) -> None:
+    def __init__(
+        self, token: str = "tok", fail: bool = False, fail_after: int | None = None
+    ) -> None:
         self._token = token
         self._fail = fail
+        self._fail_after = fail_after  # raise ReauthRequired once this many tokens have been issued
+        self.calls = 0
 
     def valid_access_token(self) -> str:
-        if self._fail:
+        if self._fail or (self._fail_after is not None and self.calls >= self._fail_after):
             raise ReauthRequired
+        self.calls += 1
         return self._token
 
 

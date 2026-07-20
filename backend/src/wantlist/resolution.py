@@ -38,18 +38,20 @@ class ResolutionService:
         self._max_per_run = max_per_run
 
     def resolve_unresolved(self) -> ResolveResult:
-        try:
-            token = self._tokens.valid_access_token()
-        except ReauthRequired:
-            log.warning("Spotify re-auth required; skipping resolution")
-            return ResolveResult(resolved=0, unresolved=0, paused=True)
-
         candidates = self._repo.albums_needing_resolution()
         if self._max_per_run is not None:
             candidates = candidates[: self._max_per_run]
 
         resolved = unresolved = errored = 0
         for album in candidates:
+            try:
+                # Per album, not once per pass: MusicBrainz throttling makes a pass take many
+                # minutes, long enough to outlive a Spotify access token. valid_access_token()
+                # refreshes ~60s before expiry, so no request 401s partway through the batch.
+                token = self._tokens.valid_access_token()
+            except ReauthRequired:
+                log.warning("Spotify re-auth required; pausing resolution")
+                return ResolveResult(resolved=resolved, unresolved=unresolved, paused=True)
             try:
                 isrcs = self._api.album_isrcs(token, album.spotify_id) if album.spotify_id else []
                 rgid = self._resolver.resolve(

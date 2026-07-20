@@ -44,6 +44,15 @@ class ArtistWatchService:
         baselined = 0
 
         for artist_id in artist_ids:
+            try:
+                # Refresh per artist: scanning many artists can outlive the access token, and
+                # this returns a fresh one (refreshing ~60s before expiry) so no call 401s.
+                token = self._tokens.valid_access_token()
+            except ReauthRequired:
+                log.warning("Spotify re-auth required; pausing artist watch")
+                return WatchResult(
+                    added=added, artists=len(artist_ids), baselined=baselined, paused=True
+                )
             is_baseline = not self._repo.artist_has_baseline(artist_id)
             to_mark: list[tuple[str, str]] = []
             for album in self._api.artist_albums(token, artist_id):
