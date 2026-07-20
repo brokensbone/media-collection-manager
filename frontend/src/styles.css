@@ -139,6 +139,10 @@ a {
 .muted {
   color: var(--muted);
 }
+.checks {
+  margin-top: 8px;
+  line-height: 1.6;
+}
 .badge {
   margin-left: 8px;
   padding: 1px 6px;
