@@ -16,6 +16,11 @@ class HttpxTransmissionClient:
         self._auth = (user, password) if user else None
         self._session_id = ""
 
+    def ping(self) -> None:
+        """Lightweight liveness check for the Transmission page's connection test — does the
+        session-id handshake and a session-get. Raises on any failure (auth, network, 409)."""
+        self._rpc({"method": "session-get", "arguments": {"fields": ["version"]}})
+
     def completed_torrents(self) -> list[Torrent]:
         data = self._rpc({"method": "torrent-get", "arguments": {"fields": _FIELDS}})
         torrents = data.get("arguments", {}).get("torrents", [])

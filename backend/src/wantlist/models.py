@@ -115,6 +115,7 @@ class ImportState(StrEnum):
     queued = "queued"  # clicked; awaiting background processing by the worker
     imported = "imported"
     failed = "failed"
+    dismissed = "dismissed"  # operator discarded it; kept so its source-key stays in the ledger
 
 
 class ImportSource(StrEnum):
@@ -145,6 +146,9 @@ class PendingImport(Base):
     state: Mapped[ImportState] = mapped_column(
         SAEnum(ImportState, name="import_state"), default=ImportState.detected
     )
+    # Whether the download contains audio (§12 non-music filter). None = not screened (watch-dir
+    # drops, older rows). Kept even for skipped torrents so the Transmission page can show them.
+    has_audio: Mapped[bool | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

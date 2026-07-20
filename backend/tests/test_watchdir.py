@@ -5,6 +5,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session, sessionmaker
 
 from wantlist.adapters.album_repo import AlbumRepo
+from wantlist.adapters.tags import MediaFileTagReader
 from wantlist.imports import ImportRunner, WatchdirDetectionService, WatchdirStager
 from wantlist.models import Album, AlbumState, ImportSource, ImportState, Provenance
 
@@ -78,6 +79,14 @@ def test_watchdir_matches_by_tags_and_dedupes(
     assert rows["pw_lup_2011.zip"].matched_album_id == album_id  # matched via embedded tags
     assert rows["pw_lup_2011.zip"].source == "watchdir"
     assert rows["unknown.zip"].matched_album_id is None  # no tags, name doesn't match → tail
+
+
+def test_tag_reader_degrades_on_a_corrupt_zip(tmp_path: Path) -> None:
+    # A non-zip named .zip (a partial download, a stray file) must not raise — else it would
+    # crash the whole watch-dir poll and block every other import. It falls back to None (name).
+    bad = tmp_path / "corrupt.zip"
+    bad.write_bytes(b"definitely not a zip")
+    assert MediaFileTagReader().read(bad) is None
 
 
 def test_watchdir_skips_unsettled_drop(

@@ -70,7 +70,7 @@ class SuggestedRow:
 
 
 @dataclass
-class WantedForMatch:
+class MatchCandidate:
     id: int
     artist: str
     title: str
@@ -85,6 +85,17 @@ class ImportRow:
     matched_album_id: int | None
     matched_artist: str | None
     matched_title: str | None
+    matched_state: str | None  # the matched album's state, so the UI can flag "already owned"
+    archive_path: str | None
+
+
+@dataclass
+class TransmissionRow:
+    id: int
+    name: str
+    state: str
+    matched: str | None  # "Artist — Title" of the matched album, if any
+    has_audio: bool | None  # False = skipped as non-music; None = not screened
 
 
 @dataclass
@@ -371,10 +382,11 @@ class AlbumRepo:
         beets_id: str,
         spotify_id: str | None,
         art_url: str | None,
-    ) -> None:
+    ) -> int | None:
         """Record a directly-imported album as owned (D21 reverse-match), so it shows in Owned.
         Sticky manual link (reconcile never clobbers it); art back-fills via the art job. If the
-        spotify_id is already tracked, do nothing (a save/import for it already exists)."""
+        spotify_id is already tracked, do nothing (a save/import for it already exists). Returns
+        the album id (created, or the existing one on conflict) so the import row can link to it."""
         with self._sf() as session:
             stmt = pg_insert(Album).values(
                 spotify_id=spotify_id,
@@ -389,8 +401,13 @@ class AlbumRepo:
             )
             if spotify_id is not None:
                 stmt = stmt.on_conflict_do_nothing(index_elements=["spotify_id"])
-            session.execute(stmt)
+            new_id = session.scalar(stmt.returning(Album.id))
             session.commit()
+            if new_id is not None:
+                return int(new_id)
+            if spotify_id is not None:  # conflicted with an existing row
+                return session.scalar(select(Album.id).where(Album.spotify_id == spotify_id))
+            return None
 
     # --- releases / artist-watch (§6b) -----------------------------------------------
 
@@ -465,14 +482,15 @@ class AlbumRepo:
         with self._sf() as session:
             return set(session.scalars(select(PendingImport.source_key)))
 
-    def wanted_for_matching(self) -> list[WantedForMatch]:
-        """`wanted` albums an acquisition could be fulfilling (§12/§13 match)."""
-        targets = (AlbumState.wanted,)
+    def albums_for_matching(self) -> list[MatchCandidate]:
+        """Every album an acquisition could correspond to (§12/§13 match) — the whole funnel,
+        not just `wanted`. A drop for something in Decide (`saved`) or freshly `suggested` is a
+        valid match, and so is one for an album you *already own* (a re-download worth flagging,
+        and matching it skips the reverse-match that would otherwise mint a duplicate owned
+        entry). Ownership is still decided by reconcile via release-group; this only labels."""
         with self._sf() as session:
-            rows = session.execute(
-                select(Album.id, Album.artist, Album.title).where(Album.state.in_(targets))
-            )
-            return [WantedForMatch(*row) for row in rows]
+            rows = session.execute(select(Album.id, Album.artist, Album.title))
+            return [MatchCandidate(*row) for row in rows]
 
     def add_pending_import(
         self,
@@ -484,6 +502,8 @@ class AlbumRepo:
         files: list[str] | None = None,
         archive_path: str | None = None,
         matched_album_id: int | None,
+        state: ImportState = ImportState.detected,
+        has_audio: bool | None = None,
     ) -> None:
         with self._sf() as session:
             session.execute(
@@ -496,15 +516,18 @@ class AlbumRepo:
                     files=files or [],
                     archive_path=archive_path,
                     matched_album_id=matched_album_id,
+                    state=state,
+                    has_audio=has_audio,
                 )
                 .on_conflict_do_nothing(index_elements=["source_key"])
             )
             session.commit()
 
     def list_imports(self) -> list[ImportRow]:
-        """All recent acquisitions with their status, so the Import screen shows a task list
-        that persists (detected → queued → imported/failed) rather than rows vanishing on
-        click. Active ones (detected/queued) first, then the rest, each by download name."""
+        """Recent acquisitions with their status, so the Import screen shows a task list that
+        persists (detected → queued → imported/failed) rather than rows vanishing on click.
+        Active ones (detected/queued) first, then the rest, each by download name. Dismissed
+        rows are hidden — kept only so their source-key stays in the seen-ledger."""
         active = (ImportState.detected, ImportState.queued)
         with self._sf() as session:
             rows = session.execute(
@@ -516,14 +539,59 @@ class AlbumRepo:
                     PendingImport.matched_album_id,
                     Album.artist,
                     Album.title,
+                    Album.state,
+                    PendingImport.archive_path,
                 )
                 .outerjoin(Album, Album.id == PendingImport.matched_album_id)
+                .where(PendingImport.state != ImportState.dismissed)
                 .order_by(
                     PendingImport.state.in_(active).desc(),  # active first
                     func.lower(PendingImport.name),
                 )
             )
-            return [ImportRow(r[0], r[1].value, r[2], r[3].value, r[4], r[5], r[6]) for r in rows]
+            return [
+                ImportRow(
+                    id=r[0],
+                    source=r[1].value,
+                    name=r[2],
+                    state=r[3].value,
+                    matched_album_id=r[4],
+                    matched_artist=r[5],
+                    matched_title=r[6],
+                    matched_state=r[7].value if r[7] is not None else None,
+                    archive_path=r[8],
+                )
+                for r in rows
+            ]
+
+    def transmission_ledger(self) -> list[TransmissionRow]:
+        """Every Transmission torrent the app has seen, whatever its state — including ones
+        skipped as non-music (dismissed with has_audio=False). Powers the Transmission page's
+        full list; newest first."""
+        with self._sf() as session:
+            rows = session.execute(
+                select(
+                    PendingImport.id,
+                    PendingImport.name,
+                    PendingImport.state,
+                    Album.artist,
+                    Album.title,
+                    PendingImport.has_audio,
+                )
+                .outerjoin(Album, Album.id == PendingImport.matched_album_id)
+                .where(PendingImport.source == ImportSource.transmission)
+                .order_by(PendingImport.created_at.desc(), func.lower(PendingImport.name))
+            )
+            return [
+                TransmissionRow(
+                    id=r[0],
+                    name=r[1],
+                    state=r[2].value,
+                    matched=f"{r[3]} — {r[4]}" if r[3] is not None else None,
+                    has_audio=r[5],
+                )
+                for r in rows
+            ]
 
     def count_active_imports(self) -> int:
         """Imports awaiting a click or still processing — the dashboard's Import count."""
@@ -579,6 +647,30 @@ class AlbumRepo:
         with self._sf() as session:
             session.execute(
                 update(PendingImport).where(PendingImport.id == import_id).values(state=state)
+            )
+            session.commit()
+
+    def set_import_match(self, import_id: int, album_id: int) -> None:
+        """Point an import row at the album it produced — used after a reverse-match creates an
+        owned album, so the row shows that album instead of a stale 'no match'."""
+        with self._sf() as session:
+            session.execute(
+                update(PendingImport)
+                .where(PendingImport.id == import_id)
+                .values(matched_album_id=album_id)
+            )
+            session.commit()
+
+    def dismiss_import(self, import_id: int) -> None:
+        """Discard an import the operator doesn't want (non-music that slipped through, a
+        re-download of something already owned). Sticky: the row is kept as `dismissed` so its
+        source_key stays in the seen-ledger and a still-seeding torrent isn't re-detected next
+        poll. Hidden from the Import list."""
+        with self._sf() as session:
+            session.execute(
+                update(PendingImport)
+                .where(PendingImport.id == import_id)
+                .values(state=ImportState.dismissed)
             )
             session.commit()
 

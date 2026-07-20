@@ -8,16 +8,18 @@ import { Imports } from './Imports'
 import { Library } from './Library'
 import { Releases } from './Releases'
 import { SpotifyStatus } from './SpotifyStatus'
+import { Transmission } from './Transmission'
 
-type View = 'app' | 'guide'
+type View = 'app' | 'guide' | 'transmission'
 
 const SECTIONS: Section[] = ['all', 'releases', 'decide', 'acquire', 'import', 'owned', 'dismissed']
 
-// The active tab lives in the URL hash (#guide, #acquire, …) so a refresh or a
-// shared link restores the same view.
+// The active tab lives in the URL hash (#guide, #transmission, #acquire, …) so a refresh or
+// a shared link restores the same view.
 function readHash(): { view: View; section: Section } {
   const h = window.location.hash.replace(/^#/, '')
   if (h === 'guide') return { view: 'guide', section: 'all' }
+  if (h === 'transmission') return { view: 'transmission', section: 'all' }
   if ((SECTIONS as string[]).includes(h)) return { view: 'app', section: h as Section }
   return { view: 'app', section: 'all' }
 }
@@ -28,7 +30,7 @@ export default function App() {
   const [query, setQuery] = useState('')
 
   useEffect(() => {
-    const target = view === 'guide' ? 'guide' : section
+    const target = view === 'app' ? section : view
     if (window.location.hash.replace(/^#/, '') !== target) window.location.hash = target
   }, [view, section])
 
@@ -74,11 +76,20 @@ export default function App() {
           >
             {view === 'guide' ? 'Dashboard' : 'Guide'}
           </button>
+          <button
+            type="button"
+            className="linklike"
+            onClick={() => setView(view === 'transmission' ? 'app' : 'transmission')}
+          >
+            {view === 'transmission' ? 'Dashboard' : 'Transmission'}
+          </button>
           <SpotifyStatus />
         </div>
       </header>
       {view === 'guide' ? (
         <Guide />
+      ) : view === 'transmission' ? (
+        <Transmission />
       ) : (
         <>
           <Dashboard refreshKey={refresh} active={section} onSelect={setSection} />

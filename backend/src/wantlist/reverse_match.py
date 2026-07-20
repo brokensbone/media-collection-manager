@@ -21,17 +21,19 @@ class ReverseMatcher:
         self._api = api
         self._tokens = tokens
 
-    def claim(self, albums: list[BeetsAlbum]) -> int:
+    def claim(self, albums: list[BeetsAlbum]) -> list[int]:
+        """Returns the ids of the albums it recorded as owned, so the caller can link the
+        import row that produced them (instead of leaving it showing 'no match')."""
         if not albums:
-            return 0
+            return []
         token = self._token()
         tracked = self._repo.tracked_release_group_ids()
-        created = 0
+        owned_ids: list[int] = []
         for album in albums:
             if album.mb_releasegroup_id and album.mb_releasegroup_id in tracked:
                 continue  # a want already covers this rgid; reconcile owns it
             found = self._search(token, f"{album.artist} {album.title}")
-            self._repo.add_owned_import(
+            album_id = self._repo.add_owned_import(
                 artist=album.artist,
                 title=album.title,
                 mb_releasegroup_id=album.mb_releasegroup_id,
@@ -39,8 +41,9 @@ class ReverseMatcher:
                 spotify_id=found.spotify_id if found else None,
                 art_url=found.art_url if found else None,
             )
-            created += 1
-        return created
+            if album_id is not None:
+                owned_ids.append(album_id)
+        return owned_ids
 
     def _token(self) -> str | None:
         try:

@@ -9,7 +9,7 @@ from .adapters.album_repo import AlbumRepo, ImportRecord
 from .adapters.beets import BeetsAlbum
 from .adapters.unpack import dispose, unpack
 from .domain.match import MatchTarget, best_match
-from .models import ImportSource, ImportState
+from .models import AlbumState, ImportSource, ImportState
 from .ports.clock import Clock
 from .ports.file_transfer import FileTransfer
 from .ports.tags import TagReader
@@ -45,6 +45,8 @@ class ImportItem:
     state: str  # detected | queued | imported | failed — drives the status shown per row
     matched_album_id: int | None
     matched: str | None  # "Artist — Title" of the matched want, or None for the no-match tail
+    matched_owned: bool  # the matched album is already owned — importing would just duplicate it
+    missing: bool  # the watch-dir file backing this drop is gone — offer removal, not import
 
 
 # --- detection: one service per front (§12 Transmission / §13 watch-dir) --------------
@@ -63,22 +65,40 @@ class ImportDetectionService:
         self._threshold = match_threshold
 
     def poll(self) -> DetectResult:
+        # The client is shared with all the operator's torrents, so on first connect there are
+        # hundreds already complete and plenty are non-music. Each hash is screened once: a
+        # torrent with audio is surfaced (and matched) for the operator; one without is recorded
+        # as `dismissed` so its hash stays in the ledger and we never screen it again. Either way
+        # the hash is now known, so a re-poll skips it on the hash check alone.
         known = self._repo.known_source_keys()
         fresh = [t for t in self._transmission.completed_torrents() if t.hash not in known]
         if not fresh:
             return DetectResult(detected=0)
 
         targets = _match_targets(self._repo)
+        detected = 0
         for t in fresh:
-            self._repo.add_pending_import(
-                source=ImportSource.transmission,
-                source_key=t.hash,
-                name=t.name,
-                download_dir=t.download_dir,
-                files=t.files,
-                matched_album_id=best_match(t.name, targets, self._threshold),
-            )
-        return DetectResult(detected=len(fresh))
+            if _has_audio(t.files):
+                self._repo.add_pending_import(
+                    source=ImportSource.transmission,
+                    source_key=t.hash,
+                    name=t.name,
+                    download_dir=t.download_dir,
+                    files=t.files,
+                    matched_album_id=best_match(t.name, targets, self._threshold),
+                    has_audio=True,
+                )
+                detected += 1
+            else:
+                self._repo.add_pending_import(  # not music: ledger the hash, never screen it again
+                    source=ImportSource.transmission,
+                    source_key=t.hash,
+                    name=t.name,
+                    matched_album_id=None,
+                    state=ImportState.dismissed,
+                    has_audio=False,
+                )
+        return DetectResult(detected=detected)
 
 
 class WatchdirDetectionService:
@@ -227,23 +247,29 @@ class ImportRunner:
         except Exception:
             log.warning("import %s: finalize/dispose failed", import_id, exc_info=True)
 
-        self._reverse_match(rec, before)
+        self._claim_ownership(rec, before)
 
     def _album_ids(self) -> set[str]:
         return {a.beets_id for a in self._catalog.all_albums()} if self._catalog else set()
 
-    def _reverse_match(self, rec: ImportRecord, before: set[str]) -> None:
-        # Only an *unmatched* import needs this — a matched one flips its want to owned via
-        # reconcile. Best-effort: a failure here mustn't undo a successful import.
-        if self._reverse_matcher is None or self._catalog is None:
-            return
-        if rec.matched_album_id is not None:
+    def _claim_ownership(self, rec: ImportRecord, before: set[str]) -> None:
+        """Turn a completed import into an owned album. A *matched* import already knows which
+        album it is, so link it owned directly to the freshly-imported beets album — don't wait
+        for reconcile, which keys on a MusicBrainz release-group that a quiet as-is beets import
+        won't have attached. An *unmatched* import is reverse-matched against Spotify (D21).
+        Best-effort: a failure here mustn't undo the successful import."""
+        if self._catalog is None:
             return
         try:
             new = [a for a in self._catalog.all_albums() if a.beets_id not in before]
-            self._reverse_matcher.claim(new)
+            if rec.matched_album_id is not None:
+                self._repo.mark_owned_manual(rec.matched_album_id, new[0].beets_id if new else None)
+            elif self._reverse_matcher is not None:
+                owned_ids = self._reverse_matcher.claim(new)
+                if owned_ids:  # link the row to what it produced, so it isn't stuck at "no match"
+                    self._repo.set_import_match(rec.id, owned_ids[0])
         except Exception:
-            log.warning("import %s: reverse-match failed", rec.id, exc_info=True)
+            log.warning("import %s: ownership claim failed", rec.id, exc_info=True)
 
     def run_queued(self) -> int:
         """Process every queued import (worker job). One failure never blocks the rest — the
@@ -273,17 +299,69 @@ class ImportsService:
                 state=r.state,
                 matched_album_id=r.matched_album_id,
                 matched=f"{r.matched_artist} — {r.matched_title}" if r.matched_album_id else None,
+                matched_owned=r.matched_state == AlbumState.owned.value,
+                missing=self._is_missing(r.state, r.archive_path),
             )
             for r in self._repo.list_imports()
         ]
 
+    @staticmethod
+    def _is_missing(state: str, archive_path: str | None) -> bool:
+        """A watch-dir drop whose file has since been removed (§13). Only meaningful before it's
+        imported — an `imported` row's file is disposed on purpose; transmission rows have no
+        local file to check (archive_path is None)."""
+        checkable = (ImportState.detected.value, ImportState.failed.value)
+        if archive_path is None or state not in checkable:
+            return False
+        return not Path(archive_path).exists()
+
     def enqueue(self, import_id: int) -> None:
         self._repo.queue_import(import_id)
+
+    def discard(self, import_id: int) -> None:
+        rec = self._repo.get_pending_import(import_id)
+        # A discarded watch-dir drop shouldn't linger in the folder. A transmission row's source
+        # lives on the seedbox and is never touched (seeding-safe, §12) — just dismiss it.
+        if rec and rec.source == ImportSource.watchdir.value and rec.archive_path:
+            path = Path(rec.archive_path)
+            if path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                path.unlink(missing_ok=True)
+        self._repo.dismiss_import(import_id)
+
+
+_AUDIO_EXTS = frozenset(
+    {
+        ".flac",
+        ".mp3",
+        ".m4a",
+        ".aac",
+        ".ogg",
+        ".opus",
+        ".wav",
+        ".aiff",
+        ".aif",
+        ".wma",
+        ".alac",
+        ".ape",
+        ".wv",
+        ".dsf",
+        ".dff",
+        ".mpc",
+    }
+)
+
+
+def _has_audio(files: list[str]) -> bool:
+    """A torrent is music only if it carries at least one audio file — the filter that keeps
+    a shared Transmission client's movies/software/ISOs out of the Import list (§12)."""
+    return any(Path(f).suffix.lower() in _AUDIO_EXTS for f in files)
 
 
 def _match_targets(repo: AlbumRepo) -> list[MatchTarget]:
     return [
-        MatchTarget(id=w.id, artist=w.artist, title=w.title) for w in repo.wanted_for_matching()
+        MatchTarget(id=c.id, artist=c.artist, title=c.title) for c in repo.albums_for_matching()
     ]
 
 

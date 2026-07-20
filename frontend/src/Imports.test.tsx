@@ -61,6 +61,28 @@ describe('Imports', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
   })
 
+  it('flags a match that is already owned', async () => {
+    mockApi([
+      item({ id: 5, name: 'Dup', matched: 'Burial — Untrue', matched_owned: true }),
+      item({ id: 6, name: 'New', matched: 'Someone — Thing', matched_owned: false }),
+    ])
+    render(<Imports />)
+    expect(await screen.findByText('owned')).toBeTruthy()
+    // only the owned match is flagged
+    expect(screen.getAllByText('owned')).toHaveLength(1)
+  })
+
+  it('discards a detected row via DELETE and drops it from the list', async () => {
+    const fetchMock = mockApi([item({ id: 7, name: 'Unwanted' })])
+    render(<Imports />)
+    await screen.findByText('Unwanted')
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
+
+    const deleted = fetchMock.mock.calls.find((c) => c[1]?.method === 'DELETE')
+    expect(deleted?.[0]).toBe('/imports/7')
+    expect(screen.queryByText('Unwanted')).toBeNull()
+  })
+
   it('shows imported status without an action', async () => {
     mockApi([item({ id: 4, name: 'Done.zip', state: 'imported' })])
     render(<Imports />)

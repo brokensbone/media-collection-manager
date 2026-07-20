@@ -42,7 +42,7 @@ def test_creates_owned_entry_with_art_when_spotify_finds_it(
     created = _matcher(sf, search={"Mclusky The World": FOUND}).claim(
         [BeetsAlbum("b1", "Mclusky", "The World", "rg1")]
     )
-    assert created == 1
+    assert len(created) == 1
     row = _only_album(sf)
     assert row.state == AlbumState.owned
     assert row.provenance == Provenance.manual
@@ -59,7 +59,7 @@ def test_creates_owned_entry_from_tags_when_no_spotify_match(
 ) -> None:
     sf = clean_album_tables
     created = _matcher(sf, search={}).claim([BeetsAlbum("b1", "Obscure", "Tape", "rg9")])
-    assert created == 1
+    assert len(created) == 1
     row = _only_album(sf)
     assert row.state == AlbumState.owned
     assert (row.artist, row.title) == ("Obscure", "Tape")
@@ -72,7 +72,7 @@ def test_still_records_when_spotify_reauth_required(
 ) -> None:
     sf = clean_album_tables
     created = _matcher(sf, fail=True).claim([BeetsAlbum("b1", "A", "B", "rg1")])
-    assert created == 1
+    assert len(created) == 1
     assert _only_album(sf).spotify_id is None  # no token → no enrichment, still owned
 
 
@@ -96,5 +96,5 @@ def test_skips_album_whose_release_group_a_want_already_covers(
     created = _matcher(sf, search={"Mclusky The World": FOUND}).claim(
         [BeetsAlbum("b1", "Mclusky", "The World", "rg1")]
     )
-    assert created == 0  # reconcile will own the existing want; don't duplicate
+    assert created == []  # reconcile will own the existing want; don't duplicate
     assert len(AlbumRepo(sf).list_albums()) == 1

@@ -39,6 +39,69 @@ def _add_wanted(sf: sessionmaker[Session], *, artist: str, title: str) -> int:
         return album.id
 
 
+def _add(sf: sessionmaker[Session], *, artist: str, title: str, state: AlbumState) -> int:
+    with sf() as session:
+        album = Album(
+            spotify_id=f"{artist}:{title}",
+            artist=artist,
+            title=title,
+            state=state,
+            provenance=Provenance.spotify_save,
+        )
+        session.add(album)
+        session.commit()
+        return album.id
+
+
+def test_detection_matches_an_album_still_in_decide(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    # A drop for an album you haven't triaged yet (still `saved`, i.e. in Decide) should match:
+    # reconcile will flip it to owned by release-group anyway, so the label should reflect that.
+    sf = clean_album_tables
+    album_id = _add(sf, artist="Patrick Wolf", title="Lupercalia", state=AlbumState.saved)
+    transmission = StubTransmissionClient(
+        [
+            Torrent(
+                hash="h1", name="Patrick_Wolf-Lupercalia-2011", download_dir="/d", files=["01.flac"]
+            )
+        ]
+    )
+    ImportDetectionService(
+        transmission=transmission, repo=AlbumRepo(sf), match_threshold=0.5
+    ).poll()
+
+    rows = {r.name: r for r in AlbumRepo(sf).list_imports()}
+    assert rows["Patrick_Wolf-Lupercalia-2011"].matched_album_id == album_id
+    item = ImportsService(repo=AlbumRepo(sf)).queue()[0]
+    assert item.matched_owned is False  # matched a Decide album, not owned
+
+
+def test_detection_matches_an_already_owned_album(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    # A drop for an album you already own is a re-download worth flagging — and matching it
+    # keeps reverse-match from minting a duplicate owned entry off Spotify.
+    sf = clean_album_tables
+    album_id = _add(sf, artist="Patrick Wolf", title="Lupercalia", state=AlbumState.owned)
+    transmission = StubTransmissionClient(
+        [
+            Torrent(
+                hash="h1", name="Patrick_Wolf-Lupercalia-2011", download_dir="/d", files=["01.flac"]
+            )
+        ]
+    )
+    ImportDetectionService(
+        transmission=transmission, repo=AlbumRepo(sf), match_threshold=0.5
+    ).poll()
+
+    rows = {r.name: r for r in AlbumRepo(sf).list_imports()}
+    assert rows["Patrick_Wolf-Lupercalia-2011"].matched_album_id == album_id
+    # the row must flag that the match is already owned, so the operator knows to discard it
+    item = ImportsService(repo=AlbumRepo(sf)).queue()[0]
+    assert item.matched_owned is True
+
+
 def _transmission_runner(repo: AlbumRepo, beets: object, inbox: str) -> ImportRunner:
     return ImportRunner(
         repo=repo,
@@ -165,6 +228,48 @@ def test_run_ignores_not_yet_queued(
     assert beets.imported == []  # nothing imported until it's queued
 
 
+def test_matched_import_links_owned_even_without_a_release_group(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    # The download was matched to a known album, but beets imported it as-is (no MB release
+    # group), so reconcile can never link it. The match itself must flip the album to owned.
+    sf = clean_album_tables
+    download_dir = tmp_path / "Album"
+    download_dir.mkdir()
+    (download_dir / "01.flac").write_text("x")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+
+    repo = AlbumRepo(sf)
+    album_id = _add(sf, artist="Pye Corner Audio", title="No Tomorrow", state=AlbumState.saved)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="Pye Corner Audio - No Tomorrow",
+        download_dir=str(download_dir),
+        files=["01.flac"],
+        matched_album_id=album_id,
+    )
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
+
+    # beets gains the album but with NO release-group id (as-is import)
+    added = BeetsAlbum("b9", "Pye Corner Audio", "No Tomorrow", None)
+    beets = FakeBeetsLibrary(adds_on_import=added)
+    ImportRunner(
+        repo=repo,
+        stagers={ImportSource.transmission: TransmissionStager(FakeFileTransfer())},
+        beets=beets,
+        inbox=str(inbox),
+        catalog=beets,
+    ).run(import_id)
+
+    owned = {a.id: a for a in AlbumRepo(sf).list_albums("owned")}
+    assert album_id in owned  # linked owned by the match, not by reconcile
+    with sf() as session:
+        assert session.get(Album, album_id).owned_beets_id == "b9"  # linked to the import
+
+
 def test_unmatched_import_reverse_matches_to_owned(
     clean_album_tables: sessionmaker[Session], tmp_path: Path
 ) -> None:
@@ -207,6 +312,11 @@ def test_unmatched_import_reverse_matches_to_owned(
     owned = AlbumRepo(sf).list_albums("owned")
     assert [(a.artist, a.title, a.owned) for a in owned] == [("Mclusky", "The World", True)]
 
+    # the import row is linked to the album it produced, not left showing "no match"
+    item = ImportsService(repo=AlbumRepo(sf)).queue()[0]
+    assert item.matched == "Mclusky — The World"
+    assert item.matched_album_id == owned[0].id
+
 
 def test_imports_service_queue_labels_match(
     clean_album_tables: sessionmaker[Session],
@@ -235,3 +345,104 @@ def test_imports_service_queue_labels_match(
     assert queue["Burial-Untrue"].source == "transmission"
     assert queue["Mystery.zip"].matched is None
     assert queue["Mystery.zip"].source == "watchdir"
+
+
+def test_queue_flags_watchdir_drop_whose_file_is_gone(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    sf = clean_album_tables
+    repo = AlbumRepo(sf)
+    here = tmp_path / "Here.zip"
+    here.write_bytes(b"z")
+    repo.add_pending_import(
+        source=ImportSource.watchdir,
+        source_key="k1",
+        name="Here.zip",
+        archive_path=str(here),
+        matched_album_id=None,
+    )
+    repo.add_pending_import(
+        source=ImportSource.watchdir,
+        source_key="k2",
+        name="Gone.zip",
+        archive_path=str(tmp_path / "Gone.zip"),
+        matched_album_id=None,
+    )
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="Torrent",
+        download_dir="/d",
+        files=["a"],
+        matched_album_id=None,
+    )
+
+    queue = {i.name: i for i in ImportsService(repo=repo).queue()}
+    assert queue["Here.zip"].missing is False  # file present
+    assert queue["Gone.zip"].missing is True  # file removed → offer removal, not import
+    assert queue["Torrent"].missing is False  # transmission has no local file to check
+
+
+def test_discard_hides_the_row_but_keeps_its_source_key(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    # Discard must be sticky: the row leaves the list but its source_key stays in the ledger,
+    # so a still-present source (a seeding torrent) isn't re-detected on the next poll.
+    sf = clean_album_tables
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="Unwanted",
+        download_dir="/d",
+        files=["a.flac"],
+        matched_album_id=None,
+    )
+    service = ImportsService(repo=repo)
+    import_id = service.queue()[0].id
+    service.discard(import_id)
+    assert service.queue() == []  # hidden from the list
+    assert "h1" in repo.known_source_keys()  # still known → won't re-detect
+
+
+def test_discarding_a_watchdir_drop_deletes_its_file(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    sf = clean_album_tables
+    repo = AlbumRepo(sf)
+    drop = tmp_path / "Drop.zip"
+    drop.write_bytes(b"z")
+    repo.add_pending_import(
+        source=ImportSource.watchdir,
+        source_key="k1",
+        name="Drop.zip",
+        archive_path=str(drop),
+        matched_album_id=None,
+    )
+    service = ImportsService(repo=repo)
+    service.discard(service.queue()[0].id)
+    assert not drop.exists()  # a discarded drop is removed from the watch folder
+    assert service.queue() == []
+
+
+def test_transmission_detection_ignores_non_music_torrents(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    sf = clean_album_tables
+    transmission = StubTransmissionClient(
+        [
+            Torrent(hash="a", name="Some Album", download_dir="/d", files=["01.flac", "cover.jpg"]),
+            Torrent(hash="b", name="A Movie 2160p", download_dir="/d", files=["movie.mkv"]),
+            Torrent(hash="c", name="Some.App", download_dir="/d", files=["setup.exe"]),
+        ]
+    )
+    service = ImportDetectionService(
+        transmission=transmission, repo=AlbumRepo(sf), match_threshold=0.5
+    )
+    assert service.poll().detected == 1  # only the audio torrent is surfaced
+
+    names = {r.name for r in AlbumRepo(sf).list_imports()}
+    assert names == {"Some Album"}  # movie/app hidden (recorded as dismissed)
+    # every hash is now ledgered, so a re-poll screens nothing again
+    assert AlbumRepo(sf).known_source_keys() == {"a", "b", "c"}
+    assert service.poll().detected == 0

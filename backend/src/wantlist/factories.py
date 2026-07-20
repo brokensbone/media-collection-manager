@@ -33,6 +33,7 @@ from .reconcile import OwnershipReconciler
 from .releases import ReleasesService
 from .resolution import ResolutionService
 from .reverse_match import ReverseMatcher
+from .transmission_service import TransmissionService
 
 
 def build_auth_service(settings: Settings, session_factory: sessionmaker[Session]) -> AuthService:
@@ -144,6 +145,27 @@ def build_import_detection_service(
         ),
         repo=AlbumRepo(session_factory),
         match_threshold=settings.import_match_threshold,
+    )
+
+
+def build_transmission_service(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> TransmissionService:
+    return TransmissionService(
+        repo=AlbumRepo(session_factory),
+        client=HttpxTransmissionClient(
+            rpc_url=settings.transmission_rpc_url,
+            user=settings.transmission_user,
+            password=settings.transmission_password,
+        ),
+        transfer=RsyncTransfer(
+            host=settings.transmission_ssh_host,
+            port=settings.transmission_ssh_port,
+            user=settings.transmission_ssh_user,
+            ssh_key=settings.transmission_ssh_key,
+        ),
+        api_configured=bool(settings.transmission_rpc_url),
+        ssh_configured=bool(settings.transmission_ssh_host),
     )
 
 
