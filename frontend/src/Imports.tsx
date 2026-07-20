@@ -61,20 +61,17 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
 
   const shown = items.filter((it) => matchesQuery(`${it.name} ${it.matched ?? ''}`, query))
 
-  // Progress across the current batch: imports run one at a time, so at most one is importing.
-  const importing = items.filter((it) => it.state === 'importing').length
+  // Only reflect active work — imported rows persist in the list as history, so counting them
+  // would make a single import read as "3 of 3". Imports run one at a time (at most one active).
+  const importing = items.some((it) => it.state === 'importing')
   const queued = items.filter((it) => it.state === 'queued').length
-  const done = items.filter((it) => it.state === 'imported').length
-  const inFlight = importing + queued
+  const progress = [importing ? 'Importing…' : null, queued > 0 ? `${queued} queued` : null]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <>
-      {inFlight > 0 && (
-        <p className="resolving">
-          Importing {done + 1} of {done + inFlight}
-          {queued > 0 && ` — ${queued} queued`} (one at a time)
-        </p>
-      )}
+      {progress && <p className="resolving">{progress}</p>}
       <table>
       <tbody>
         {shown.map((it) => (

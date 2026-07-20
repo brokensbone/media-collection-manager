@@ -83,18 +83,23 @@ describe('Imports', () => {
     expect(screen.queryByText('Unwanted')).toBeNull()
   })
 
-  it('shows the active import and a batch progress summary', async () => {
+  it('summarises only active work, ignoring already-imported history', async () => {
     mockApi([
-      item({ id: 1, name: 'A', state: 'imported' }),
+      item({ id: 1, name: 'A', state: 'imported' }), // history, must not inflate the summary
       item({ id: 2, name: 'B', state: 'importing' }),
       item({ id: 3, name: 'C', state: 'queued' }),
     ])
     render(<Imports />)
-    expect(await screen.findByText('importing…')).toBeTruthy()
-    expect(screen.getByText('queued')).toBeTruthy()
-    // 1 done, so it's on the 2nd of 3, with 1 still queued
-    expect(screen.getByText(/Importing 2 of 3/)).toBeTruthy()
-    expect(screen.getByText(/1 queued/)).toBeTruthy()
+    // summary reflects the active batch only: one importing, one queued
+    expect(await screen.findByText('Importing… · 1 queued')).toBeTruthy()
+  })
+
+  it('hides the progress summary when nothing is active', async () => {
+    mockApi([item({ id: 1, name: 'A', state: 'imported' })])
+    render(<Imports />)
+    await screen.findByText('A')
+    expect(screen.queryByText(/Importing/)).toBeNull()
+    expect(screen.queryByText(/queued/)).toBeNull()
   })
 
   it('shows imported status without an action', async () => {
