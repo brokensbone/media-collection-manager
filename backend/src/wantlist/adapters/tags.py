@@ -13,12 +13,18 @@ class MediaFileTagReader:
     reads that — so matching doesn't require unpacking the whole archive up front."""
 
     def read(self, path: Path) -> tuple[str, str] | None:
-        if path.is_dir():
-            audio = next((p for p in sorted(path.rglob("*")) if _is_audio(p)), None)
-            return _tags_of(audio) if audio else None
-        if path.suffix.lower() == ".zip":
-            return self._read_from_zip(path)
-        return None
+        # A malformed archive (e.g. a partial download, or a non-zip named .zip) or any unreadable
+        # file yields None so detection falls back to the name — one bad drop must never crash the
+        # whole watch-dir poll and block every other import.
+        try:
+            if path.is_dir():
+                audio = next((p for p in sorted(path.rglob("*")) if _is_audio(p)), None)
+                return _tags_of(audio) if audio else None
+            if path.suffix.lower() == ".zip":
+                return self._read_from_zip(path)
+            return None
+        except Exception:
+            return None
 
     def _read_from_zip(self, path: Path) -> tuple[str, str] | None:
         with zipfile.ZipFile(path) as zf:
