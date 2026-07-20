@@ -229,6 +229,7 @@ class ImportRunner:
         if rec is None or rec.state != ImportState.queued.value:
             return  # only queued imports are processed (the click/retry enqueues them)
         stager = self._stagers[ImportSource(rec.source)]
+        self._repo.mark_import(import_id, ImportState.importing)  # so the UI shows the active one
 
         before = self._album_ids()  # snapshot to identify what this import adds (D21)
         staging = Path(self._inbox) / str(rec.id)  # unique per import; no name-collisions
@@ -272,8 +273,11 @@ class ImportRunner:
             log.warning("import %s: ownership claim failed", rec.id, exc_info=True)
 
     def run_queued(self) -> int:
-        """Process every queued import (worker job). One failure never blocks the rest — the
-        runner marks it failed; the operator can retry it from the Import screen."""
+        """Process every queued import, one at a time (worker job). One failure never blocks the
+        rest — the runner marks it failed; the operator can retry it from the Import screen."""
+        # A worker crash mid-import leaves a row stuck at `importing`; requeue those first so
+        # they retry. Safe because imports never run concurrently (scheduler max_instances=1).
+        self._repo.requeue_importing()
         ids = self._repo.queued_import_ids()
         for import_id in ids:
             try:

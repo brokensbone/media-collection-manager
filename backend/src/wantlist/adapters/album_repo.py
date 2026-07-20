@@ -549,7 +549,7 @@ class AlbumRepo:
         persists (detected → queued → imported/failed) rather than rows vanishing on click.
         Active ones (detected/queued) first, then the rest, each by download name. Dismissed
         rows are hidden — kept only so their source-key stays in the seen-ledger."""
-        active = (ImportState.detected, ImportState.queued)
+        active = (ImportState.detected, ImportState.queued, ImportState.importing)
         with self._sf() as session:
             rows = session.execute(
                 select(
@@ -616,7 +616,7 @@ class AlbumRepo:
 
     def count_active_imports(self) -> int:
         """Imports awaiting a click or still processing — the dashboard's Import count."""
-        active = (ImportState.detected, ImportState.queued)
+        active = (ImportState.detected, ImportState.queued, ImportState.importing)
         with self._sf() as session:
             return int(
                 session.scalar(
@@ -648,6 +648,17 @@ class AlbumRepo:
                     select(PendingImport.id).where(PendingImport.state == ImportState.queued)
                 )
             )
+
+    def requeue_importing(self) -> None:
+        """Reset any import stuck at `importing` back to `queued` — it was interrupted by a
+        worker restart mid-import, so it should retry rather than be stranded."""
+        with self._sf() as session:
+            session.execute(
+                update(PendingImport)
+                .where(PendingImport.state == ImportState.importing)
+                .values(state=ImportState.queued)
+            )
+            session.commit()
 
     def get_pending_import(self, import_id: int) -> ImportRecord | None:
         with self._sf() as session:

@@ -28,7 +28,7 @@ x-app: &app
     - beetsdata:/beets
     - ./beets/config.yaml:/etc/beets/config.yaml:ro
     - ./watchdir:/watchdir  # host ./watchdir <-> container /watchdir
-    # - ~/.ssh/id_ed25519:/keys/id:ro   # uncomment to give rsync a key for the seedbox (§12)
+    - ~/.ssh/ucc:/keys/id:ro   # uncomment to give rsync a key for the seedbox (§12)
 
 services:
   postgres:

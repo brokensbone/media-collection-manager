@@ -5,7 +5,7 @@ type Item = {
   id: number
   source: string
   name: string
-  state: 'detected' | 'queued' | 'imported' | 'failed'
+  state: 'detected' | 'queued' | 'importing' | 'imported' | 'failed'
   matched_album_id: number | null
   matched: string | null
   matched_owned: boolean
@@ -14,7 +14,8 @@ type Item = {
 
 const STATUS: Record<Item['state'], string> = {
   detected: '',
-  queued: 'pending…',
+  queued: 'queued',
+  importing: 'importing…',
   imported: 'imported ✓',
   failed: 'failed',
 }
@@ -60,8 +61,21 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
 
   const shown = items.filter((it) => matchesQuery(`${it.name} ${it.matched ?? ''}`, query))
 
+  // Progress across the current batch: imports run one at a time, so at most one is importing.
+  const importing = items.filter((it) => it.state === 'importing').length
+  const queued = items.filter((it) => it.state === 'queued').length
+  const done = items.filter((it) => it.state === 'imported').length
+  const inFlight = importing + queued
+
   return (
-    <table>
+    <>
+      {inFlight > 0 && (
+        <p className="resolving">
+          Importing {done + 1} of {done + inFlight}
+          {queued > 0 && ` — ${queued} queued`} (one at a time)
+        </p>
+      )}
+      <table>
       <tbody>
         {shown.map((it) => (
           <tr key={it.id}>
@@ -93,6 +107,7 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
                     </>
                   )}
                   {it.state === 'queued' && <span className="muted">{STATUS.queued}</span>}
+                  {it.state === 'importing' && <span className="muted">{STATUS.importing}</span>}
                   {it.state === 'imported' && <span className="muted">{STATUS.imported}</span>}
                   {it.state === 'failed' && (
                     <>
@@ -112,5 +127,6 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
         ))}
       </tbody>
     </table>
+    </>
   )
 }

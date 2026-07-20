@@ -172,6 +172,33 @@ def test_clicking_import_enqueues_and_worker_processes_it(
     assert repo.count_active_imports() == 0
 
 
+def test_run_queued_requeues_an_interrupted_import(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    # A row left at `importing` by a crashed worker must be retried, not stranded.
+    sf = clean_album_tables
+    download_dir = tmp_path / "d"
+    download_dir.mkdir()
+    (download_dir / "a.flac").write_text("x")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="Album",
+        download_dir=str(download_dir),
+        files=["a.flac"],
+        matched_album_id=None,
+    )
+    import_id = repo.list_imports()[0].id
+    repo.mark_import(import_id, ImportState.importing)  # simulate a mid-import crash
+
+    _transmission_runner(repo, RecordingBeetsClient(), str(inbox)).run_queued()
+    assert repo.get_pending_import(import_id).state == ImportState.imported.value  # type: ignore[union-attr]
+
+
 def test_run_marks_failed_and_can_be_retried(
     clean_album_tables: sessionmaker[Session], tmp_path: Path
 ) -> None:
