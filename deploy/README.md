@@ -50,10 +50,15 @@ pollers stay paused, so no data flows in. To see the full loop, create a Spotify
 
 ## For the real deploy
 
-Nothing here is load-bearing. Point `WANTLIST_BEETS_CONFIG` at your existing beets config
-(whose `library:`/`directory:` reference your real library, mounted where the container can
-read it), point `WANTLIST_DATABASE_URL` at your real Postgres, and set the same `.env` values.
-The image and compose services are otherwise the same.
+Use [`docker-compose.prod.yml`](docker-compose.prod.yml) with
+[`.env.prod.example`](.env.prod.example) (copy it to `.env` and fill in the placeholders). It
+runs only the app + worker — Postgres lives elsewhere (on partridge, over the tailnet;
+provisioned by `nixos/hosts/partridge/wantlist-db.nix` in the lab repo) — and bind-mounts your
+real, existing beets library.
+
+The essentials: point `WANTLIST_DATABASE_URL` at that Postgres, point `WANTLIST_BEETS_CONFIG`
+at your existing beets config, and mount the music dir and beets dir at their real absolute
+paths (see the path-consistency note below).
 
 ### Beets paths must be host-consistent
 

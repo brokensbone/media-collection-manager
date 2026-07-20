@@ -1,0 +1,57 @@
+# Real deploy: the app (API+SPA on one origin) + the poller worker, in Docker on blink.
+# Postgres is NOT here — it lives on partridge and is reached over the tailnet (provisioned by
+# nixos/hosts/partridge/wantlist-db.nix in the lab repo). The beets library is the real,
+# existing one, bind-mounted at its own absolute path so the paths beets records stay valid
+# (see the "host-consistent paths" note in deploy/README.md).
+#
+#   cp .env.prod.example .env      # then fill in the placeholders
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Tear down (data lives on partridge + the host bind mounts, so nothing is lost):
+#   docker compose -f docker-compose.prod.yml down
+
+x-app: &app
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  image: wantlist:latest
+  env_file: .env
+  environment:
+    WANTLIST_STATIC_DIR: /app/frontend-dist  # api serves the SPA; worker ignores it
+  restart: unless-stopped
+  volumes:
+    # Beets library, mounted at the SAME absolute path host<->container so library.db paths
+    # resolve everywhere (see deploy/README.md). ${WANTLIST_MUSIC_DIR} is the beets `directory:`;
+    # ${WANTLIST_BEETS_DIR} holds config.yaml + library.db + the import inbox.
+    - ${WANTLIST_MUSIC_DIR}:${WANTLIST_MUSIC_DIR}
+    - ${WANTLIST_BEETS_DIR}:${WANTLIST_BEETS_DIR}
+    # Watch-dir import (§13): drop albums/zips here on the host.
+    - ${WANTLIST_WATCHDIR_PATH}:${WANTLIST_WATCHDIR_PATH}
+    # Transmission auto-land (§12): give rsync the seedbox SSH key. Uncomment and set
+    # WANTLIST_TRANSMISSION_SSH_KEY=/keys/id in .env once you wire up Transmission.
+    # - ${WANTLIST_SSH_KEY}:/keys/id:ro
+
+services:
+  # One-shot: apply migrations against the partridge database before api/worker start. The real
+  # beets library already exists, so (unlike the local deploy) this creates nothing.
+  init:
+    <<: *app
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+
+  api:
+    <<: *app
+    # Bound to localhost; blink's reverse proxy terminates TLS and forwards to it. Change the
+    # bind address if the proxy reaches it another way.
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "wantlist.worker"]
+    depends_on:
+      init:
+        condition: service_completed_successfully
