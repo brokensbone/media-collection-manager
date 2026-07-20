@@ -19,5 +19,5 @@ dist/
 !.env.*.example
 
 # Local deploy runtime drop area (keep the dir, ignore drops)
-deploy/watchdir/*
-!deploy/watchdir/.gitkeep
+deploy/local/watchdir/*
+!deploy/local/watchdir/.gitkeep

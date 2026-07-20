@@ -1,18 +1,19 @@
 # Real deploy: the app (API+SPA on one origin) + the poller worker, in Docker on blink.
-# Postgres is NOT here — it lives on partridge and is reached over the tailnet (provisioned by
+# Postgres is NOT here — it lives on partridge and is reached over the LAN (provisioned by
 # nixos/hosts/partridge/wantlist-db.nix in the lab repo). The beets library is the real,
 # existing one, bind-mounted at its own absolute path so the paths beets records stay valid
 # (see the "host-consistent paths" note in deploy/README.md).
 #
-#   cp .env.prod.example .env      # then fill in the placeholders
-#   docker compose -f docker-compose.prod.yml up -d --build
+# Run from this directory (deploy/prod):
+#   cp .env.example .env      # then fill in the placeholders
+#   docker compose up -d --build
 #
 # Tear down (data lives on partridge + the host bind mounts, so nothing is lost):
-#   docker compose -f docker-compose.prod.yml down
+#   docker compose down
 
 x-app: &app
   build:
-    context: ..
+    context: ../..
     dockerfile: deploy/Dockerfile
   image: wantlist:latest
   env_file: .env
