@@ -54,3 +54,26 @@ Nothing here is load-bearing. Point `WANTLIST_BEETS_CONFIG` at your existing bee
 (whose `library:`/`directory:` reference your real library, mounted where the container can
 read it), point `WANTLIST_DATABASE_URL` at your real Postgres, and set the same `.env` values.
 The image and compose services are otherwise the same.
+
+### Beets paths must be host-consistent
+
+beets stores **absolute** file paths in `library.db` (one per track, under its `directory:`),
+and it runs *inside* the container. So the music directory must be mounted at the **same
+absolute path** on the host and in the container, and `directory:` must equal that path.
+
+Mount your real library at its own path, e.g.:
+
+```yaml
+volumes:
+  - /srv/music:/srv/music      # NOT /srv/music:/beets/music
+```
+
+with `directory: /srv/music` in the beets config. Then every path beets reads or writes is
+valid on the host too, and matches what your existing `library.db` already records — no
+rewrite, no surprises.
+
+**Don't** mount the library at a different container path than the host path (e.g. a host dir
+onto `/beets/music`, or a Docker named volume). beets would then record container-only paths
+that don't resolve anywhere else — imports "work" but the library is wrong the moment beets
+runs outside that exact container. (The disposable local deploy above uses a `beetsdata`
+volume precisely because it's throwaway; don't copy that pattern to production.)
