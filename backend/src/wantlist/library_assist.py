@@ -26,13 +26,51 @@ class OwnedHint:
     owned_hint: str | None  # "Artist — Title" of the likely-owned edition, for display
 
 
+@dataclass
+class OwnedAlbum:
+    beets_id: str
+    artist: str
+    title: str
+    mb_releasegroup_id: str | None
+    album_id: int | None  # matched tracked album, for its cover art (None = unmatched)
+    has_art: bool
+    on_spotify: bool  # also present in your Spotify saves/library
+
+
 class LibraryAssistService:
     """D17 assisted tail (§5/§7): match a want against the beets library so linking is one
-    click, and flag wants that look already-owned (a different edition the rgid join missed)."""
+    click, and flag wants that look already-owned (a different edition the rgid join missed).
+    Also serves the Owned view: the beets library *is* what you own, overlaid with Spotify."""
 
     def __init__(self, *, repo: AlbumRepo, catalog: LibraryCatalog) -> None:
         self._repo = repo
         self._catalog = catalog
+
+    def owned_library(self) -> list[OwnedAlbum]:
+        """The Owned view: the whole beets catalogue (what you actually own), enriched from the
+        DB where a release-group matches — cover art and whether it's also in your Spotify saves.
+        beets is the source of truth for ownership; Spotify is overlaid where it lines up."""
+        enrichment = self._repo.enrichment_by_release_group()
+        owned: list[OwnedAlbum] = []
+        for a in self._catalog.all_albums():
+            match = enrichment.get(a.mb_releasegroup_id) if a.mb_releasegroup_id else None
+            owned.append(
+                OwnedAlbum(
+                    beets_id=a.beets_id,
+                    artist=a.artist,
+                    title=a.title,
+                    mb_releasegroup_id=a.mb_releasegroup_id,
+                    album_id=match.album_id if match else None,
+                    has_art=match.has_art if match else False,
+                    on_spotify=match.on_spotify if match else False,
+                )
+            )
+        owned.sort(key=lambda o: (o.artist.lower(), o.title.lower()))
+        return owned
+
+    def owned_count(self) -> int:
+        """Size of the beets library — the Owned dashboard tile."""
+        return len(self._catalog.all_albums())
 
     def search(self, query: str) -> list[LinkCandidate]:
         """Rank the beets library against a free-text query (the Mark-owned search box), so the

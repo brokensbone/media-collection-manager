@@ -186,7 +186,12 @@ def test_full_loop(settings: Settings, stub: tuple[str, _Control]) -> None:
     assert acquire[0]["bandcamp_url"].startswith("https://bandcamp.com/search?q=")
     assert client.post(f"/albums/{want_id}/mark-owned").status_code == 204
 
-    assert client.get("/dashboard").json()["owned"] == 2
+    # Owned is the beets library itself: one album ("Owned One"), overlaid with its Spotify save.
+    # (Want One is marked owned in the funnel but isn't in beets, so it's not in the Owned view.)
+    assert client.get("/dashboard").json()["owned"] == 1
+    owned = client.get("/owned").json()
+    assert [o["title"] for o in owned] == ["Owned One"]
+    assert owned[0]["on_spotify"] is True and owned[0]["album_id"] is not None
 
     # 6. re-auth path: expire the token and make refresh fail -> ingest pauses, disconnected
     control.fail_refresh = True
