@@ -19,11 +19,12 @@ x-app: &app
   env_file: .env
   environment:
     WANTLIST_STATIC_DIR: /app/frontend-dist  # api serves the SPA; worker ignores it
+    BEETSDIR: ${WANTLIST_BEETS_DIR}  # beets reads config.yaml + library from here
   restart: unless-stopped
   volumes:
     # Beets library, mounted at the SAME absolute path host<->container so library.db paths
-    # resolve everywhere (see deploy/README.md). ${WANTLIST_MUSIC_DIR} is the beets `directory:`;
-    # ${WANTLIST_BEETS_DIR} holds config.yaml + library.db + the import inbox.
+    # resolve everywhere (see deploy/README.md). ${WANTLIST_BEETS_DIR} is BEETSDIR (holds
+    # config.yaml + library.db); ${WANTLIST_MUSIC_DIR} is where the music lives (beets `directory:`).
     - ${WANTLIST_MUSIC_DIR}:${WANTLIST_MUSIC_DIR}
     - ${WANTLIST_BEETS_DIR}:${WANTLIST_BEETS_DIR}
     # Watch-dir import (§13): drop albums/zips here on the host.

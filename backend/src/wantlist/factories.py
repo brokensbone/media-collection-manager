@@ -86,7 +86,7 @@ def build_ownership_reconciler(
     settings: Settings, session_factory: sessionmaker[Session]
 ) -> OwnershipReconciler:
     return OwnershipReconciler(
-        beets=BeetsClient(settings.beets_config),
+        beets=BeetsClient(),
         repo=AlbumRepo(session_factory),
     )
 
@@ -197,7 +197,7 @@ def build_import_runner(settings: Settings, session_factory: sessionmaker[Sessio
         disposition=settings.watchdir_disposition,
         archive_subdir=settings.watchdir_archive_subdir,
     )
-    beets = BeetsClient(settings.beets_config)
+    beets = BeetsClient()
     reverse_matcher = ReverseMatcher(
         repo=AlbumRepo(session_factory),
         api=HttpxSpotifyApiClient(settings.spotify_api_url, settings.art_target_px),
@@ -221,7 +221,7 @@ def build_library_assist_service(
 ) -> LibraryAssistService:
     return LibraryAssistService(
         repo=AlbumRepo(session_factory),
-        catalog=BeetsClient(settings.beets_config),
+        catalog=BeetsClient(),
     )
 
 

@@ -109,20 +109,21 @@ def stub() -> Iterator[tuple[str, _Control]]:
 
 
 @pytest.fixture
-def beets_config(tmp_path: Path) -> str:
+def beetsdir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     db = tmp_path / "library.db"
     lib = Library(str(db))
     item = Item(album="Owned One", albumartist="Artist", title="t", path=b"/fake/t.flac")
     item.mb_releasegroupid = OWNED_RGID
     lib.add_album([item])
     del lib
-    config = tmp_path / "config.yaml"
-    config.write_text(f"library: {db}\ndirectory: {tmp_path}\n")
-    return str(config)
+    (tmp_path / "config.yaml").write_text(f"library: {db}\ndirectory: {tmp_path}\n")
+    # The app runs `beet` with no -c; it reads BEETSDIR to find config.yaml + the library.
+    monkeypatch.setenv("BEETSDIR", str(tmp_path))
+    return tmp_path
 
 
 @pytest.fixture
-def settings(pg_e2e_url: str, stub: tuple[str, _Control], beets_config: str) -> Settings:
+def settings(pg_e2e_url: str, stub: tuple[str, _Control], beetsdir: Path) -> Settings:
     base, _ = stub
     return Settings(
         database_url=pg_e2e_url,
@@ -132,7 +133,6 @@ def settings(pg_e2e_url: str, stub: tuple[str, _Control], beets_config: str) -> 
         spotify_api_url=f"{base}/v1",
         musicbrainz_url=f"{base}/ws/2",
         musicbrainz_min_interval=0.0,
-        beets_config=beets_config,
     )
 
 

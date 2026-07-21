@@ -50,8 +50,9 @@ docker compose up -d --build
 App + worker only — Postgres lives on partridge and is reached over the LAN (provisioned by
 `nixos/hosts/partridge/wantlist-db.nix` in the lab repo), and your real, existing beets library
 is bind-mounted. Fill [`prod/.env.example`](prod/.env.example): point `WANTLIST_DATABASE_URL`
-at partridge's LAN address, point `WANTLIST_BEETS_CONFIG` at your beets config, and set the
-music/beets dirs to their real absolute paths (see below).
+at partridge's LAN address, set `WANTLIST_BEETS_DIR` to your beets directory (the app runs beets
+with `BEETSDIR` set to it, so beets finds its own config + library there), and set the music dir
+to its real absolute path (see below).
 
 ### Beets paths must be host-consistent
 
