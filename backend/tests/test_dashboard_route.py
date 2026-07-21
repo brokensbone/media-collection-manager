@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from wantlist.acquire import AcquireService
 from wantlist.adapters.album_repo import AlbumRepo
+from wantlist.adapters.beets import BeetsAlbum
 from wantlist.app import create_app
 from wantlist.config import Settings
 from wantlist.decide import DecideService
@@ -52,6 +53,12 @@ def test_dashboard_counts(clean_album_tables: sessionmaker[Session]) -> None:
         repo=AlbumRepo(sf),
         assist=LibraryAssistService(repo=AlbumRepo(sf), catalog=StubLibraryCatalog()),
     )
+    # Owned is now the beets library size, not the DB `owned` state — three albums in beets even
+    # though only one DB row is in the `owned` state.
+    library = [BeetsAlbum(str(i), "A", f"lib-{i}", None) for i in range(3)]
+    app.state.library_assist_service = LibraryAssistService(
+        repo=AlbumRepo(sf), catalog=StubLibraryCatalog(library)
+    )
 
     body = TestClient(app).get("/dashboard").json()
     assert body == {
@@ -59,7 +66,7 @@ def test_dashboard_counts(clean_album_tables: sessionmaker[Session]) -> None:
         "decide": 1,
         "acquire": 2,
         "import": 0,
-        "owned": 1,
+        "owned": 3,
         "dismissed": 0,
         "resolved": 0,  # none of these have a release-group yet
         "unresolved": 4,  # all four non-dismissed albums await resolution

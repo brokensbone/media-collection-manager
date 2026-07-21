@@ -6,6 +6,7 @@ import { Decide } from './Decide'
 import { Guide } from './Guide'
 import { Imports } from './Imports'
 import { Library } from './Library'
+import { Owned } from './Owned'
 import { Releases } from './Releases'
 import { SpotifyStatus } from './SpotifyStatus'
 import { Transmission } from './Transmission'
@@ -55,7 +56,7 @@ export default function App() {
     {
       key: 'owned',
       heading: 'Owned',
-      node: <Library state="owned" refreshKey={refresh} query={query} />,
+      node: <Owned refreshKey={refresh} query={query} />,
     },
     {
       key: 'dismissed',

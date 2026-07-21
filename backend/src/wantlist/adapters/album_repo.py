@@ -44,6 +44,16 @@ class AlbumSummary:
 
 
 @dataclass
+class OwnedEnrichment:
+    """What the DB adds to a beets-owned album matched on release-group id: the tracked album's
+    id (so its stored cover art can be shown) and whether it's also in your Spotify saves."""
+
+    album_id: int
+    has_art: bool
+    on_spotify: bool
+
+
+@dataclass
 class SavedCandidate:
     id: int
     spotify_id: str | None
@@ -809,6 +819,25 @@ class AlbumRepo:
             return [JobRunRow(*row) for row in rows]
 
     # --- library view ----------------------------------------------------------------
+
+    def enrichment_by_release_group(self) -> dict[str, OwnedEnrichment]:
+        """Per release-group id, the tracked album to enrich a beets-owned row with (cover art +
+        Spotify presence). Keyed by rgid; if several albums share one, the row that has art wins
+        (so the Owned view shows a cover when any edition has one)."""
+        with self._sf() as session:
+            has_art = exists().where(AlbumArt.album_id == Album.id)
+            rows = session.execute(
+                select(Album.mb_releasegroup_id, Album.id, has_art, Album.spotify_id)
+                .where(Album.mb_releasegroup_id.is_not(None))
+                .order_by(has_art.desc(), Album.id)
+            )
+            out: dict[str, OwnedEnrichment] = {}
+            for rgid, album_id, art, spotify_id in rows:
+                if rgid not in out:
+                    out[rgid] = OwnedEnrichment(
+                        album_id=album_id, has_art=bool(art), on_spotify=spotify_id is not None
+                    )
+            return out
 
     def list_albums(self, state: str | None = None) -> list[AlbumSummary]:
         with self._sf() as session:
