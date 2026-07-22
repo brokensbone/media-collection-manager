@@ -1,3 +1,4 @@
+import re
 import time
 import urllib.parse
 from collections import Counter
@@ -71,7 +72,14 @@ class HttpxMusicBrainzResolver:
         ]
 
     def _by_text(self, artist: str, title: str) -> str | None:
-        query = f'artist:"{_esc(artist)}" AND releasegroup:"{_esc(title)}"'
+        # Field-scoped bare terms for the title, not a quoted phrase: Spotify and MusicBrainz
+        # punctuate/space titles differently ("Nothing/Everything" vs "Nothing / Everything"),
+        # and an exact phrase misses across that. The artist stays a quoted phrase (loosening it
+        # balloons the match set), and the score gate guards against loose over-matching.
+        terms = _terms(title)
+        if not terms:
+            return None
+        query = f'artist:"{_esc(artist)}" AND releasegroup:({terms})'
         groups = self._get("release-group", query).get("release-groups", [])
         if groups and int(groups[0].get("score", 0)) >= self._text_min_score:
             return str(groups[0]["id"])
@@ -108,3 +116,12 @@ class HttpxMusicBrainzResolver:
 
 def _esc(text: str) -> str:
     return text.replace('"', " ").replace(":", " ")
+
+
+_SPECIAL = re.compile(r"[^\w\s]", re.UNICODE)
+
+
+def _terms(text: str) -> str:
+    """Bare, space-separated search terms: drop Lucene punctuation (`/`, `!`, `?`, …) so a
+    field query matches across Spotify↔MusicBrainz punctuation and spacing differences."""
+    return " ".join(_SPECIAL.sub(" ", text).split())
