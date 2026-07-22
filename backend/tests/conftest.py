@@ -15,6 +15,7 @@ from wantlist.models import (
     PendingImport,
     PlayHistory,
     SeenRelease,
+    WorkerEvent,
 )
 
 # testcontainers' ryuk reaper bind-mounts the docker socket, which colima rejects; our
@@ -36,6 +37,7 @@ def pg_session_factory() -> Iterator[sessionmaker[Session]]:
 def clean_album_tables(pg_session_factory: sessionmaker[Session]) -> sessionmaker[Session]:
     """A session factory with the album tables emptied first (shared container is reused)."""
     with pg_session_factory() as session:
+        session.execute(delete(WorkerEvent))
         session.execute(delete(AlbumArt))
         session.execute(delete(PlayHistory))
         session.execute(delete(SeenRelease))

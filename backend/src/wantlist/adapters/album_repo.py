@@ -112,6 +112,7 @@ class TransmissionRow:
 class ImportRecord:
     id: int
     source: str
+    name: str
     download_dir: str | None
     files: list[str]
     archive_path: str | None
@@ -291,6 +292,16 @@ class AlbumRepo:
                 )
             )
             return [(album_id, rgid) for album_id, rgid in rows]
+
+    def labels_for(self, album_ids: list[int]) -> dict[int, str]:
+        """`Artist — Title` per album id, for activity-feed messages."""
+        if not album_ids:
+            return {}
+        with self._sf() as session:
+            rows = session.execute(
+                select(Album.id, Album.artist, Album.title).where(Album.id.in_(album_ids))
+            )
+            return {aid: f"{artist} — {title}" for aid, artist, title in rows}
 
     def mark_owned_auto(self, album_ids: list[int]) -> None:
         if not album_ids:
@@ -695,6 +706,7 @@ class AlbumRepo:
             return ImportRecord(
                 id=row.id,
                 source=row.source.value,
+                name=row.name,
                 download_dir=row.download_dir,
                 files=list(row.files),
                 archive_path=row.archive_path,

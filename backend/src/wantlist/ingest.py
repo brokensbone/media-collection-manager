@@ -3,6 +3,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from .adapters.album_repo import AlbumRepo
+from .adapters.event_log import NullEventSink
+from .ports.events import EventSink
 from .ports.spotify import AccessTokenProvider, ReauthRequired
 from .ports.spotify_api import SpotifyApiClient
 
@@ -26,11 +28,13 @@ class IngestService:
         repo: AlbumRepo,
         tokens: AccessTokenProvider,
         fetch_image: Callable[[str], tuple[str, bytes]],
+        events: EventSink | None = None,
     ) -> None:
         self._api = api
         self._repo = repo
         self._tokens = tokens
         self._fetch_image = fetch_image
+        self._events = events or NullEventSink()
 
     def ingest_saves(self) -> IngestResult:
         try:
@@ -56,6 +60,11 @@ class IngestService:
             )
             existing.add(album.spotify_id)
             added += 1
+            self._events.emit(
+                job="ingest",
+                type="saved",
+                message=f"New saved album: '{album.artist} — {album.title}'",
+            )
         return IngestResult(added=added, skipped=skipped, paused=False)
 
     def backfill_owned_art(self) -> int:

@@ -5,6 +5,7 @@ from .adapters.album_repo import AlbumRepo
 from .adapters.art_fetcher import fetch_image
 from .adapters.beets import BeetsClient
 from .adapters.clock import SystemClock
+from .adapters.event_log import WorkerEventLog
 from .adapters.mb_resolver import HttpxMusicBrainzResolver
 from .adapters.notifier import WebhookNotifier
 from .adapters.rsync import RsyncTransfer
@@ -62,6 +63,7 @@ def build_ingest_service(
         repo=AlbumRepo(session_factory),
         tokens=build_auth_service(settings, session_factory),
         fetch_image=fetch_image,
+        events=WorkerEventLog(session_factory),
     )
 
 
@@ -79,6 +81,7 @@ def build_resolution_service(
         repo=AlbumRepo(session_factory),
         tokens=build_auth_service(settings, session_factory),
         max_per_run=settings.resolution_max_per_run,
+        events=WorkerEventLog(session_factory),
     )
 
 
@@ -88,6 +91,7 @@ def build_ownership_reconciler(
     return OwnershipReconciler(
         beets=BeetsClient(),
         repo=AlbumRepo(session_factory),
+        events=WorkerEventLog(session_factory),
     )
 
 
@@ -108,6 +112,7 @@ def build_artist_watch_service(
         api=HttpxSpotifyApiClient(settings.spotify_api_url, settings.art_target_px),
         repo=AlbumRepo(session_factory),
         tokens=build_auth_service(settings, session_factory),
+        events=WorkerEventLog(session_factory),
     )
 
 
@@ -145,6 +150,7 @@ def build_import_detection_service(
         ),
         repo=AlbumRepo(session_factory),
         match_threshold=settings.import_match_threshold,
+        events=WorkerEventLog(session_factory),
     )
 
 
@@ -180,6 +186,7 @@ def build_watchdir_detection_service(
         archive_subdir=settings.watchdir_archive_subdir,
         settle_seconds=settings.watchdir_settle_seconds,
         match_threshold=settings.import_match_threshold,
+        events=WorkerEventLog(session_factory),
     )
 
 
@@ -213,6 +220,7 @@ def build_import_runner(settings: Settings, session_factory: sessionmaker[Sessio
         inbox=settings.import_inbox_path,
         catalog=beets,
         reverse_matcher=reverse_matcher,
+        events=WorkerEventLog(session_factory),
     )
 
 

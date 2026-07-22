@@ -2,6 +2,8 @@ import logging
 from dataclasses import dataclass
 
 from .adapters.album_repo import AlbumRepo
+from .adapters.event_log import NullEventSink
+from .ports.events import EventSink
 from .ports.spotify import AccessTokenProvider, ReauthRequired
 from .ports.spotify_api import SpotifyApiClient
 
@@ -24,11 +26,17 @@ class ArtistWatchService:
     back-catalogue flood). Later runs surface only album ids not seen before."""
 
     def __init__(
-        self, *, api: SpotifyApiClient, repo: AlbumRepo, tokens: AccessTokenProvider
+        self,
+        *,
+        api: SpotifyApiClient,
+        repo: AlbumRepo,
+        tokens: AccessTokenProvider,
+        events: EventSink | None = None,
     ) -> None:
         self._api = api
         self._repo = repo
         self._tokens = tokens
+        self._events = events or NullEventSink()
 
     def poll(self) -> WatchResult:
         try:
@@ -72,6 +80,11 @@ class ArtistWatchService:
                         art_url=album.art_url,
                     )
                     added += 1
+                    self._events.emit(
+                        job="artist_watch",
+                        type="suggested",
+                        message=f"New release from {album.artist}: '{album.title}'",
+                    )
             self._repo.mark_seen(to_mark)
             if is_baseline:
                 baselined += 1

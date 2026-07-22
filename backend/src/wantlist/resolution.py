@@ -2,6 +2,8 @@ import logging
 from dataclasses import dataclass
 
 from .adapters.album_repo import AlbumRepo
+from .adapters.event_log import NullEventSink
+from .ports.events import EventSink
 from .ports.musicbrainz import MusicBrainzResolver
 from .ports.spotify import AccessTokenProvider, ReauthRequired
 from .ports.spotify_api import SpotifyApiClient
@@ -28,6 +30,7 @@ class ResolutionService:
         repo: AlbumRepo,
         tokens: AccessTokenProvider,
         max_per_run: int | None = None,
+        events: EventSink | None = None,
     ) -> None:
         self._api = api
         self._resolver = resolver
@@ -36,6 +39,7 @@ class ResolutionService:
         # Cap albums resolved per pass so a cold start (e.g. 1000 fresh saves) chips away at
         # MusicBrainz politely instead of hammering it for ~20 minutes each reconcile.
         self._max_per_run = max_per_run
+        self._events = events or NullEventSink()
 
     def resolve_unresolved(self) -> ResolveResult:
         candidates = self._repo.albums_needing_resolution()
@@ -65,13 +69,31 @@ class ResolutionService:
                 errored += 1
                 unresolved += 1
                 attempted_unresolved.append(album.id)
+                self._events.emit(
+                    job="resolution",
+                    type="error",
+                    message=f"Couldn't reach MusicBrainz for '{album.artist} — {album.title}'",
+                    album_id=album.id,
+                )
                 continue
             if rgid:
                 self._repo.set_release_group(album.id, rgid)
                 resolved += 1
+                self._events.emit(
+                    job="resolution",
+                    type="resolved",
+                    message=f"Resolved '{album.artist} — {album.title}'",
+                    album_id=album.id,
+                )
             else:
                 unresolved += 1
                 attempted_unresolved.append(album.id)
+                self._events.emit(
+                    job="resolution",
+                    type="no_match",
+                    message=f"No MusicBrainz match for '{album.artist} — {album.title}'",
+                    album_id=album.id,
+                )
         # Count this pass against the ones that didn't resolve, so the persistent tail sinks in
         # the least-tried-first order and stops crowding out fresh albums next pass.
         self._repo.bump_resolution_attempts(attempted_unresolved)

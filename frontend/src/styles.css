@@ -256,3 +256,36 @@ a {
   border: 1px solid var(--border);
   padding: 8px 10px;
 }
+
+/* Activity feed (worker event tail) */
+.activity {
+  font-size: 13px;
+}
+.activity .ev-time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  width: 1%;
+}
+.activity .ev-job {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+.activity tr.ev-error td,
+.activity tr.ev-failed td {
+  color: #d9534f;
+}
+.activity tr.ev-owned td,
+.activity tr.ev-imported td,
+.activity tr.ev-resolved td {
+  color: var(--text);
+}
+.activity tr.ev-no_match td {
+  color: var(--muted);
+}

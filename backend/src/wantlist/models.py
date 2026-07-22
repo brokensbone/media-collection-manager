@@ -172,6 +172,26 @@ class JobRun(Base):
     errors: Mapped[int] = mapped_column(default=0)
 
 
+class WorkerEvent(Base):
+    """Append-only activity log the worker writes as it processes items (resolve, own, import,
+    …). The Activity view (served by the *API* process) tails it, so — like job_run — it goes
+    through the DB because the worker's in-memory state can't cross the process boundary. Pruned
+    to a recent window; `id` is the poll cursor."""
+
+    __tablename__ = "worker_event"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    job: Mapped[str]  # which poller: resolution, reconcile, ingest, import, watchdir, …
+    type: Mapped[str]  # machine tag for the UI: resolved, no_match, owned, imported, error, …
+    message: Mapped[str]
+    album_id: Mapped[int | None] = mapped_column(
+        ForeignKey("album.id", ondelete="SET NULL"), default=None
+    )
+
+
 class NotificationState(Base):
     """Single-row dedup flags so alerts (§8d) fire once per episode, not every poll."""
 
