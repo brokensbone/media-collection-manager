@@ -24,6 +24,15 @@ describe('Releases', () => {
     expect(await screen.findByText('New One')).toBeTruthy()
   })
 
+  it('links the cover to the album on Spotify in a new tab', async () => {
+    mockApi([{ id: 1, artist: 'The Band', title: 'New One', has_art: true, spotify_id: 'spot9' }])
+    const { container } = render(<Releases />)
+    await screen.findByText('New One')
+    const link = container.querySelector('a') as HTMLAnchorElement
+    expect(link.href).toContain('open.spotify.com/album/spot9')
+    expect(link.target).toBe('_blank')
+  })
+
   it('want: POSTs and removes the row', async () => {
     const fetchMock = mockApi([{ id: 5, artist: 'B', title: 'Only', has_art: false }])
     render(<Releases />)

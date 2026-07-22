@@ -2,7 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Cover } from './Cover'
 import { matchesQuery } from './filter'
 
-type Item = { id: number; artist: string; title: string; reason: string; has_art: boolean }
+type Item = {
+  id: number
+  artist: string
+  title: string
+  reason: string
+  has_art: boolean
+  spotify_id: string | null
+}
 type Action = 'keep' | 'drop' | 'snooze'
 
 export function Decide({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
@@ -78,7 +85,7 @@ export function Decide({ onChange, query = '' }: { onChange?: () => void; query?
             ref={i === cur ? selRef : undefined}
             className={i === cur ? 'sel' : undefined}
           >
-            <Cover id={it.id} hasArt={it.has_art} />
+            <Cover id={it.id} hasArt={it.has_art} spotifyId={it.spotify_id} />
             <td>{it.artist}</td>
             <td>{it.title}</td>
             <td className="nowrap">{it.reason}</td>

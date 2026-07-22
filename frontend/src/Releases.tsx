@@ -2,7 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { Cover } from './Cover'
 import { matchesQuery } from './filter'
 
-type Item = { id: number; artist: string; title: string; has_art: boolean }
+type Item = {
+  id: number
+  artist: string
+  title: string
+  has_art: boolean
+  spotify_id: string | null
+}
 type Action = 'save' | 'want' | 'dismiss'
 
 export function Releases({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
@@ -36,7 +42,7 @@ export function Releases({ onChange, query = '' }: { onChange?: () => void; quer
       <tbody>
         {shown.map((it) => (
           <tr key={it.id}>
-            <Cover id={it.id} hasArt={it.has_art} />
+            <Cover id={it.id} hasArt={it.has_art} spotifyId={it.spotify_id} />
             <td>{it.artist}</td>
             <td>{it.title}</td>
             <td className="nowrap">
