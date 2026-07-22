@@ -1,3 +1,5 @@
+import urllib.parse
+
 import httpx
 import respx
 
@@ -55,6 +57,22 @@ def test_text_tier_accepts_high_score() -> None:
         return_value=httpx.Response(200, json={"release-groups": [{"id": "rg-text", "score": 95}]})
     )
     assert _resolver().resolve(upc=None, isrcs=[], artist="A", title="T") == "rg-text"
+
+
+@respx.mock
+def test_text_query_uses_sanitised_terms_not_a_quoted_phrase() -> None:
+    # A title's punctuation ("Nothing/Everything") is dropped to bare, field-scoped terms so it
+    # matches MB's differently-spaced "Nothing / Everything" — a quoted phrase misses that.
+    route = respx.get(f"{MB}/release-group").mock(
+        return_value=httpx.Response(200, json={"release-groups": [{"id": "rg", "score": 100}]})
+    )
+    got = _resolver().resolve(
+        upc=None, isrcs=[], artist="The Lovely Eggs", title="Nothing/Everything"
+    )
+    assert got == "rg"
+    sent = urllib.parse.unquote_plus(str(route.calls[0].request.url))
+    assert "releasegroup:(Nothing Everything)" in sent
+    assert '"Nothing/Everything"' not in sent  # not a rigid quoted phrase
 
 
 @respx.mock
