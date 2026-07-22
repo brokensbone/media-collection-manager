@@ -19,8 +19,10 @@ def test_followed_artist_ids_paginates() -> None:
 
 
 @respx.mock
-def test_artist_albums_parses_with_artist_id() -> None:
-    respx.get(f"{API}/artists/art1/albums?include_groups=album&limit=50").mock(
+def test_artist_albums_parses_and_scopes_to_market() -> None:
+    # market must be sent — it dedupes Spotify's per-country album variants (else old releases
+    # resurface as new) and limits results to what's playable in that market.
+    route = respx.get(f"{API}/artists/art1/albums?include_groups=album&limit=50&market=GB").mock(
         return_value=httpx.Response(
             200,
             json={
@@ -36,7 +38,8 @@ def test_artist_albums_parses_with_artist_id() -> None:
             },
         )
     )
-    albums = HttpxSpotifyApiClient(API, 300).artist_albums("tok", "art1")
+    albums = HttpxSpotifyApiClient(API, 300, market="GB").artist_albums("tok", "art1")
+    assert route.called
     assert albums[0].spotify_id == "alb1"
     assert albums[0].artist_id == "art1"
     assert albums[0].added_at is None
