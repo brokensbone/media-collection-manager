@@ -11,6 +11,7 @@ type OwnedAlbum = {
   album_id: number | null
   has_art: boolean
   on_spotify: boolean
+  spotify_id: string | null
 }
 
 export function Owned({ refreshKey = 0, query = '' }: { refreshKey?: number; query?: string }) {
@@ -34,7 +35,11 @@ export function Owned({ refreshKey = 0, query = '' }: { refreshKey?: number; que
       <tbody>
         {shown.map((a) => (
           <tr key={a.beets_id}>
-            <Cover id={a.album_id ?? 0} hasArt={a.has_art} />
+            <Cover
+              id={a.album_id ?? 0}
+              hasArt={a.has_art}
+              href={a.spotify_id ? `https://open.spotify.com/album/${a.spotify_id}` : undefined}
+            />
             <td>{a.artist}</td>
             <td>{a.title}</td>
             <td className="muted">{a.on_spotify ? 'on Spotify' : ''}</td>

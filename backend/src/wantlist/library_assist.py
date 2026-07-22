@@ -35,6 +35,7 @@ class OwnedAlbum:
     album_id: int | None  # matched tracked album, for its cover art (None = unmatched)
     has_art: bool
     on_spotify: bool  # also present in your Spotify saves/library
+    spotify_id: str | None  # set iff on_spotify — lets the cover link to the album on Spotify
 
 
 class LibraryAssistService:
@@ -62,7 +63,8 @@ class LibraryAssistService:
                     mb_releasegroup_id=a.mb_releasegroup_id,
                     album_id=match.album_id if match else None,
                     has_art=match.has_art if match else False,
-                    on_spotify=match.on_spotify if match else False,
+                    on_spotify=bool(match and match.spotify_id),
+                    spotify_id=match.spotify_id if match else None,
                 )
             )
         owned.sort(key=lambda o: (o.artist.lower(), o.title.lower()))

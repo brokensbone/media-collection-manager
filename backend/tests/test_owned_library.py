@@ -47,7 +47,9 @@ def test_owned_library_is_the_full_beets_catalogue_enriched(
         ("Zamrock", "Only In Beets"),
     ]
     assert owned[0].album_id == album_id and owned[0].on_spotify is True
+    assert owned[0].spotify_id == "s1"  # carried through so the cover can link to Spotify
     assert owned[1].album_id is None and owned[1].on_spotify is False and owned[1].has_art is False
+    assert owned[1].spotify_id is None
 
 
 def test_owned_library_shows_cover_from_the_matching_album(

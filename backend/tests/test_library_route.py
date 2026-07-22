@@ -74,4 +74,6 @@ def test_owned_lists_the_full_beets_library(clean_album_tables: sessionmaker[Ses
 
     assert [o["title"] for o in owned] == ["Matched", "Unmatched"]
     assert owned[0]["on_spotify"] is True and owned[0]["album_id"] is not None
+    assert owned[0]["spotify_id"] == "s1"
     assert owned[1]["on_spotify"] is False and owned[1]["album_id"] is None
+    assert owned[1]["spotify_id"] is None
