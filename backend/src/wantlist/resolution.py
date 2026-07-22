@@ -43,6 +43,7 @@ class ResolutionService:
             candidates = candidates[: self._max_per_run]
 
         resolved = unresolved = errored = 0
+        attempted_unresolved: list[int] = []
         for album in candidates:
             try:
                 # Per album, not once per pass: MusicBrainz throttling makes a pass take many
@@ -51,6 +52,7 @@ class ResolutionService:
                 token = self._tokens.valid_access_token()
             except ReauthRequired:
                 log.warning("Spotify re-auth required; pausing resolution")
+                self._repo.bump_resolution_attempts(attempted_unresolved)
                 return ResolveResult(resolved=resolved, unresolved=unresolved, paused=True)
             try:
                 isrcs = self._api.album_isrcs(token, album.spotify_id) if album.spotify_id else []
@@ -62,12 +64,17 @@ class ResolutionService:
                 # leave this one unresolved and it retries next reconcile.
                 errored += 1
                 unresolved += 1
+                attempted_unresolved.append(album.id)
                 continue
             if rgid:
                 self._repo.set_release_group(album.id, rgid)
                 resolved += 1
             else:
                 unresolved += 1
+                attempted_unresolved.append(album.id)
+        # Count this pass against the ones that didn't resolve, so the persistent tail sinks in
+        # the least-tried-first order and stops crowding out fresh albums next pass.
+        self._repo.bump_resolution_attempts(attempted_unresolved)
         if errored:
             log.warning("resolution: %s album(s) failed on upstream errors; will retry", errored)
         return ResolveResult(resolved=resolved, unresolved=unresolved, paused=False)
