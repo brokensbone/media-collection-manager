@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 
-from ..imports import ImportItem, ImportsService
+from ..imports import DetectResult, ImportItem, ImportsService, WatchdirDetectionService
 
 router = APIRouter(tags=["imports"])
 
@@ -9,9 +9,18 @@ def _service(request: Request) -> ImportsService:
     return request.app.state.imports_service  # type: ignore[no-any-return]
 
 
+def _watchdir(request: Request) -> WatchdirDetectionService:
+    return request.app.state.watchdir_detection_service  # type: ignore[no-any-return]
+
+
 @router.get("/imports")
 def import_queue(request: Request) -> list[ImportItem]:
     return _service(request).queue()
+
+
+@router.post("/imports/scan")
+def scan_imports(request: Request) -> DetectResult:
+    return _watchdir(request).poll(force=True)
 
 
 @router.post("/imports/{import_id}/import", status_code=204)

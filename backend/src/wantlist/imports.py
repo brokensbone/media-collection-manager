@@ -138,14 +138,18 @@ class WatchdirDetectionService:
         self._threshold = match_threshold
         self._events = events or NullEventSink()
 
-    def poll(self) -> DetectResult:
+    def poll(self, *, force: bool = False) -> DetectResult:
         root = Path(self._watch_dir)
         if not root.is_dir():
             return DetectResult(detected=0)
 
         known = self._repo.known_source_keys()
         cutoff = self._clock.now() - timedelta(seconds=self._settle_seconds)
-        fresh = [drop for drop in self._settled_drops(root, cutoff) if _drop_key(drop) not in known]
+        fresh = [
+            drop
+            for drop in self._settled_drops(root, cutoff, force=force)
+            if _drop_key(drop) not in known
+        ]
         if not fresh:
             return DetectResult(detected=0)
 
@@ -165,14 +169,16 @@ class WatchdirDetectionService:
             )
         return DetectResult(detected=len(fresh))
 
-    def _settled_drops(self, root: Path, cutoff: datetime) -> list[Path]:
+    def _settled_drops(self, root: Path, cutoff: datetime, *, force: bool = False) -> list[Path]:
         drops = []
         for entry in sorted(root.iterdir()):
             if entry.name == self._archive_subdir:
                 continue  # never re-ingest what we archived
             if entry.is_file() and entry.suffix.lower() != ".zip":
                 continue
-            if _newest_mtime(entry) <= cutoff:  # settle check: not still being written
+            if entry.is_dir() and not _dir_has_audio(entry):
+                continue
+            if force or _newest_mtime(entry) <= cutoff:  # settle check: not still being written
                 drops.append(entry)
         return drops
 
@@ -256,10 +262,14 @@ class ImportRunner:
         )
 
         before = self._album_ids()  # snapshot to identify what this import adds (D21)
+        new: list[BeetsAlbum] = []
         staging = Path(self._inbox) / str(rec.id)  # unique per import; no name-collisions
         try:
             stager.stage(rec, str(staging))
             self._beets.import_dir(str(staging))
+            new = self._new_albums(before)
+            if self._catalog is not None and not new:
+                raise RuntimeError("beets import completed without adding any albums")
         except Exception:
             self._repo.mark_import(import_id, ImportState.failed)
             self._events.emit(
@@ -284,12 +294,17 @@ class ImportRunner:
         except Exception:
             log.warning("import %s: finalize/dispose failed", import_id, exc_info=True)
 
-        self._claim_ownership(rec, before)
+        self._claim_ownership(rec, new)
 
     def _album_ids(self) -> set[str]:
         return {a.beets_id for a in self._catalog.all_albums()} if self._catalog else set()
 
-    def _claim_ownership(self, rec: ImportRecord, before: set[str]) -> None:
+    def _new_albums(self, before: set[str]) -> list[BeetsAlbum]:
+        if self._catalog is None:
+            return []
+        return [a for a in self._catalog.all_albums() if a.beets_id not in before]
+
+    def _claim_ownership(self, rec: ImportRecord, new: list[BeetsAlbum]) -> None:
         """Turn a completed import into an owned album. A *matched* import already knows which
         album it is, so link it owned directly to the freshly-imported beets album — don't wait
         for reconcile, which keys on a MusicBrainz release-group that a quiet as-is beets import
@@ -298,7 +313,6 @@ class ImportRunner:
         if self._catalog is None:
             return
         try:
-            new = [a for a in self._catalog.all_albums() if a.beets_id not in before]
             if rec.matched_album_id is not None:
                 self._repo.mark_owned_manual(rec.matched_album_id, new[0].beets_id if new else None)
             elif self._reverse_matcher is not None:
@@ -426,3 +440,7 @@ def _newest_mtime(entry: Path) -> datetime:
 
 def _dir_size(entry: Path) -> int:
     return sum(p.stat().st_size for p in entry.rglob("*") if p.is_file())
+
+
+def _dir_has_audio(entry: Path) -> bool:
+    return any(_has_audio([str(p)]) for p in entry.rglob("*") if p.is_file())

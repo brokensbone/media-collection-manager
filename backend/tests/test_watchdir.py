@@ -103,6 +103,29 @@ def test_watchdir_skips_unsettled_drop(
     assert _detector(sf, watch, FakeTagReader({}), now=now).poll().detected == 0
 
 
+def test_watchdir_forced_scan_picks_up_fresh_audio_folder(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    sf = clean_album_tables
+    album_id = _add_wanted(sf, artist="Fennesz", title="Endless Summer")
+    watch = tmp_path / "watch"
+    folder = watch / "fresh-folder"
+    folder.mkdir(parents=True)
+    (folder / "01.flac").write_text("x")
+    (watch / "notes").mkdir()
+    (watch / "notes" / "readme.txt").write_text("ignore me")
+    now = datetime.fromtimestamp((folder / "01.flac").stat().st_mtime, tz=UTC)
+
+    detector = _detector(
+        sf, watch, FakeTagReader({"fresh-folder": ("Fennesz", "Endless Summer")}), now=now
+    )
+
+    assert detector.poll(force=True).detected == 1
+    rows = {r.name: r for r in AlbumRepo(sf).list_imports()}
+    assert set(rows) == {"fresh-folder"}
+    assert rows["fresh-folder"].matched_album_id == album_id
+
+
 def test_watchdir_import_unpacks_and_archives_original(
     clean_album_tables: sessionmaker[Session], tmp_path: Path
 ) -> None:
