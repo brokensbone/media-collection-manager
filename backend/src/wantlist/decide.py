@@ -14,6 +14,7 @@ class DecideItem:
     title: str
     reason: str
     has_art: bool
+    spotify_id: str | None
 
 
 class DecideService:
@@ -53,7 +54,11 @@ class DecideService:
                 listened_days=self._listened_days,
             )
             if reason:
-                items.append(DecideItem(cand.id, cand.artist, cand.title, reason, cand.has_art))
+                items.append(
+                    DecideItem(
+                        cand.id, cand.artist, cand.title, reason, cand.has_art, cand.spotify_id
+                    )
+                )
         return items
 
     def keep(self, album_id: int) -> None:

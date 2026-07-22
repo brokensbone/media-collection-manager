@@ -11,6 +11,7 @@ type Item = {
   bandcamp_url: string
   possibly_owned: boolean
   owned_hint: string | null
+  spotify_id: string | null
 }
 
 type Candidate = {
@@ -80,7 +81,7 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
         <tbody>
           {shown.map((it) => (
             <tr key={it.id}>
-              <Cover id={it.id} hasArt={it.has_art} />
+              <Cover id={it.id} hasArt={it.has_art} spotifyId={it.spotify_id} />
               <td>{it.artist}</td>
               <td>
                 {it.title}

@@ -9,6 +9,7 @@ type Album = {
   state: string
   owned: boolean
   has_art: boolean
+  spotify_id: string | null
 }
 
 export function Library({
@@ -37,7 +38,7 @@ export function Library({
       <tbody>
         {shown.map((a) => (
           <tr key={a.id}>
-            <Cover id={a.id} hasArt={a.has_art} />
+            <Cover id={a.id} hasArt={a.has_art} spotifyId={a.spotify_id} />
             <td>{a.artist}</td>
             <td>{a.title}</td>
             {/* The state is redundant in a single-state view (Owned/Dismissed); only show it

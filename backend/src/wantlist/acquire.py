@@ -14,6 +14,7 @@ class AcquireItem:
     bandcamp_url: str
     possibly_owned: bool  # a same-artist/similar-title edition already sits in beets (§7)
     owned_hint: str | None
+    spotify_id: str | None
 
 
 class AcquireService:
@@ -37,6 +38,7 @@ class AcquireService:
                 bandcamp_url=bandcamp_search_url(row.artist, row.title),
                 possibly_owned=row.id in hints,
                 owned_hint=hints[row.id].owned_hint if row.id in hints else None,
+                spotify_id=row.spotify_id,
             )
             for row in rows
         ]
