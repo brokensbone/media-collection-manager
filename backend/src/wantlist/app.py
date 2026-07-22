@@ -14,6 +14,7 @@ from .factories import (
     build_library_assist_service,
     build_releases_service,
     build_transmission_service,
+    build_watchdir_detection_service,
 )
 from .imports import ImportsService
 from .metrics import MetricsService
@@ -45,6 +46,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.library_assist_service = build_library_assist_service(settings, session_factory)
     app.state.releases_service = build_releases_service(settings, session_factory)
     app.state.imports_service = ImportsService(repo=AlbumRepo(session_factory))
+    app.state.watchdir_detection_service = build_watchdir_detection_service(
+        settings, session_factory
+    )
     app.state.transmission_service = build_transmission_service(settings, session_factory)
     app.state.metrics_service = MetricsService(
         repo=AlbumRepo(session_factory),

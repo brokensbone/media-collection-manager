@@ -12,6 +12,19 @@ function mockApi(items: unknown) {
   return fetchMock
 }
 
+function mockApiSequence(responses: unknown[]) {
+  let get = 0
+  const fetchMock = vi.fn((_url: string, opts?: { method?: string }) =>
+    opts?.method === 'POST'
+      ? Promise.resolve({ ok: true })
+      : Promise.resolve({
+          json: () => Promise.resolve(responses[get++] ?? responses[responses.length - 1]),
+        }),
+  )
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
+}
+
 function item(over: Record<string, unknown> = {}) {
   return {
     id: 1,
@@ -52,6 +65,17 @@ describe('Imports', () => {
     // row stays, now showing queued status
     expect(screen.getByText('Only')).toBeTruthy()
     await waitFor(() => expect(screen.getByText('queued')).toBeTruthy())
+  })
+
+  it('scans the watch folder and refreshes newly detected rows', async () => {
+    const fetchMock = mockApiSequence([[], [item({ id: 8, name: 'Dropped Folder' })]])
+    render(<Imports />)
+    expect(await screen.findByText('No downloads to import.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Scan watch folder' }))
+
+    const posted = fetchMock.mock.calls.find((c) => c[0] === '/imports/scan')
+    expect(posted?.[1]?.method).toBe('POST')
+    expect(await screen.findByText('Dropped Folder')).toBeTruthy()
   })
 
   it('shows a Retry for a failed import', async () => {
@@ -106,6 +130,7 @@ describe('Imports', () => {
     mockApi([item({ id: 4, name: 'Done.zip', state: 'imported' })])
     render(<Imports />)
     expect(await screen.findByText('imported ✓')).toBeTruthy()
-    expect(screen.queryByRole('button')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Import' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull()
   })
 })

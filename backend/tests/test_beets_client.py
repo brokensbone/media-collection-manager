@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 import pytest
 from beets.library import Item, Library
@@ -29,3 +30,22 @@ def test_owned_release_group_ids_via_beetsdir(
     monkeypatch.setenv("BEETSDIR", str(_make_beets_dir(tmp_path)))
     owned = BeetsClient().owned_release_group_ids()
     assert owned == {"rg-1", "rg-2"}  # the id-less album contributes a blank line, dropped
+
+
+def test_import_dir_uses_quiet_asis_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_run(argv: list[str], **kwargs: Any) -> object:
+        captured["argv"] = argv
+        captured["kwargs"] = kwargs
+
+        class Result:
+            stdout = ""
+
+        return Result()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    BeetsClient().import_dir("/drop")
+
+    assert captured["argv"] == ["beet", "import", "-q", "--quiet-fallback=asis", "/drop"]

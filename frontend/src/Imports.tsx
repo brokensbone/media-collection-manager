@@ -22,6 +22,7 @@ const STATUS: Record<Item['state'], string> = {
 
 export function Imports({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
   const [items, setItems] = useState<Item[] | null>(null)
+  const [scanning, setScanning] = useState(false)
 
   const refresh = useCallback(() => {
     fetch('/imports')
@@ -48,6 +49,14 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
     [onChange],
   )
 
+  const scan = useCallback(() => {
+    setScanning(true)
+    fetch('/imports/scan', { method: 'POST' })
+      .then(refresh)
+      .then(() => onChange?.())
+      .finally(() => setScanning(false))
+  }, [onChange, refresh])
+
   const discard = useCallback(
     (id: number) => {
       setItems((list) => list?.filter((it) => it.id !== id) ?? list)
@@ -57,7 +66,6 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
   )
 
   if (!items) return <p>Loading…</p>
-  if (items.length === 0) return <p>No downloads to import.</p>
 
   const shown = items.filter((it) => matchesQuery(`${it.name} ${it.matched ?? ''}`, query))
 
@@ -71,61 +79,71 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
 
   return (
     <>
+      <div className="inline-actions">
+        <button type="button" onClick={scan} disabled={scanning}>
+          {scanning ? 'Scanning…' : 'Scan watch folder'}
+        </button>
+      </div>
+      {items.length === 0 && <p>No downloads to import.</p>}
       {progress && <p className="resolving">{progress}</p>}
-      <table>
-        <tbody>
-          {shown.map((it) => (
-            <tr key={it.id}>
-              <td className="muted">{it.source}</td>
-              <td>{it.name}</td>
-              <td>
-                {it.matched ?? <span className="muted">no match</span>}
-                {/* "already owned" is a pre-import warning; pointless once it's imported. */}
-                {it.matched_owned && it.state !== 'imported' && (
-                  <span className="badge">owned</span>
-                )}
-              </td>
-              <td className="nowrap">
-                {it.missing ? (
-                  <>
-                    <span className="muted">file no longer in watch folder</span>{' '}
-                    <button type="button" onClick={() => discard(it.id)}>
-                      Discard
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    {it.state === 'detected' && (
-                      <>
-                        <button type="button" onClick={() => enqueue(it.id)}>
-                          Import
-                        </button>{' '}
-                        <button type="button" onClick={() => discard(it.id)}>
-                          Discard
-                        </button>
-                      </>
-                    )}
-                    {it.state === 'queued' && <span className="muted">{STATUS.queued}</span>}
-                    {it.state === 'importing' && <span className="muted">{STATUS.importing}</span>}
-                    {it.state === 'imported' && <span className="muted">{STATUS.imported}</span>}
-                    {it.state === 'failed' && (
-                      <>
-                        <span className="muted">{STATUS.failed}</span>{' '}
-                        <button type="button" onClick={() => enqueue(it.id)}>
-                          Retry
-                        </button>{' '}
-                        <button type="button" onClick={() => discard(it.id)}>
-                          Discard
-                        </button>
-                      </>
-                    )}
-                  </>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {items.length > 0 && (
+        <table>
+          <tbody>
+            {shown.map((it) => (
+              <tr key={it.id}>
+                <td className="muted">{it.source}</td>
+                <td>{it.name}</td>
+                <td>
+                  {it.matched ?? <span className="muted">no match</span>}
+                  {/* "already owned" is a pre-import warning; pointless once it's imported. */}
+                  {it.matched_owned && it.state !== 'imported' && (
+                    <span className="badge">owned</span>
+                  )}
+                </td>
+                <td className="nowrap">
+                  {it.missing ? (
+                    <>
+                      <span className="muted">file no longer in watch folder</span>{' '}
+                      <button type="button" onClick={() => discard(it.id)}>
+                        Discard
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {it.state === 'detected' && (
+                        <>
+                          <button type="button" onClick={() => enqueue(it.id)}>
+                            Import
+                          </button>{' '}
+                          <button type="button" onClick={() => discard(it.id)}>
+                            Discard
+                          </button>
+                        </>
+                      )}
+                      {it.state === 'queued' && <span className="muted">{STATUS.queued}</span>}
+                      {it.state === 'importing' && (
+                        <span className="muted">{STATUS.importing}</span>
+                      )}
+                      {it.state === 'imported' && <span className="muted">{STATUS.imported}</span>}
+                      {it.state === 'failed' && (
+                        <>
+                          <span className="muted">{STATUS.failed}</span>{' '}
+                          <button type="button" onClick={() => enqueue(it.id)}>
+                            Retry
+                          </button>{' '}
+                          <button type="button" onClick={() => discard(it.id)}>
+                            Discard
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </>
   )
 }

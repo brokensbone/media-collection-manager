@@ -38,7 +38,7 @@ class BeetsClient:
     def import_dir(self, path: str) -> None:
         """Import a folder into the library non-interactively (SPEC §12/§13). beets moves the
         files into the library per its config (`move: yes`), leaving the inbox empty."""
-        self._run("import", "-q", path, timeout=600)
+        self._run("import", "-q", "--quiet-fallback=asis", path, timeout=600)
 
     def _run(self, *args: str, timeout: int) -> str:
         # No env= override: inherit the process environment so `beet` picks up BEETSDIR.

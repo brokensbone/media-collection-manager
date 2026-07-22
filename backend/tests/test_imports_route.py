@@ -37,3 +37,27 @@ def test_import_click_enqueues_and_row_persists_with_status(
     after = client.get("/imports").json()
     assert len(after) == 1
     assert after[0]["state"] == "queued"
+
+
+def test_scan_imports_forces_watchdir_detection(clean_album_tables: sessionmaker[Session]) -> None:
+    sf = clean_album_tables
+    repo = AlbumRepo(sf)
+
+    class FakeWatchdir:
+        forced: bool | None = None
+
+        def poll(self, *, force: bool = False):
+            self.forced = force
+            return {"detected": 1}
+
+    watchdir = FakeWatchdir()
+    app = create_app(Settings())
+    app.state.imports_service = ImportsService(repo=repo)
+    app.state.watchdir_detection_service = watchdir
+    client = TestClient(app)
+
+    resp = client.post("/imports/scan")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"detected": 1}
+    assert watchdir.forced is True

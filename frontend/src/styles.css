@@ -133,6 +133,13 @@ button {
 button:hover {
   background: var(--surface);
 }
+button:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+button:disabled:hover {
+  background: transparent;
+}
 a {
   color: var(--accent);
 }
@@ -146,6 +153,11 @@ a {
 .resolving {
   margin: 4px 0 8px;
   font-size: 0.9em;
+}
+.inline-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 4px 0 8px;
 }
 .badge {
   margin-left: 8px;

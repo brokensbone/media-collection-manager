@@ -9,6 +9,7 @@ from wantlist.imports import (
     ImportRunner,
     ImportsService,
     TransmissionStager,
+    WatchdirStager,
 )
 from wantlist.models import Album, AlbumState, ImportSource, ImportState, Provenance
 from wantlist.ports.spotify_api import SavedAlbum
@@ -234,6 +235,47 @@ def test_run_marks_failed_and_can_be_retried(
     repo.queue_import(import_id)
     _transmission_runner(repo, RecordingBeetsClient(), str(inbox)).run_queued()
     assert repo.get_pending_import(import_id).state == ImportState.imported.value  # type: ignore[union-attr]
+
+
+def test_import_fails_without_disposing_source_when_beets_adds_nothing(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    sf = clean_album_tables
+    watch = tmp_path / "watch"
+    drop = watch / "Album"
+    drop.mkdir(parents=True)
+    (drop / "01.flac").write_text("x")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.watchdir,
+        source_key="k1",
+        name="Album",
+        archive_path=str(drop),
+        matched_album_id=None,
+    )
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
+
+    beets = FakeBeetsLibrary()  # import_dir returns successfully, but the catalog is unchanged
+    processed = ImportRunner(
+        repo=repo,
+        stagers={
+            ImportSource.watchdir: WatchdirStager(
+                watch_dir=str(watch), disposition="archive", archive_subdir="done"
+            )
+        },
+        beets=beets,
+        inbox=str(inbox),
+        catalog=beets,
+    ).run_queued()
+
+    assert processed == 1
+    assert repo.get_pending_import(import_id).state == ImportState.failed.value  # type: ignore[union-attr]
+    assert drop.exists()  # not moved to done unless beets actually imports something
+    assert not (watch / "done" / "Album").exists()
 
 
 def test_run_ignores_not_yet_queued(
