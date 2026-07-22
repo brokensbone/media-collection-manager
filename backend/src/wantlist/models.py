@@ -54,6 +54,10 @@ class Album(Base):
     upc: Mapped[str | None] = mapped_column(default=None)
     art_url: Mapped[str | None] = mapped_column(default=None)  # source URL; blob in album_art
 
+    # Failed resolution attempts (§5). Resolution runs least-tried-first, so the MB-absent tail
+    # sinks below fresh albums instead of clogging the front of the queue and starving them.
+    resolution_attempts: Mapped[int] = mapped_column(default=0, server_default="0")
+
     state: Mapped[AlbumState] = mapped_column(SAEnum(AlbumState, name="album_state"))
     provenance: Mapped[Provenance] = mapped_column(SAEnum(Provenance, name="provenance"))
 

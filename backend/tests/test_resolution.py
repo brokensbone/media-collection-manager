@@ -73,6 +73,31 @@ def test_reresolve_picks_up_release_once_it_appears_in_mb(
     assert AlbumRepo(sf).albums_needing_resolution() == []  # no longer in the tail
 
 
+def test_unresolvable_albums_sink_so_fresh_ones_get_a_turn(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    # With a capped pass and plain id order, a low-id album MB can't place would be re-ground
+    # every run and starve higher-id resolvable ones forever. Least-tried-first must let the
+    # fresh album through once the dead one has taken its turn.
+    sf = clean_album_tables
+    _saved(sf, spotify_id="s1", title="Dead")  # lower id, never in MB
+    _saved(sf, spotify_id="s2", title="Fresh")  # resolvable
+
+    def svc() -> ResolutionService:
+        return ResolutionService(
+            api=StubSpotifyApiClient([]),  # type: ignore[arg-type]
+            resolver=StubMusicBrainzResolver({"Fresh": "rg-fresh"}),  # type: ignore[arg-type]
+            repo=AlbumRepo(sf),
+            tokens=StubTokens(),  # type: ignore[arg-type]
+            max_per_run=1,
+        )
+
+    # pass 1: only the least-tried/lowest-id (Dead) is attempted → no-match, its attempt is counted
+    assert svc().resolve_unresolved().resolved == 0
+    # pass 2: Dead now has 1 attempt, Fresh has 0 → Fresh goes first this time and resolves
+    assert svc().resolve_unresolved().resolved == 1
+
+
 def test_resolution_pauses_on_reauth(clean_album_tables: sessionmaker[Session]) -> None:
     sf = clean_album_tables
     _saved(sf, spotify_id="s1", title="X")

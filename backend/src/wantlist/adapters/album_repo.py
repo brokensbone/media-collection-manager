@@ -241,15 +241,32 @@ class AlbumRepo:
     # --- resolution (§5) -------------------------------------------------------------
 
     def albums_needing_resolution(self) -> list[UnresolvedAlbum]:
-        """Non-dismissed albums without a release-group id yet (resolve-once, re-try tail)."""
+        """Non-dismissed albums without a release-group id yet (resolve-once, re-try tail).
+        Least-tried first (then oldest): a capped pass always reaches fresh albums before
+        re-grinding the MB-absent tail, so repeated no-matches can't starve the queue (§5)."""
         with self._sf() as session:
             rows = session.execute(
-                select(Album.id, Album.spotify_id, Album.upc, Album.artist, Album.title).where(
+                select(Album.id, Album.spotify_id, Album.upc, Album.artist, Album.title)
+                .where(
                     Album.mb_releasegroup_id.is_(None),
                     Album.state != AlbumState.dismissed,
                 )
+                .order_by(Album.resolution_attempts.asc(), Album.id.asc())
             )
             return [UnresolvedAlbum(*row) for row in rows]
+
+    def bump_resolution_attempts(self, album_ids: list[int]) -> None:
+        """Record a failed resolution attempt, so a repeatedly-unresolvable album sinks below
+        fresher ones in albums_needing_resolution's least-tried-first order."""
+        if not album_ids:
+            return
+        with self._sf() as session:
+            session.execute(
+                update(Album)
+                .where(Album.id.in_(album_ids))
+                .values(resolution_attempts=Album.resolution_attempts + 1)
+            )
+            session.commit()
 
     def set_release_group(self, album_id: int, mb_releasegroup_id: str) -> None:
         with self._sf() as session:
