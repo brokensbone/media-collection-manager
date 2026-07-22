@@ -46,11 +46,12 @@ class AlbumSummary:
 @dataclass
 class OwnedEnrichment:
     """What the DB adds to a beets-owned album matched on release-group id: the tracked album's
-    id (so its stored cover art can be shown) and whether it's also in your Spotify saves."""
+    id (so its stored cover art can be shown) and its Spotify id (present iff it's in your saves,
+    so the Owned view can both flag it and link the cover to the album on Spotify)."""
 
     album_id: int
     has_art: bool
-    on_spotify: bool
+    spotify_id: str | None
 
 
 @dataclass
@@ -864,7 +865,7 @@ class AlbumRepo:
             for rgid, album_id, art, spotify_id in rows:
                 if rgid not in out:
                     out[rgid] = OwnedEnrichment(
-                        album_id=album_id, has_art=bool(art), on_spotify=spotify_id is not None
+                        album_id=album_id, has_art=bool(art), spotify_id=spotify_id
                     )
             return out
 

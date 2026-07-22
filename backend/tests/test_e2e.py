@@ -192,6 +192,7 @@ def test_full_loop(settings: Settings, stub: tuple[str, _Control]) -> None:
     owned = client.get("/owned").json()
     assert [o["title"] for o in owned] == ["Owned One"]
     assert owned[0]["on_spotify"] is True and owned[0]["album_id"] is not None
+    assert owned[0]["spotify_id"] == "albO"  # cover links to the album on Spotify
 
     # 6. re-auth path: expire the token and make refresh fail -> ingest pauses, disconnected
     control.fail_refresh = True

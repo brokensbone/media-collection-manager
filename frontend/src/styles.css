@@ -289,3 +289,12 @@ a {
 .activity tr.ev-no_match td {
   color: var(--muted);
 }
+
+/* Linked cover (opens the album on Spotify) */
+.cover-cell a {
+  display: inline-block;
+  cursor: pointer;
+}
+.cover-cell a:hover .cover {
+  opacity: 0.8;
+}
