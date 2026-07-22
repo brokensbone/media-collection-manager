@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     spotify_scopes: str = "user-library-read user-library-modify"  # modify: Save/Want (§6b)
     spotify_accounts_url: str = "https://accounts.spotify.com"
     spotify_api_url: str = "https://api.spotify.com/v1"
+    # Country for artist-album lookups (§6b). Without it Spotify returns per-market duplicate
+    # album ids, so an old release resurfaces as "new"; it also filters to what you can play.
+    spotify_market: str = "GB"
 
     # Re-auth countdown (§8c): refresh tokens expire ~6 months after authorization.
     reauth_lifetime_days: int = 183

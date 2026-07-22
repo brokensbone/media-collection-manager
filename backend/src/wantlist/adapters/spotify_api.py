@@ -11,9 +11,10 @@ from ..ports.spotify_api import Play, SavedAlbum
 class HttpxSpotifyApiClient:
     """Reads the Spotify Web API over httpx. Base URL injected so E2E can stub it (§14)."""
 
-    def __init__(self, api_url: str, art_target_px: int) -> None:
+    def __init__(self, api_url: str, art_target_px: int, market: str = "GB") -> None:
         self._api_url = api_url.rstrip("/")
         self._art_target_px = art_target_px
+        self._market = market
 
     def saved_albums(self, access_token: str) -> Iterable[SavedAlbum]:
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -62,8 +63,12 @@ class HttpxSpotifyApiClient:
 
     def artist_albums(self, access_token: str, artist_id: str) -> list[SavedAlbum]:
         headers = {"Authorization": f"Bearer {access_token}"}
+        # market dedupes Spotify's per-country album variants (else the same release returns
+        # different ids over time and an old album resurfaces as a bogus "new release"), and
+        # restricts to albums actually playable in that market (§6b).
         url: str | None = (
-            f"{self._api_url}/artists/{artist_id}/albums?include_groups=album&limit=50"
+            f"{self._api_url}/artists/{artist_id}/albums"
+            f"?include_groups=album&limit=50&market={self._market}"
         )
         albums: list[SavedAlbum] = []
         while url:

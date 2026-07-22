@@ -59,7 +59,9 @@ def build_ingest_service(
     settings: Settings, session_factory: sessionmaker[Session]
 ) -> IngestService:
     return IngestService(
-        api=HttpxSpotifyApiClient(settings.spotify_api_url, settings.art_target_px),
+        api=HttpxSpotifyApiClient(
+            settings.spotify_api_url, settings.art_target_px, settings.spotify_market
+        ),
         repo=AlbumRepo(session_factory),
         tokens=build_auth_service(settings, session_factory),
         fetch_image=fetch_image,
@@ -71,7 +73,9 @@ def build_resolution_service(
     settings: Settings, session_factory: sessionmaker[Session]
 ) -> ResolutionService:
     return ResolutionService(
-        api=HttpxSpotifyApiClient(settings.spotify_api_url, settings.art_target_px),
+        api=HttpxSpotifyApiClient(
+            settings.spotify_api_url, settings.art_target_px, settings.spotify_market
+        ),
         resolver=HttpxMusicBrainzResolver(
             base_url=settings.musicbrainz_url,
             user_agent=settings.musicbrainz_user_agent,
@@ -99,7 +103,9 @@ def build_play_history_service(
     settings: Settings, session_factory: sessionmaker[Session]
 ) -> PlayHistoryService:
     return PlayHistoryService(
-        api=HttpxSpotifyApiClient(settings.spotify_api_url, settings.art_target_px),
+        api=HttpxSpotifyApiClient(
+            settings.spotify_api_url, settings.art_target_px, settings.spotify_market
+        ),
         repo=AlbumRepo(session_factory),
         tokens=build_auth_service(settings, session_factory),
     )
@@ -109,7 +115,9 @@ def build_artist_watch_service(
     settings: Settings, session_factory: sessionmaker[Session]
 ) -> ArtistWatchService:
     return ArtistWatchService(
-        api=HttpxSpotifyApiClient(settings.spotify_api_url, settings.art_target_px),
+        api=HttpxSpotifyApiClient(
+            settings.spotify_api_url, settings.art_target_px, settings.spotify_market
+        ),
         repo=AlbumRepo(session_factory),
         tokens=build_auth_service(settings, session_factory),
         events=WorkerEventLog(session_factory),
@@ -207,7 +215,9 @@ def build_import_runner(settings: Settings, session_factory: sessionmaker[Sessio
     beets = BeetsClient()
     reverse_matcher = ReverseMatcher(
         repo=AlbumRepo(session_factory),
-        api=HttpxSpotifyApiClient(settings.spotify_api_url, settings.art_target_px),
+        api=HttpxSpotifyApiClient(
+            settings.spotify_api_url, settings.art_target_px, settings.spotify_market
+        ),
         tokens=build_auth_service(settings, session_factory),
     )
     return ImportRunner(
@@ -246,7 +256,9 @@ def build_releases_service(
     settings: Settings, session_factory: sessionmaker[Session]
 ) -> ReleasesService:
     return ReleasesService(
-        api=HttpxSpotifyApiClient(settings.spotify_api_url, settings.art_target_px),
+        api=HttpxSpotifyApiClient(
+            settings.spotify_api_url, settings.art_target_px, settings.spotify_market
+        ),
         repo=AlbumRepo(session_factory),
         tokens=build_auth_service(settings, session_factory),
         clock=SystemClock(),
