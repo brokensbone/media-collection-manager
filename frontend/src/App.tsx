@@ -1,6 +1,7 @@
 import './styles.css'
 import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { Acquire } from './Acquire'
+import { Activity } from './Activity'
 import { Dashboard, type Section } from './Dashboard'
 import { Decide } from './Decide'
 import { Guide } from './Guide'
@@ -11,7 +12,7 @@ import { Releases } from './Releases'
 import { SpotifyStatus } from './SpotifyStatus'
 import { Transmission } from './Transmission'
 
-type View = 'app' | 'guide' | 'transmission'
+type View = 'app' | 'guide' | 'transmission' | 'activity'
 
 const SECTIONS: Section[] = ['all', 'releases', 'decide', 'acquire', 'import', 'owned', 'dismissed']
 
@@ -21,6 +22,7 @@ function readHash(): { view: View; section: Section } {
   const h = window.location.hash.replace(/^#/, '')
   if (h === 'guide') return { view: 'guide', section: 'all' }
   if (h === 'transmission') return { view: 'transmission', section: 'all' }
+  if (h === 'activity') return { view: 'activity', section: 'all' }
   if ((SECTIONS as string[]).includes(h)) return { view: 'app', section: h as Section }
   return { view: 'app', section: 'all' }
 }
@@ -84,6 +86,13 @@ export default function App() {
           >
             {view === 'transmission' ? 'Dashboard' : 'Transmission'}
           </button>
+          <button
+            type="button"
+            className="linklike"
+            onClick={() => setView(view === 'activity' ? 'app' : 'activity')}
+          >
+            {view === 'activity' ? 'Dashboard' : 'Activity'}
+          </button>
           <SpotifyStatus />
         </div>
       </header>
@@ -91,6 +100,8 @@ export default function App() {
         <Guide />
       ) : view === 'transmission' ? (
         <Transmission />
+      ) : view === 'activity' ? (
+        <Activity />
       ) : (
         <>
           <Dashboard refreshKey={refresh} active={section} onSelect={setSection} />

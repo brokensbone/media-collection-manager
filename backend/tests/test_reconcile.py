@@ -4,7 +4,7 @@ from wantlist.adapters.album_repo import AlbumRepo
 from wantlist.models import Album, AlbumState, LinkSource, Provenance
 from wantlist.reconcile import OwnershipReconciler
 
-from .fakes import StubOwnedReleaseGroups
+from .fakes import RecordingEventSink, StubOwnedReleaseGroups
 
 
 def _add(
@@ -46,6 +46,21 @@ def test_reconcile_marks_matching_owned_and_leaves_rest(
     assert result.newly_owned == 1
     owned = _by_title(sf)
     assert owned == {"own-me": True, "not-owned": False}
+
+
+def test_reconcile_emits_an_owned_event_per_album(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    sf = clean_album_tables
+    _add(sf, title="own-me", rgid="rg1")
+    events = RecordingEventSink()
+    OwnershipReconciler(
+        beets=StubOwnedReleaseGroups({"rg1"}),
+        repo=AlbumRepo(sf),
+        events=events,  # type: ignore[arg-type]
+    ).reconcile()
+    assert [(e[0], e[1]) for e in events.events] == [("reconcile", "owned")]
+    assert "own-me" in events.events[0][2]
 
 
 def test_reconcile_never_touches_a_manual_link(

@@ -7,10 +7,12 @@ from typing import Protocol
 
 from .adapters.album_repo import AlbumRepo, ImportRecord
 from .adapters.beets import BeetsAlbum
+from .adapters.event_log import NullEventSink
 from .adapters.unpack import dispose, unpack
 from .domain.match import MatchTarget, best_match
 from .models import AlbumState, ImportSource, ImportState
 from .ports.clock import Clock
+from .ports.events import EventSink
 from .ports.file_transfer import FileTransfer
 from .ports.tags import TagReader
 from .ports.transmission import TransmissionClient
@@ -58,11 +60,17 @@ class ImportDetectionService:
     so the operator can hand-import them (the no-match tail)."""
 
     def __init__(
-        self, *, transmission: TransmissionClient, repo: AlbumRepo, match_threshold: float
+        self,
+        *,
+        transmission: TransmissionClient,
+        repo: AlbumRepo,
+        match_threshold: float,
+        events: EventSink | None = None,
     ):
         self._transmission = transmission
         self._repo = repo
         self._threshold = match_threshold
+        self._events = events or NullEventSink()
 
     def poll(self) -> DetectResult:
         # The client is shared with all the operator's torrents, so on first connect there are
@@ -89,6 +97,9 @@ class ImportDetectionService:
                     has_audio=True,
                 )
                 detected += 1
+                self._events.emit(
+                    job="import", type="detected", message=f"Detected download: '{t.name}'"
+                )
             else:
                 self._repo.add_pending_import(  # not music: ledger the hash, never screen it again
                     source=ImportSource.transmission,
@@ -116,6 +127,7 @@ class WatchdirDetectionService:
         archive_subdir: str,
         settle_seconds: int,
         match_threshold: float,
+        events: EventSink | None = None,
     ):
         self._repo = repo
         self._tags = tags
@@ -124,6 +136,7 @@ class WatchdirDetectionService:
         self._archive_subdir = archive_subdir
         self._settle_seconds = settle_seconds
         self._threshold = match_threshold
+        self._events = events or NullEventSink()
 
     def poll(self) -> DetectResult:
         root = Path(self._watch_dir)
@@ -146,6 +159,9 @@ class WatchdirDetectionService:
                 name=drop.name,
                 archive_path=str(drop),
                 matched_album_id=best_match(query, targets, self._threshold),
+            )
+            self._events.emit(
+                job="watchdir", type="detected", message=f"Detected drop: '{drop.name}'"
             )
         return DetectResult(detected=len(fresh))
 
@@ -216,6 +232,7 @@ class ImportRunner:
         inbox: str,
         catalog: LibraryCatalog | None = None,
         reverse_matcher: ReverseMatcher | None = None,
+        events: EventSink | None = None,
     ):
         self._repo = repo
         self._stagers = stagers
@@ -223,6 +240,7 @@ class ImportRunner:
         self._inbox = inbox
         self._catalog = catalog
         self._reverse_matcher = reverse_matcher
+        self._events = events or NullEventSink()
 
     def run(self, import_id: int) -> None:
         rec = self._repo.get_pending_import(import_id)
@@ -230,6 +248,12 @@ class ImportRunner:
             return  # only queued imports are processed (the click/retry enqueues them)
         stager = self._stagers[ImportSource(rec.source)]
         self._repo.mark_import(import_id, ImportState.importing)  # so the UI shows the active one
+        self._events.emit(
+            job="import",
+            type="importing",
+            message=f"Importing '{rec.name}'…",
+            album_id=rec.matched_album_id,
+        )
 
         before = self._album_ids()  # snapshot to identify what this import adds (D21)
         staging = Path(self._inbox) / str(rec.id)  # unique per import; no name-collisions
@@ -238,10 +262,22 @@ class ImportRunner:
             self._beets.import_dir(str(staging))
         except Exception:
             self._repo.mark_import(import_id, ImportState.failed)
+            self._events.emit(
+                job="import",
+                type="failed",
+                message=f"Import failed: '{rec.name}'",
+                album_id=rec.matched_album_id,
+            )
             raise
         finally:
             shutil.rmtree(staging, ignore_errors=True)  # tidy the local staging either way
         self._repo.mark_import(import_id, ImportState.imported)
+        self._events.emit(
+            job="import",
+            type="imported",
+            message=f"Imported '{rec.name}'",
+            album_id=rec.matched_album_id,
+        )
 
         try:
             stager.finalize(rec)  # dispose the source; a hiccup here mustn't cause a re-import

@@ -82,6 +82,16 @@ class StubOwnedReleaseGroups:
         return set(self._owned)
 
 
+class RecordingEventSink:
+    """Captures emitted activity events so a test can assert what the worker reported."""
+
+    def __init__(self) -> None:
+        self.events: list[tuple[str, str, str, int | None]] = []
+
+    def emit(self, *, job: str, type: str, message: str, album_id: int | None = None) -> None:
+        self.events.append((job, type, message, album_id))
+
+
 class StubLibraryCatalog:
     """A fake beets catalogue for the D17 link-candidate / possibly-owned assist."""
 

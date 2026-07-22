@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import health
 from .adapters.album_repo import AlbumRepo
+from .adapters.event_log import WorkerEventLog
 from .config import Settings
 from .db import make_engine, make_session_factory
 from .factories import (
@@ -21,6 +22,7 @@ from .routers import art as art_router
 from .routers import auth as auth_router
 from .routers import dashboard as dashboard_router
 from .routers import decide as decide_router
+from .routers import events as events_router
 from .routers import imports as imports_router
 from .routers import library as library_router
 from .routers import metrics as metrics_router
@@ -48,12 +50,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         repo=AlbumRepo(session_factory),
         auth=build_auth_service(settings, session_factory),
     )
+    app.state.event_log = WorkerEventLog(session_factory)
     app.include_router(auth_router.router)
     app.include_router(art_router.router)
     app.include_router(library_router.router)
     app.include_router(decide_router.router)
     app.include_router(acquire_router.router)
     app.include_router(dashboard_router.router)
+    app.include_router(events_router.router)
     app.include_router(releases_router.router)
     app.include_router(imports_router.router)
     app.include_router(transmission_router.router)
