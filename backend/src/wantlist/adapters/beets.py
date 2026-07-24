@@ -1,7 +1,10 @@
 import subprocess
+import time
 from dataclasses import dataclass
 
 _SEP = "\x1f"  # unit separator: safe field delimiter (won't occur in artist/album text)
+_LOCK_RETRIES = 4
+_LOCK_BACKOFF = 1.5  # seconds; grows per attempt
 
 
 @dataclass
@@ -42,6 +45,20 @@ class BeetsClient:
 
     def _run(self, *args: str, timeout: int) -> str:
         # No env= override: inherit the process environment so `beet` picks up BEETSDIR.
-        return subprocess.run(
-            ["beet", *args], capture_output=True, text=True, check=True, timeout=timeout
-        ).stdout
+        #
+        # beets keeps its catalogue in one SQLite file shared across this worker and the API
+        # process (Owned view, health check) plus reconcile — so a concurrent writer/reader can
+        # hold the lock past beets' busy timeout and the call dies with "database is locked".
+        # Retry with backoff: the contending call is short-lived, so a retry clears it. (beets'
+        # own `timeout:` config raises the busy timeout too, but this keeps us safe without it.)
+        for attempt in range(_LOCK_RETRIES + 1):
+            try:
+                return subprocess.run(
+                    ["beet", *args], capture_output=True, text=True, check=True, timeout=timeout
+                ).stdout
+            except subprocess.CalledProcessError as e:
+                if attempt < _LOCK_RETRIES and "database is locked" in (e.stderr or ""):
+                    time.sleep(_LOCK_BACKOFF * (attempt + 1))
+                    continue
+                raise
+        raise RuntimeError("unreachable: the retry loop returns or raises")
