@@ -6,25 +6,19 @@ from wantlist.app import create_app
 from wantlist.config import Settings
 
 
-def _client(monkeypatch: pytest.MonkeyPatch, *, postgres: bool, beets: bool) -> TestClient:
+def _client(monkeypatch: pytest.MonkeyPatch, *, postgres: bool) -> TestClient:
     monkeypatch.setattr(health, "check_postgres", lambda engine: postgres)
-    monkeypatch.setattr(health, "check_beets", lambda: beets)
     return TestClient(create_app(Settings()))
 
 
 def test_health_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    resp = _client(monkeypatch, postgres=True, beets=True).get("/health")
+    resp = _client(monkeypatch, postgres=True).get("/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok", "checks": {"postgres": True, "beets": True}}
+    # postgres only — the API never runs beets, so beets liveness isn't part of this check
+    assert resp.json() == {"status": "ok", "checks": {"postgres": True}}
 
 
 def test_health_degraded_when_postgres_down(monkeypatch: pytest.MonkeyPatch) -> None:
-    resp = _client(monkeypatch, postgres=False, beets=True).get("/health")
+    resp = _client(monkeypatch, postgres=False).get("/health")
     assert resp.status_code == 503
-    assert resp.json()["checks"] == {"postgres": False, "beets": True}
-
-
-def test_health_degraded_when_beets_down(monkeypatch: pytest.MonkeyPatch) -> None:
-    resp = _client(monkeypatch, postgres=True, beets=False).get("/health")
-    assert resp.status_code == 503
-    assert resp.json()["checks"] == {"postgres": True, "beets": False}
+    assert resp.json()["checks"] == {"postgres": False}

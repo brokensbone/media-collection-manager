@@ -6,6 +6,8 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session, sessionmaker
 
 from .adapters.album_repo import AlbumRepo
+from .adapters.beets import BeetsClient
+from .adapters.beets_cache import BeetsCatalogCache
 from .config import Settings
 from .db import make_engine, make_session_factory
 from .factories import (
@@ -42,6 +44,12 @@ def _session_factory(settings: Settings) -> sessionmaker[Session]:
     return make_session_factory(make_engine(settings.database_url))
 
 
+def _refresh_library_cache(session_factory: sessionmaker[Session]) -> None:
+    """Snapshot the beets catalogue into the DB (§5) so the API reads it instead of running beet.
+    Worker-only: the live `beet list` happens here, never on a page load."""
+    BeetsCatalogCache(session_factory).replace(BeetsClient().all_albums())
+
+
 def ingest_once(settings: Settings | None = None) -> None:
     """One saves-ingest + art-fetch pass. CLI form: `python -m wantlist.jobs`."""
     settings = settings or Settings()
@@ -69,6 +77,7 @@ def reconcile_once(settings: Settings | None = None) -> None:
         resolution = build_resolution_service(settings, session_factory).resolve_unresolved()
         reconciled = build_ownership_reconciler(settings, session_factory).reconcile()
         build_alerts_service(settings, session_factory).owned(reconciled.newly_owned)
+        _refresh_library_cache(session_factory)  # keep the API's catalogue cache current
         log.info(
             "reconcile: resolved=%s unresolved=%s paused=%s newly_owned=%s",
             resolution.resolved,
@@ -121,6 +130,7 @@ def run_imports_once(settings: Settings | None = None) -> None:
     with heartbeat(session_factory, "imports"):
         processed = build_import_runner(settings, session_factory).run_queued()
         if processed:
+            _refresh_library_cache(session_factory)  # an import may have changed the library
             log.info("imports: processed=%s", processed)
 
 

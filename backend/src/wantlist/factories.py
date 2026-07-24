@@ -4,6 +4,7 @@ from .acquire import AcquireService
 from .adapters.album_repo import AlbumRepo
 from .adapters.art_fetcher import fetch_image
 from .adapters.beets import BeetsClient
+from .adapters.beets_cache import BeetsCatalogCache
 from .adapters.clock import SystemClock
 from .adapters.event_log import WorkerEventLog
 from .adapters.mb_resolver import HttpxMusicBrainzResolver
@@ -237,9 +238,11 @@ def build_import_runner(settings: Settings, session_factory: sessionmaker[Sessio
 def build_library_assist_service(
     settings: Settings, session_factory: sessionmaker[Session]
 ) -> LibraryAssistService:
+    # Reads the DB-cached catalogue, never live beets — this service is API-facing (Owned view,
+    # Acquire), and the API must never shell out to `beet` (§5). The worker keeps the cache fresh.
     return LibraryAssistService(
         repo=AlbumRepo(session_factory),
-        catalog=BeetsClient(),
+        catalog=BeetsCatalogCache(session_factory),
     )
 
 
