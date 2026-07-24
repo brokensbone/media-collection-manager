@@ -69,14 +69,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health")
     def health_endpoint(request: Request) -> JSONResponse:
+        # Postgres only: the API never runs beets (the worker owns it), so beets liveness is
+        # surfaced by the poller heartbeats + metrics (§16), not this check.
         postgres = health.check_postgres(request.app.state.engine)
-        beets = health.check_beets()
-        ok = postgres and beets
         return JSONResponse(
-            status_code=200 if ok else 503,
+            status_code=200 if postgres else 503,
             content={
-                "status": "ok" if ok else "degraded",
-                "checks": {"postgres": postgres, "beets": beets},
+                "status": "ok" if postgres else "degraded",
+                "checks": {"postgres": postgres},
             },
         )
 

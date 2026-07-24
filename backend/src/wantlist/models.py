@@ -193,6 +193,20 @@ class WorkerEvent(Base):
     )
 
 
+class BeetsAlbumCache(Base):
+    """Cached snapshot of the beets catalogue (§5), refreshed by the worker (each reconcile and
+    after an import). The API reads *only* this — it never shells out to `beet` — so page loads
+    don't pay a live beets call and don't contend on the library's SQLite lock. Empty until the
+    worker's first refresh (a cold start shows no owned figures for a moment, by design)."""
+
+    __tablename__ = "beets_album_cache"
+
+    beets_id: Mapped[str] = mapped_column(primary_key=True)
+    artist: Mapped[str]
+    title: Mapped[str]
+    mb_releasegroup_id: Mapped[str | None] = mapped_column(index=True, default=None)
+
+
 class NotificationState(Base):
     """Single-row dedup flags so alerts (§8d) fire once per episode, not every poll."""
 
