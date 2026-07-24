@@ -248,14 +248,16 @@ class WatchdirStager:
 
 
 class VideoLibraryImporter:
-    """Places staged video files into their canonical library destination."""
+    """Places staged video files into their canonical library destination. Returns the number of
+    files actually moved; files already present at the destination are skipped, not overwritten,
+    so re-importing a pack that's already (partly) in the library is a no-op for those files —
+    mirroring how the beets path treats a duplicate (D21)."""
 
-    def import_dir(self, staged: str, destination: str) -> None:
+    def import_dir(self, staged: str, destination: str) -> int:
         source_root = _content_root(Path(staged))
         target_root = Path(destination)
         target_root.mkdir(parents=True, exist_ok=True)
-        for child in source_root.iterdir():
-            _move_into(child, target_root / child.name)
+        return sum(_move_into(child, target_root / child.name) for child in source_root.iterdir())
 
 
 class ImportRunner:
@@ -299,6 +301,7 @@ class ImportRunner:
 
         before = self._album_ids()  # snapshot to identify what this import adds (D21)
         new: list[BeetsAlbum] = []
+        placed_video = 0
         staging = Path(self._inbox) / str(rec.id)  # unique per import; no name-collisions
         try:
             stager.stage(rec, str(staging))
@@ -308,7 +311,7 @@ class ImportRunner:
             elif rec.import_target in (ImportTarget.tv.value, ImportTarget.film.value):
                 if not rec.destination_path:
                     raise RuntimeError("video import missing destination path")
-                self._video.import_dir(str(staging), rec.destination_path)
+                placed_video = self._video.import_dir(str(staging), rec.destination_path)
             else:
                 raise RuntimeError("import target is review-only")
         except Exception:
@@ -323,10 +326,17 @@ class ImportRunner:
         finally:
             shutil.rmtree(staging, ignore_errors=True)  # tidy the local staging either way
 
-        # beets adds nothing when the album is already in the library (duplicate_action: skip).
-        # That's a no-op, not a failure and not a second copy — record it as skipped and leave
-        # the source in place (we only ever dispose something we actually imported).
-        if self._catalog is not None and not new:
+        # A no-op import — already wholly in the library — is neither a failure nor a second copy:
+        # record it skipped and leave the source in place (we only ever dispose what we actually
+        # imported). beets signals this by adding nothing (duplicate_action: skip); a video import
+        # signals it by moving nothing (every file already present at the destination). "nothing
+        # new" is meaningless for a video, so this must be gated per target — not on `new` alone,
+        # which is always empty for the video path.
+        if rec.import_target == ImportTarget.beets.value:
+            is_noop = self._catalog is not None and not new
+        else:
+            is_noop = placed_video == 0
+        if is_noop:
             self._repo.mark_import(import_id, ImportState.skipped)
             self._events.emit(
                 job="import",
@@ -673,7 +683,12 @@ def _film_title_and_year(name: str, main_video: str) -> tuple[str | None, int | 
 
 
 def _clean_title(raw: str) -> str | None:
-    title = raw.replace(".", " ").replace("_", " ").strip()
+    # These titles come from untrusted torrent names and are used to build filesystem destinations
+    # under tv_root/film_root, so neutralise path separators and NULs up front — otherwise a
+    # crafted name yielding e.g. a leading-slash segment makes `Path(root) / seg` discard the root
+    # entirely (path escape). `.` becomes a space below, so `..` traversal can't survive either.
+    title = raw.replace("/", " ").replace("\\", " ").replace("\x00", " ")
+    title = title.replace(".", " ").replace("_", " ").strip()
     title = _STRIP_TAIL_RE.sub("", title)
     title = re.sub(r"\s+", " ", title).strip(" -._")
     if not title:
@@ -688,16 +703,23 @@ def _content_root(staging: Path) -> Path:
     return staging
 
 
-def _move_into(source: Path, dest: Path) -> None:
+def _move_into(source: Path, dest: Path) -> int:
+    """Move `source` to `dest`, returning how many files were actually placed. A file already at
+    the destination is left untouched (skipped, not overwritten) so a re-import can't clobber the
+    library or fail the whole pack on one pre-existing episode."""
     if source.is_dir():
         if dest.exists() and not dest.is_dir():
             raise FileExistsError(f"destination exists and is not a directory: {dest}")
         dest.mkdir(parents=True, exist_ok=True)
-        for child in source.iterdir():
-            _move_into(child, dest / child.name)
-        source.rmdir()
-        return
+        moved = sum(_move_into(child, dest / child.name) for child in source.iterdir())
+        # Only removable once emptied; if some children were skipped it stays, which is fine.
+        try:
+            source.rmdir()
+        except OSError:
+            pass
+        return moved
     if dest.exists():
-        raise FileExistsError(f"destination file already exists: {dest}")
+        return 0  # already in the library — skip, don't overwrite
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(source), str(dest))
+    return 1

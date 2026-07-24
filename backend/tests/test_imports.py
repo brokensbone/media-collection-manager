@@ -11,6 +11,7 @@ from wantlist.imports import (
     TransmissionStager,
     VideoLibraryImporter,
     WatchdirStager,
+    _classify_torrent,
 )
 from wantlist.models import Album, AlbumState, ImportSource, ImportState, ImportTarget, Provenance
 from wantlist.ports.spotify_api import SavedAlbum
@@ -600,3 +601,105 @@ def test_video_import_moves_staged_files_into_destination(
     assert (target / "The.Matrix.1999.2160p.mkv").read_text() == "video"
     assert (target / "poster.jpg").read_text() == "art"
     assert repo.get_pending_import(import_id).state == ImportState.imported.value  # type: ignore[union-attr]
+
+
+def test_video_import_with_catalog_present_still_imports(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    # Production wires a catalog into the runner (for the music before/after diff). A video import
+    # never adds to the beets catalogue, so the "nothing new => skipped" no-op check must be gated
+    # to the beets target only — otherwise every real TV/film import is wrongly marked skipped and
+    # its files are never placed. (The other video test wires catalog=None, hiding this.)
+    sf = clean_album_tables
+    download_dir = tmp_path / "downloads"
+    release_dir = download_dir / "The.Matrix.1999.2160p"
+    release_dir.mkdir(parents=True)
+    (release_dir / "The.Matrix.1999.2160p.mkv").write_text("video")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    film_root = tmp_path / "film"
+
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="The.Matrix.1999.2160p",
+        import_target=ImportTarget.film,
+        destination_path=str(film_root / "The Matrix (1999)"),
+        download_dir=str(download_dir),
+        files=["The.Matrix.1999.2160p/The.Matrix.1999.2160p.mkv"],
+        matched_album_id=None,
+    )
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
+
+    beets = FakeBeetsLibrary()  # catalog wired as in prod; a video import leaves it empty
+    ImportRunner(
+        repo=repo,
+        stagers={ImportSource.transmission: TransmissionStager(FakeFileTransfer())},
+        beets=beets,
+        video=VideoLibraryImporter(),
+        inbox=str(inbox),
+        catalog=beets,
+    ).run(import_id)
+
+    assert (film_root / "The Matrix (1999)" / "The.Matrix.1999.2160p.mkv").read_text() == "video"
+    assert repo.get_pending_import(import_id).state == ImportState.imported.value  # type: ignore[union-attr]
+
+
+def test_video_reimport_skips_when_all_files_already_present(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    # Re-importing a pack already in the library is a no-op: don't overwrite, don't fail the whole
+    # import — mark it skipped, mirroring the beets duplicate path.
+    sf = clean_album_tables
+    download_dir = tmp_path / "downloads"
+    release_dir = download_dir / "The.Matrix.1999.2160p"
+    release_dir.mkdir(parents=True)
+    (release_dir / "The.Matrix.1999.2160p.mkv").write_text("new copy")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    target = tmp_path / "film" / "The Matrix (1999)"
+    target.mkdir(parents=True)
+    (target / "The.Matrix.1999.2160p.mkv").write_text("already here")  # pre-existing
+
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="The.Matrix.1999.2160p",
+        import_target=ImportTarget.film,
+        destination_path=str(target),
+        download_dir=str(download_dir),
+        files=["The.Matrix.1999.2160p/The.Matrix.1999.2160p.mkv"],
+        matched_album_id=None,
+    )
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
+
+    beets = FakeBeetsLibrary()
+    ImportRunner(
+        repo=repo,
+        stagers={ImportSource.transmission: TransmissionStager(FakeFileTransfer())},
+        beets=beets,
+        video=VideoLibraryImporter(),
+        inbox=str(inbox),
+        catalog=beets,
+    ).run(import_id)
+
+    assert (target / "The.Matrix.1999.2160p.mkv").read_text() == "already here"  # not overwritten
+    assert repo.get_pending_import(import_id).state == ImportState.skipped.value  # type: ignore[union-attr]
+
+
+def test_classify_torrent_sanitises_path_traversal_in_title() -> None:
+    # The show/film title is derived from an untrusted torrent name and used to build a filesystem
+    # destination. A leading-slash segment would make `Path(tv_root) / seg` discard tv_root, so
+    # the title must be reduced to a safe single path component under the root.
+    classified = _classify_torrent(
+        "/evil.S01E01.1080p",
+        ["/evil.S01E01.1080p.mkv"],
+        tv_root="/tv",
+        film_root="/film",
+        matched_album_id=None,
+    )
+    assert classified.destination_path == "/tv/Evil/Season 01"
