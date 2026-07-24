@@ -30,7 +30,7 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
   // intent here and re-apply it to every poll result until the server catches up — no flicker.
   const pending = useRef<Map<number, 'queued' | 'discarded'>>(new Map())
 
-  const merge = useCallback((data: Item[]): Item[] => {
+  const merge = useCallback((prev: Item[] | null, data: Item[]): Item[] => {
     const p = pending.current
     const ids = new Set(data.map((it) => it.id))
     for (const it of data) {
@@ -39,15 +39,30 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
     for (const [id, kind] of [...p]) {
       if (kind === 'discarded' && !ids.has(id)) p.delete(id) // server dismissed it
     }
-    return data
+    const effective: Item[] = data
       .filter((it) => p.get(it.id) !== 'discarded')
-      .map((it) => (p.get(it.id) === 'queued' ? { ...it, state: 'queued' } : it))
+      .map((it) => (p.get(it.id) === 'queued' ? { ...it, state: 'queued' as const } : it))
+    // Keep rows where they already are: adopting the server's active-first order on every poll
+    // makes a row that changes state (e.g. Retry: failed -> queued) jump up the list under the
+    // cursor. So preserve the current display order, update rows in place, append only new ones.
+    if (!prev) return effective // first load takes the server order
+    const byId = new Map(effective.map((it) => [it.id, it]))
+    const seen = new Set<number>()
+    const kept: Item[] = []
+    for (const row of prev) {
+      const updated = byId.get(row.id)
+      if (updated) {
+        kept.push(updated)
+        seen.add(row.id)
+      }
+    }
+    return [...kept, ...effective.filter((it) => !seen.has(it.id))]
   }, [])
 
   const refresh = useCallback(() => {
     fetch('/imports')
       .then((r) => r.json())
-      .then((data: Item[]) => setItems(merge(data)))
+      .then((data: Item[]) => setItems((prev) => merge(prev, data)))
       .catch(() => setItems([]))
   }, [merge])
 

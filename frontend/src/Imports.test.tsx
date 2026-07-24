@@ -95,6 +95,24 @@ describe('Imports', () => {
     expect(screen.queryByText('Unwanted')).toBeNull()
   })
 
+  it('keeps a row in place when Retry changes its state (no jump)', async () => {
+    // Retrying a failed row flips it to queued; the server then sorts active rows to the top.
+    // The list must keep the row where it is rather than jumping it up under the cursor.
+    const a = item({ id: 1, name: 'Aaa', state: 'detected' })
+    const z = item({ id: 2, name: 'Zzz', state: 'failed' })
+    mockApiSequence([
+      [a, z], // initial order: Aaa, then Zzz
+      [{ ...z, state: 'queued' }, a], // after retry: server re-sorts queued Zzz to the top
+      [{ ...z, state: 'queued' }, a],
+    ])
+    const { container } = render(<Imports />)
+    await screen.findByText('Zzz')
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(screen.getByText('queued')).toBeTruthy())
+    const text = container.textContent ?? ''
+    expect(text.indexOf('Aaa')).toBeLessThan(text.indexOf('Zzz')) // order unchanged
+  })
+
   it('scans the watch folder and refreshes newly detected rows', async () => {
     const fetchMock = mockApiSequence([[], [item({ id: 8, name: 'Dropped Folder' })]])
     render(<Imports />)
