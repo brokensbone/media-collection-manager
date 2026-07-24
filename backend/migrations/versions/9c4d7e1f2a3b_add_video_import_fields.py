@@ -20,7 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 media_kind = sa.Enum("music", "tv", "film", "unknown", name="media_kind")
 import_target = sa.Enum(
-    "beets", "jellyfin_tv", "jellyfin_film", "review", name="import_target"
+    "beets", "tv", "film", "review", name="import_target"
 )
 
 

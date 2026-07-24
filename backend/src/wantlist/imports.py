@@ -248,7 +248,7 @@ class WatchdirStager:
 
 
 class VideoLibraryImporter:
-    """Places staged video files into their canonical Jellyfin destination."""
+    """Places staged video files into their canonical library destination."""
 
     def import_dir(self, staged: str, destination: str) -> None:
         source_root = _content_root(Path(staged))
@@ -307,10 +307,7 @@ class ImportRunner:
                 new = self._new_albums(before)
                 if self._catalog is not None and not new:
                     raise RuntimeError("beets import completed without adding any albums")
-            elif rec.import_target in (
-                ImportTarget.jellyfin_tv.value,
-                ImportTarget.jellyfin_film.value,
-            ):
+            elif rec.import_target in (ImportTarget.tv.value, ImportTarget.film.value):
                 if not rec.destination_path:
                     raise RuntimeError("video import missing destination path")
                 self._video.import_dir(str(staging), rec.destination_path)
@@ -548,7 +545,7 @@ def _classify_torrent(
             season = next(iter(seasons))
             return Classification(
                 media_kind=MediaKind.tv,
-                import_target=ImportTarget.jellyfin_tv,
+                import_target=ImportTarget.tv,
                 classification_detail=f"Detected TV episode pack for season {season:02d}.",
                 destination_path=str(Path(tv_root) / show_title / f"Season {season:02d}"),
                 state=ImportState.detected,
@@ -583,7 +580,7 @@ def _classify_torrent(
                 detail = "Detected a film, but no year was found."
             return Classification(
                 media_kind=MediaKind.film,
-                import_target=ImportTarget.jellyfin_film,
+                import_target=ImportTarget.film,
                 classification_detail=detail,
                 destination_path=str(Path(film_root) / folder),
                 state=ImportState.detected,

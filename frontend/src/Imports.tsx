@@ -7,7 +7,7 @@ type Item = {
   name: string
   state: 'detected' | 'queued' | 'importing' | 'imported' | 'skipped' | 'failed'
   media_kind: 'music' | 'tv' | 'film' | 'unknown'
-  import_target: 'beets' | 'jellyfin_tv' | 'jellyfin_film' | 'review'
+  import_target: 'beets' | 'tv' | 'film' | 'review'
   classification_detail: string | null
   destination_path: string | null
   state: 'detected' | 'queued' | 'importing' | 'imported' | 'skipped' | 'failed'

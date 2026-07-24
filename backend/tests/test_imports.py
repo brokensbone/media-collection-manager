@@ -534,9 +534,9 @@ def test_transmission_detection_classifies_music_tv_film_and_non_media(
     rows = {r.name: r for r in AlbumRepo(sf).list_imports()}
     assert set(rows) == {"Some Album", "Severance.S02E01.1080p", "The.Matrix.1999.2160p"}
     assert rows["Some Album"].media_kind == "music"
-    assert rows["Severance.S02E01.1080p"].import_target == "jellyfin_tv"
+    assert rows["Severance.S02E01.1080p"].import_target == "tv"
     assert rows["Severance.S02E01.1080p"].destination_path == "/tv/Severance/Season 02"
-    assert rows["The.Matrix.1999.2160p"].import_target == "jellyfin_film"
+    assert rows["The.Matrix.1999.2160p"].import_target == "film"
     assert rows["The.Matrix.1999.2160p"].destination_path == "/film/The Matrix (1999)"
     # every hash is now ledgered, so a re-poll screens nothing again
     assert AlbumRepo(sf).known_source_keys() == {"a", "b", "c", "d"}
@@ -582,7 +582,7 @@ def test_video_import_moves_staged_files_into_destination(
         source=ImportSource.transmission,
         source_key="h1",
         name="The.Matrix.1999.2160p",
-        import_target=ImportTarget.jellyfin_film,
+        import_target=ImportTarget.film,
         destination_path=str(film_root / "The Matrix (1999)"),
         download_dir=str(download_dir),
         files=[

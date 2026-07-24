@@ -141,8 +141,8 @@ class MediaKind(StrEnum):
 
 class ImportTarget(StrEnum):
     beets = "beets"
-    jellyfin_tv = "jellyfin_tv"
-    jellyfin_film = "jellyfin_film"
+    tv = "tv"
+    film = "film"
     review = "review"
 
 

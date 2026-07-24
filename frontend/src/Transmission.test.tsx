@@ -36,7 +36,7 @@ describe('Transmission', () => {
         id: 2,
         name: 'A Movie',
         media_kind: 'film',
-        import_target: 'jellyfin_film',
+        import_target: 'film',
         classification_detail: 'Detected a single-feature film.',
         destination_path: '/film/A Movie (2024)',
         state: 'detected',
