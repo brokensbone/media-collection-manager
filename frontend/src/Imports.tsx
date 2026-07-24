@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { matchesQuery } from './filter'
 
 type Item = {
@@ -24,12 +24,31 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
   const [items, setItems] = useState<Item[] | null>(null)
   const [scanning, setScanning] = useState(false)
 
+  // Optimistic actions that must outlive a poll: after clicking Import/Discard, an in-flight (or
+  // next) /imports poll can still return the pre-action row and flash it back. So we hold the
+  // intent here and re-apply it to every poll result until the server catches up — no flicker.
+  const pending = useRef<Map<number, 'queued' | 'discarded'>>(new Map())
+
+  const merge = useCallback((data: Item[]): Item[] => {
+    const p = pending.current
+    const ids = new Set(data.map((it) => it.id))
+    for (const it of data) {
+      if (p.get(it.id) === 'queued' && it.state !== 'detected') p.delete(it.id) // server caught up
+    }
+    for (const [id, kind] of [...p]) {
+      if (kind === 'discarded' && !ids.has(id)) p.delete(id) // server dismissed it
+    }
+    return data
+      .filter((it) => p.get(it.id) !== 'discarded')
+      .map((it) => (p.get(it.id) === 'queued' ? { ...it, state: 'queued' } : it))
+  }, [])
+
   const refresh = useCallback(() => {
     fetch('/imports')
       .then((r) => r.json())
-      .then(setItems)
+      .then((data: Item[]) => setItems(merge(data)))
       .catch(() => setItems([]))
-  }, [])
+  }, [merge])
 
   // Poll so background imports (queued → imported/failed) update on screen without a reload.
   useEffect(() => {
@@ -40,13 +59,17 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
 
   const enqueue = useCallback(
     (id: number) => {
-      // optimistically show it queued; the poll then tracks it to imported/failed
+      // optimistically show it queued (sticky via `pending`); the poll tracks it onward
+      pending.current.set(id, 'queued')
       setItems(
         (list) => list?.map((it) => (it.id === id ? { ...it, state: 'queued' } : it)) ?? list,
       )
-      fetch(`/imports/${id}/import`, { method: 'POST' }).then(() => onChange?.())
+      fetch(`/imports/${id}/import`, { method: 'POST' }).then(() => {
+        onChange?.()
+        refresh()
+      })
     },
-    [onChange],
+    [onChange, refresh],
   )
 
   const scan = useCallback(() => {
@@ -59,10 +82,14 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
 
   const discard = useCallback(
     (id: number) => {
+      pending.current.set(id, 'discarded') // sticky removal until the server dismisses it
       setItems((list) => list?.filter((it) => it.id !== id) ?? list)
-      fetch(`/imports/${id}`, { method: 'DELETE' }).then(() => onChange?.())
+      fetch(`/imports/${id}`, { method: 'DELETE' }).then(() => {
+        onChange?.()
+        refresh()
+      })
     },
-    [onChange],
+    [onChange, refresh],
   )
 
   if (!items) return <p>Loading…</p>
