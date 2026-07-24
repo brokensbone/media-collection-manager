@@ -119,6 +119,7 @@ class ImportState(StrEnum):
     queued = "queued"  # clicked; awaiting background processing by the worker
     importing = "importing"  # the worker is actively staging/importing this one right now
     imported = "imported"
+    skipped = "skipped"  # beets found it already in the library — no second copy kept (§12/§13)
     failed = "failed"
     dismissed = "dismissed"  # operator discarded it; kept so its source-key stays in the ledger
 

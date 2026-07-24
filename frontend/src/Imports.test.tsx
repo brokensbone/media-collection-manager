@@ -154,6 +154,15 @@ describe('Imports', () => {
     expect(screen.queryByText(/queued/)).toBeNull()
   })
 
+  it('shows an already-in-library skip without actions', async () => {
+    mockApi([item({ id: 4, name: 'Dup.zip', state: 'skipped' })])
+    render(<Imports />)
+    expect(await screen.findByText('already in library')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Import' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull()
+  })
+
   it('shows imported status without an action', async () => {
     mockApi([item({ id: 4, name: 'Done.zip', state: 'imported' })])
     render(<Imports />)

@@ -5,7 +5,7 @@ type Item = {
   id: number
   source: string
   name: string
-  state: 'detected' | 'queued' | 'importing' | 'imported' | 'failed'
+  state: 'detected' | 'queued' | 'importing' | 'imported' | 'skipped' | 'failed'
   matched_album_id: number | null
   matched: string | null
   matched_owned: boolean
@@ -17,6 +17,7 @@ const STATUS: Record<Item['state'], string> = {
   queued: 'queued',
   importing: 'importing…',
   imported: 'imported ✓',
+  skipped: 'already in library',
   failed: 'failed',
 }
 
@@ -152,6 +153,7 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
                         <span className="muted">{STATUS.importing}</span>
                       )}
                       {it.state === 'imported' && <span className="muted">{STATUS.imported}</span>}
+                      {it.state === 'skipped' && <span className="muted">{STATUS.skipped}</span>}
                       {it.state === 'failed' && (
                         <>
                           <span className="muted">{STATUS.failed}</span>{' '}

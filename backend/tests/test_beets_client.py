@@ -34,12 +34,13 @@ def test_owned_release_group_ids_via_beetsdir(
     assert owned == {"rg-1", "rg-2"}  # the id-less album contributes a blank line, dropped
 
 
-def test_import_dir_uses_quiet_asis_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_import_dir_skips_duplicates_and_uses_asis(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, Any] = {}
 
     def fake_run(argv: list[str], **kwargs: Any) -> object:
         captured["argv"] = argv
-        captured["kwargs"] = kwargs
+        # read the layered override while the temp file still exists (unlinked after _run returns)
+        captured["override"] = Path(argv[argv.index("--config") + 1]).read_text()
 
         class Result:
             stdout = ""
@@ -50,7 +51,10 @@ def test_import_dir_uses_quiet_asis_fallback(monkeypatch: pytest.MonkeyPatch) ->
 
     BeetsClient().import_dir("/drop")
 
-    assert captured["argv"] == ["beet", "import", "-q", "--quiet-fallback=asis", "/drop"]
+    argv = captured["argv"]
+    assert argv[0] == "beet" and argv[1] == "--config"
+    assert argv[3:] == ["import", "-q", "--quiet-fallback=asis", "/drop"]
+    assert "duplicate_action: skip" in captured["override"]
 
 
 def _locked_error(argv: list[str]) -> subprocess.CalledProcessError:
