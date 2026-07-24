@@ -30,6 +30,10 @@ function item(over: Record<string, unknown> = {}) {
     id: 1,
     source: 'watchdir',
     name: 'Album.zip',
+    media_kind: 'music',
+    import_target: 'beets',
+    classification_detail: null,
+    destination_path: null,
     state: 'detected',
     matched_album_id: null,
     matched: null,
@@ -46,12 +50,13 @@ describe('Imports', () => {
   it('shows the source, matched want and a no-match label', async () => {
     mockApi([
       item({ id: 1, source: 'transmission', name: 'Burial-Untrue', matched: 'Burial — Untrue' }),
-      item({ id: 2, name: 'Mystery' }),
+      item({ id: 2, name: 'Mystery', media_kind: 'film', destination_path: '/film/Mystery' }),
     ])
     render(<Imports />)
     expect(await screen.findByText('Burial — Untrue')).toBeTruthy()
     expect(screen.getByText('transmission')).toBeTruthy()
     expect(screen.getByText('no match')).toBeTruthy()
+    expect(screen.getByText('/film/Mystery')).toBeTruthy()
   })
 
   it('import enqueues and the row persists showing queued, not vanishing', async () => {
@@ -187,5 +192,20 @@ describe('Imports', () => {
     expect(await screen.findByText('imported ✓')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Import' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull()
+  })
+
+  it('shows blocked review-only rows without an Import action', async () => {
+    mockApi([
+      item({
+        id: 10,
+        name: 'Mystery Pack',
+        media_kind: 'unknown',
+        import_target: 'review',
+        classification_detail: 'Video files found, but the title or type is ambiguous.',
+      }),
+    ])
+    render(<Imports />)
+    expect(await screen.findByText('needs review')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Import' })).toBeNull()
   })
 })

@@ -132,6 +132,20 @@ class ImportSource(StrEnum):
     watchdir = "watchdir"
 
 
+class MediaKind(StrEnum):
+    music = "music"
+    tv = "tv"
+    film = "film"
+    unknown = "unknown"
+
+
+class ImportTarget(StrEnum):
+    beets = "beets"
+    jellyfin_tv = "jellyfin_tv"
+    jellyfin_film = "jellyfin_film"
+    review = "review"
+
+
 class PendingImport(Base):
     """An acquisition awaiting a one-click import into beets, from either front (§12/§13).
     `source_key` is the per-source seen-ledger key (torrent hash / drop path) so a given
@@ -146,6 +160,14 @@ class PendingImport(Base):
     download_dir: Mapped[str | None] = mapped_column(default=None)  # §12 transfer source
     files: Mapped[list[str]] = mapped_column(JSON, default=list)  # §12 paths relative to dir
     archive_path: Mapped[str | None] = mapped_column(default=None)  # §13 zip/folder to unpack
+    media_kind: Mapped[MediaKind] = mapped_column(
+        SAEnum(MediaKind, name="media_kind"), default=MediaKind.music
+    )
+    import_target: Mapped[ImportTarget] = mapped_column(
+        SAEnum(ImportTarget, name="import_target"), default=ImportTarget.beets
+    )
+    classification_detail: Mapped[str | None] = mapped_column(default=None)
+    destination_path: Mapped[str | None] = mapped_column(default=None)
     matched_album_id: Mapped[int | None] = mapped_column(
         ForeignKey("album.id", ondelete="SET NULL"), default=None
     )

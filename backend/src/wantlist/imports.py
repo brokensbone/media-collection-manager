@@ -1,4 +1,5 @@
 import logging
+import re
 import shutil
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -10,7 +11,7 @@ from .adapters.beets import BeetsAlbum
 from .adapters.event_log import NullEventSink
 from .adapters.unpack import dispose, unpack
 from .domain.match import MatchTarget, best_match
-from .models import AlbumState, ImportSource, ImportState
+from .models import AlbumState, ImportSource, ImportState, ImportTarget, MediaKind
 from .ports.clock import Clock
 from .ports.events import EventSink
 from .ports.file_transfer import FileTransfer
@@ -44,11 +45,25 @@ class ImportItem:
     id: int
     source: str
     name: str
+    media_kind: str
+    import_target: str
+    classification_detail: str | None
+    destination_path: str | None
     state: str  # detected | queued | imported | failed — drives the status shown per row
     matched_album_id: int | None
     matched: str | None  # "Artist — Title" of the matched want, or None for the no-match tail
     matched_owned: bool  # the matched album is already owned — importing would just duplicate it
     missing: bool  # the watch-dir file backing this drop is gone — offer removal, not import
+
+
+@dataclass
+class Classification:
+    media_kind: MediaKind
+    import_target: ImportTarget
+    classification_detail: str
+    destination_path: str | None
+    state: ImportState
+    matched_album_id: int | None = None
 
 
 # --- detection: one service per front (§12 Transmission / §13 watch-dir) --------------
@@ -65,19 +80,21 @@ class ImportDetectionService:
         transmission: TransmissionClient,
         repo: AlbumRepo,
         match_threshold: float,
+        jellyfin_tv_root: str = "",
+        jellyfin_film_root: str = "",
         events: EventSink | None = None,
     ):
         self._transmission = transmission
         self._repo = repo
         self._threshold = match_threshold
+        self._tv_root = jellyfin_tv_root
+        self._film_root = jellyfin_film_root
         self._events = events or NullEventSink()
 
     def poll(self) -> DetectResult:
         # The client is shared with all the operator's torrents, so on first connect there are
-        # hundreds already complete and plenty are non-music. Each hash is screened once: a
-        # torrent with audio is surfaced (and matched) for the operator; one without is recorded
-        # as `dismissed` so its hash stays in the ledger and we never screen it again. Either way
-        # the hash is now known, so a re-poll skips it on the hash check alone.
+        # hundreds already complete and plenty are not importable media. Each hash is screened
+        # once and recorded in the ledger so re-polls skip it entirely.
         known = self._repo.known_source_keys()
         fresh = [t for t in self._transmission.completed_torrents() if t.hash not in known]
         if not fresh:
@@ -86,28 +103,31 @@ class ImportDetectionService:
         targets = _match_targets(self._repo)
         detected = 0
         for t in fresh:
-            if _has_audio(t.files):
-                self._repo.add_pending_import(
-                    source=ImportSource.transmission,
-                    source_key=t.hash,
-                    name=t.name,
-                    download_dir=t.download_dir,
-                    files=t.files,
-                    matched_album_id=best_match(t.name, targets, self._threshold),
-                    has_audio=True,
-                )
+            classified = _classify_torrent(
+                t.name,
+                t.files,
+                tv_root=self._tv_root,
+                film_root=self._film_root,
+                matched_album_id=best_match(t.name, targets, self._threshold),
+            )
+            self._repo.add_pending_import(
+                source=ImportSource.transmission,
+                source_key=t.hash,
+                name=t.name,
+                media_kind=classified.media_kind,
+                import_target=classified.import_target,
+                classification_detail=classified.classification_detail,
+                destination_path=classified.destination_path,
+                download_dir=t.download_dir,
+                files=t.files,
+                matched_album_id=classified.matched_album_id,
+                state=classified.state,
+                has_audio=classified.media_kind == MediaKind.music,
+            )
+            if classified.state != ImportState.dismissed:
                 detected += 1
                 self._events.emit(
                     job="import", type="detected", message=f"Detected download: '{t.name}'"
-                )
-            else:
-                self._repo.add_pending_import(  # not music: ledger the hash, never screen it again
-                    source=ImportSource.transmission,
-                    source_key=t.hash,
-                    name=t.name,
-                    matched_album_id=None,
-                    state=ImportState.dismissed,
-                    has_audio=False,
                 )
         return DetectResult(detected=detected)
 
@@ -161,6 +181,9 @@ class WatchdirDetectionService:
                 source=ImportSource.watchdir,
                 source_key=_drop_key(drop),
                 name=drop.name,
+                media_kind=MediaKind.music,
+                import_target=ImportTarget.beets,
+                classification_detail="Watch-folder audio drop.",
                 archive_path=str(drop),
                 matched_album_id=best_match(query, targets, self._threshold),
             )
@@ -224,6 +247,17 @@ class WatchdirStager:
         dispose(rec.archive_path, disposition=self._disposition, archive_dir=self._archive_dir)
 
 
+class VideoLibraryImporter:
+    """Places staged video files into their canonical Jellyfin destination."""
+
+    def import_dir(self, staged: str, destination: str) -> None:
+        source_root = _content_root(Path(staged))
+        target_root = Path(destination)
+        target_root.mkdir(parents=True, exist_ok=True)
+        for child in source_root.iterdir():
+            _move_into(child, target_root / child.name)
+
+
 class ImportRunner:
     """The shared import tail (SPEC §12/§13): stage the acquisition into the beets inbox via
     the source's stager, import it, tidy the staging, then let the stager dispose the source.
@@ -235,6 +269,7 @@ class ImportRunner:
         repo: AlbumRepo,
         stagers: dict[ImportSource, Stager],
         beets: BeetsImporter,
+        video: VideoLibraryImporter,
         inbox: str,
         catalog: LibraryCatalog | None = None,
         reverse_matcher: ReverseMatcher | None = None,
@@ -243,6 +278,7 @@ class ImportRunner:
         self._repo = repo
         self._stagers = stagers
         self._beets = beets
+        self._video = video
         self._inbox = inbox
         self._catalog = catalog
         self._reverse_matcher = reverse_matcher
@@ -266,8 +302,20 @@ class ImportRunner:
         staging = Path(self._inbox) / str(rec.id)  # unique per import; no name-collisions
         try:
             stager.stage(rec, str(staging))
-            self._beets.import_dir(str(staging))
-            new = self._new_albums(before)
+            if rec.import_target == ImportTarget.beets.value:
+                self._beets.import_dir(str(staging))
+                new = self._new_albums(before)
+                if self._catalog is not None and not new:
+                    raise RuntimeError("beets import completed without adding any albums")
+            elif rec.import_target in (
+                ImportTarget.jellyfin_tv.value,
+                ImportTarget.jellyfin_film.value,
+            ):
+                if not rec.destination_path:
+                    raise RuntimeError("video import missing destination path")
+                self._video.import_dir(str(staging), rec.destination_path)
+            else:
+                raise RuntimeError("import target is review-only")
         except Exception:
             self._repo.mark_import(import_id, ImportState.failed)
             self._events.emit(
@@ -362,6 +410,10 @@ class ImportsService:
                 id=r.id,
                 source=r.source,
                 name=r.name,
+                media_kind=r.media_kind,
+                import_target=r.import_target,
+                classification_detail=r.classification_detail,
+                destination_path=r.destination_path,
                 state=r.state,
                 matched_album_id=r.matched_album_id,
                 matched=f"{r.matched_artist} — {r.matched_title}" if r.matched_album_id else None,
@@ -382,6 +434,9 @@ class ImportsService:
         return not Path(archive_path).exists()
 
     def enqueue(self, import_id: int) -> None:
+        rec = self._repo.get_pending_import(import_id)
+        if rec is None or rec.import_target == ImportTarget.review.value:
+            return
         self._repo.queue_import(import_id)
 
     def discard(self, import_id: int) -> None:
@@ -418,11 +473,129 @@ _AUDIO_EXTS = frozenset(
     }
 )
 
+_VIDEO_EXTS = frozenset(
+    {
+        ".mkv",
+        ".mp4",
+        ".avi",
+        ".m4v",
+        ".mov",
+        ".wmv",
+        ".mpg",
+        ".mpeg",
+        ".ts",
+        ".m2ts",
+        ".webm",
+    }
+)
+
+_EPISODE_RE = re.compile(r"(?i)\bS(?P<season>\d{1,2})E(?P<episode>\d{2,3})\b")
+_EPISODE_ALT_RE = re.compile(r"(?i)\b(?P<season>\d{1,2})x(?P<episode>\d{2,3})\b")
+_SEASON_RE = re.compile(r"(?i)\bS(?:eason)?[ ._-]?(?P<season>\d{1,2})\b")
+_YEAR_RE = re.compile(r"\b(19\d{2}|20\d{2})\b")
+_STRIP_TAIL_RE = re.compile(
+    r"(?i)\b("
+    r"720p|1080p|2160p|480p|x264|x265|h\.?264|h\.?265|hevc|bluray|bdrip|brrip|"
+    r"webrip|web[- ]dl|amzn|nf|hulu|ddp?[57]\.1|aac2?\.0|proper|repack|remux|internal"
+    r")\b.*$"
+)
+
 
 def _has_audio(files: list[str]) -> bool:
     """A torrent is music only if it carries at least one audio file — the filter that keeps
     a shared Transmission client's movies/software/ISOs out of the Import list (§12)."""
     return any(Path(f).suffix.lower() in _AUDIO_EXTS for f in files)
+
+
+def _has_video(files: list[str]) -> bool:
+    return any(Path(f).suffix.lower() in _VIDEO_EXTS for f in files)
+
+
+def _classify_torrent(
+    name: str,
+    files: list[str],
+    *,
+    tv_root: str,
+    film_root: str,
+    matched_album_id: int | None,
+) -> Classification:
+    if _has_audio(files):
+        return Classification(
+            media_kind=MediaKind.music,
+            import_target=ImportTarget.beets,
+            classification_detail="Audio files detected.",
+            destination_path=None,
+            state=ImportState.detected,
+            matched_album_id=matched_album_id,
+        )
+
+    video_files = _video_files(files)
+    if not video_files:
+        return Classification(
+            media_kind=MediaKind.unknown,
+            import_target=ImportTarget.review,
+            classification_detail="No audio or video files detected.",
+            destination_path=None,
+            state=ImportState.dismissed,
+        )
+
+    episode_matches = [_episode_match(p) for p in [name, *video_files]]
+    episodes = [m for m in episode_matches if m is not None]
+    if episodes:
+        seasons = {season for _, season in episodes}
+        show_title = _series_title(name, video_files)
+        if show_title and len(seasons) == 1 and tv_root:
+            season = next(iter(seasons))
+            return Classification(
+                media_kind=MediaKind.tv,
+                import_target=ImportTarget.jellyfin_tv,
+                classification_detail=f"Detected TV episode pack for season {season:02d}.",
+                destination_path=str(Path(tv_root) / show_title / f"Season {season:02d}"),
+                state=ImportState.detected,
+            )
+        detail = "Detected TV episodes, but could not derive a single season destination."
+        return Classification(
+            media_kind=MediaKind.tv,
+            import_target=ImportTarget.review,
+            classification_detail=detail,
+            destination_path=None,
+            state=ImportState.detected,
+        )
+
+    if not film_root:
+        return Classification(
+            media_kind=MediaKind.film,
+            import_target=ImportTarget.review,
+            classification_detail=(
+                "Detected a film-like video, but the film root is not configured."
+            ),
+            destination_path=None,
+            state=ImportState.detected,
+        )
+
+    main_videos = [vf for vf in video_files if "sample" not in Path(vf).stem.lower()]
+    if len(main_videos) == 1:
+        title, year = _film_title_and_year(name, main_videos[0])
+        if title:
+            folder = f"{title} ({year})" if year is not None else title
+            detail = "Detected a single-feature film."
+            if year is None:
+                detail = "Detected a film, but no year was found."
+            return Classification(
+                media_kind=MediaKind.film,
+                import_target=ImportTarget.jellyfin_film,
+                classification_detail=detail,
+                destination_path=str(Path(film_root) / folder),
+                state=ImportState.detected,
+            )
+
+    return Classification(
+        media_kind=MediaKind.unknown,
+        import_target=ImportTarget.review,
+        classification_detail="Video files found, but the title or type is ambiguous.",
+        destination_path=None,
+        state=ImportState.detected,
+    )
 
 
 def _match_targets(repo: AlbumRepo) -> list[MatchTarget]:
@@ -456,3 +629,80 @@ def _dir_size(entry: Path) -> int:
 
 def _dir_has_audio(entry: Path) -> bool:
     return any(_has_audio([str(p)]) for p in entry.rglob("*") if p.is_file())
+
+
+def _video_files(files: list[str]) -> list[str]:
+    return [f for f in files if Path(f).suffix.lower() in _VIDEO_EXTS]
+
+
+def _episode_match(value: str) -> tuple[str, int] | None:
+    cleaned = value.replace("_", " ").replace(".", " ")
+    for pattern in (_EPISODE_RE, _EPISODE_ALT_RE):
+        match = pattern.search(cleaned)
+        if match:
+            prefix = cleaned[: match.start()].strip(" -._")
+            return prefix, int(match.group("season"))
+    return None
+
+
+def _series_title(name: str, files: list[str]) -> str | None:
+    candidates = [name, *files]
+    for value in candidates:
+        match = _episode_match(value)
+        if match is not None:
+            title = _clean_title(match[0])
+            if title:
+                return title
+    season_match = _SEASON_RE.search(name.replace(".", " ").replace("_", " "))
+    if season_match:
+        title = _clean_title(name[: season_match.start()])
+        if title:
+            return title
+    return None
+
+
+def _film_title_and_year(name: str, main_video: str) -> tuple[str | None, int | None]:
+    candidates = [Path(main_video).stem, Path(main_video).parent.name, name]
+    for raw in candidates:
+        cleaned = raw.replace(".", " ").replace("_", " ")
+        year_match = _YEAR_RE.search(cleaned)
+        if year_match:
+            title = _clean_title(cleaned[: year_match.start()])
+            if title:
+                return title, int(year_match.group(1))
+    for raw in candidates:
+        title = _clean_title(raw)
+        if title:
+            return title, None
+    return None, None
+
+
+def _clean_title(raw: str) -> str | None:
+    title = raw.replace(".", " ").replace("_", " ").strip()
+    title = _STRIP_TAIL_RE.sub("", title)
+    title = re.sub(r"\s+", " ", title).strip(" -._")
+    if not title:
+        return None
+    return " ".join(word.capitalize() if word.islower() else word for word in title.split())
+
+
+def _content_root(staging: Path) -> Path:
+    children = list(staging.iterdir())
+    if len(children) == 1 and children[0].is_dir():
+        return children[0]
+    return staging
+
+
+def _move_into(source: Path, dest: Path) -> None:
+    if source.is_dir():
+        if dest.exists() and not dest.is_dir():
+            raise FileExistsError(f"destination exists and is not a directory: {dest}")
+        dest.mkdir(parents=True, exist_ok=True)
+        for child in source.iterdir():
+            _move_into(child, dest / child.name)
+        source.rmdir()
+        return
+    if dest.exists():
+        raise FileExistsError(f"destination file already exists: {dest}")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(source), str(dest))
