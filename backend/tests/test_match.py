@@ -41,6 +41,16 @@ def test_plain_download_matches_a_deluxe_edition_but_not_a_sibling() -> None:
     assert best_match("BIG SPECIAL -2025- NATIONAL AVERAGE (FLAC)", targets, 0.5) is None
 
 
+def test_self_titled_album_does_not_swallow_other_albums() -> None:
+    # A self-titled album's title == its artist, so an artist-only gate would greedily match any
+    # download by that artist. Only a download that is itself just the artist should match it.
+    targets = [MatchTarget(id=1, artist="Billy Nomates", title="Billy Nomates")]
+    assert (
+        best_match("Billy Nomates - Metalhorse (2025) [WEB-FLAC]", targets, threshold=0.5) is None
+    )
+    assert best_match("Billy Nomates - 2020 - FLAC", targets, threshold=0.5) == 1
+
+
 def test_unrelated_titles_do_not_match_on_incidental_character_overlap() -> None:
     # Whole-string ratio used to match these (shared spaces/letters/"the"); the title gate rejects.
     targets = [
