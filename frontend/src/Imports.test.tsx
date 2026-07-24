@@ -67,6 +67,34 @@ describe('Imports', () => {
     await waitFor(() => expect(screen.getByText('queued')).toBeTruthy())
   })
 
+  it('keeps a queued row queued when a follow-up poll still reports it detected', async () => {
+    // The race: the post-Import refresh (and background polls) can still return the pre-click
+    // detected row; the optimistic queued state must stick, not flash back to the Import button.
+    mockApiSequence([
+      [item({ id: 9, name: 'Only' })], // initial poll: detected
+      [item({ id: 9, name: 'Only' })], // post-import refresh: still detected (stale)
+      [item({ id: 9, name: 'Only' })],
+    ])
+    render(<Imports />)
+    await screen.findByText('Only')
+    fireEvent.click(screen.getByRole('button', { name: 'Import' }))
+    await waitFor(() => expect(screen.getByText('queued')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Import' })).toBeNull()
+  })
+
+  it('keeps a discarded row gone when a follow-up poll still returns it', async () => {
+    mockApiSequence([
+      [item({ id: 7, name: 'Unwanted' })],
+      [item({ id: 7, name: 'Unwanted' })], // stale refresh still lists it
+      [item({ id: 7, name: 'Unwanted' })],
+    ])
+    render(<Imports />)
+    await screen.findByText('Unwanted')
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
+    await waitFor(() => expect(screen.queryByText('Unwanted')).toBeNull())
+    expect(screen.queryByText('Unwanted')).toBeNull()
+  })
+
   it('scans the watch folder and refreshes newly detected rows', async () => {
     const fetchMock = mockApiSequence([[], [item({ id: 8, name: 'Dropped Folder' })]])
     render(<Imports />)
