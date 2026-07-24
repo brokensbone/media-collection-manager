@@ -41,8 +41,8 @@ export function Dashboard({ refreshKey = 0, active = 'all', onSelect }: Props) {
       .catch(() => setCounts(null))
   }, [refreshKey])
 
-  if (!counts) return null
-
+  // Render the panel immediately with a static layout; only the numbers fill in once the fetch
+  // lands, so the page doesn't jump when the (slightly slow) counts arrive.
   return (
     <>
       <div className="dashboard">
@@ -60,11 +60,11 @@ export function Dashboard({ refreshKey = 0, active = 'all', onSelect }: Props) {
             className={active === t.key ? 'stat active' : 'stat'}
             onClick={() => onSelect?.(t.key)}
           >
-            <b>{counts[t.key]}</b> {t.label}
+            <b>{counts ? counts[t.key] : '·'}</b> {t.label}
           </button>
         ))}
       </div>
-      {counts.unresolved > 0 && (
+      {counts && counts.unresolved > 0 && (
         <div className="muted resolving">
           Resolving to MusicBrainz: {counts.resolved}/{counts.resolved + counts.unresolved} albums
           matched

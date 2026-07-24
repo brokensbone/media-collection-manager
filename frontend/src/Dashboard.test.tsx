@@ -32,6 +32,18 @@ describe('Dashboard', () => {
     expect(container.textContent).toContain('5 import')
   })
 
+  it('renders the panel layout immediately, before the counts load', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise(() => {})), // never resolves — counts stay pending
+    )
+    render(<Dashboard />)
+    // tiles are present synchronously (no await) so the page doesn't jump when counts arrive
+    expect(screen.getByText('decide')).toBeTruthy()
+    expect(screen.getByText('owned')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /all/ })).toBeTruthy()
+  })
+
   it('refetches its counts when refreshKey changes', async () => {
     const fetchMock = vi.fn(() =>
       Promise.resolve({
