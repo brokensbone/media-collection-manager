@@ -5,7 +5,6 @@ type Item = {
   id: number
   source: string
   name: string
-  state: 'detected' | 'queued' | 'importing' | 'imported' | 'skipped' | 'failed'
   media_kind: 'music' | 'tv' | 'film' | 'unknown'
   import_target: 'beets' | 'tv' | 'film' | 'review'
   classification_detail: string | null
