@@ -56,12 +56,12 @@ def upgrade() -> None:
         """
         UPDATE pending_import
         SET media_kind = CASE
-            WHEN source = 'transmission' AND has_audio IS FALSE THEN 'unknown'
-            ELSE 'music'
+            WHEN source = 'transmission' AND has_audio IS FALSE THEN 'unknown'::media_kind
+            ELSE 'music'::media_kind
         END,
         import_target = CASE
-            WHEN source = 'transmission' AND has_audio IS FALSE THEN 'review'
-            ELSE 'beets'
+            WHEN source = 'transmission' AND has_audio IS FALSE THEN 'review'::import_target
+            ELSE 'beets'::import_target
         END
         """
     )
