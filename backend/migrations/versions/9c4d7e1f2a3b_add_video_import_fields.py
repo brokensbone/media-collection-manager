@@ -1,7 +1,7 @@
 """add video import fields
 
 Revision ID: 9c4d7e1f2a3b
-Revises: b7e1d2c4a9f0
+Revises: c9a3d5e7f1b4
 Create Date: 2026-07-24 15:30:00.000000
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "9c4d7e1f2a3b"
-down_revision: Union[str, Sequence[str], None] = "b7e1d2c4a9f0"
+down_revision: Union[str, Sequence[str], None] = "c9a3d5e7f1b4"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
