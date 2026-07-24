@@ -237,7 +237,7 @@ def test_run_marks_failed_and_can_be_retried(
     assert repo.get_pending_import(import_id).state == ImportState.imported.value  # type: ignore[union-attr]
 
 
-def test_import_fails_without_disposing_source_when_beets_adds_nothing(
+def test_import_skips_and_keeps_source_when_beets_adds_nothing(
     clean_album_tables: sessionmaker[Session], tmp_path: Path
 ) -> None:
     sf = clean_album_tables
@@ -273,8 +273,9 @@ def test_import_fails_without_disposing_source_when_beets_adds_nothing(
     ).run_queued()
 
     assert processed == 1
-    assert repo.get_pending_import(import_id).state == ImportState.failed.value  # type: ignore[union-attr]
-    assert drop.exists()  # not moved to done unless beets actually imports something
+    # beets added nothing => already in the library (duplicate skipped), not a failure
+    assert repo.get_pending_import(import_id).state == ImportState.skipped.value  # type: ignore[union-attr]
+    assert drop.exists()  # a skip is a no-op — the source is left untouched, never disposed
     assert not (watch / "done" / "Album").exists()
 
 

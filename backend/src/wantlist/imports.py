@@ -268,8 +268,6 @@ class ImportRunner:
             stager.stage(rec, str(staging))
             self._beets.import_dir(str(staging))
             new = self._new_albums(before)
-            if self._catalog is not None and not new:
-                raise RuntimeError("beets import completed without adding any albums")
         except Exception:
             self._repo.mark_import(import_id, ImportState.failed)
             self._events.emit(
@@ -281,6 +279,20 @@ class ImportRunner:
             raise
         finally:
             shutil.rmtree(staging, ignore_errors=True)  # tidy the local staging either way
+
+        # beets adds nothing when the album is already in the library (duplicate_action: skip).
+        # That's a no-op, not a failure and not a second copy — record it as skipped and leave
+        # the source in place (we only ever dispose something we actually imported).
+        if self._catalog is not None and not new:
+            self._repo.mark_import(import_id, ImportState.skipped)
+            self._events.emit(
+                job="import",
+                type="skipped",
+                message=f"Already in the library, skipped: '{rec.name}'",
+                album_id=rec.matched_album_id,
+            )
+            return
+
         self._repo.mark_import(import_id, ImportState.imported)
         self._events.emit(
             job="import",
