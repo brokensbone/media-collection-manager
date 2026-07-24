@@ -1,4 +1,6 @@
+import os
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass
 
@@ -39,9 +41,21 @@ class BeetsClient:
         return albums
 
     def import_dir(self, path: str) -> None:
-        """Import a folder into the library non-interactively (SPEC §12/§13). beets moves the
-        files into the library per its config (`move: yes`), leaving the inbox empty."""
-        self._run("import", "-q", "--quiet-fallback=asis", path, timeout=600)
+        """Import a folder into the library non-interactively (SPEC §12/§13), leaving the inbox
+        empty. Force `duplicate_action: skip` so importing an album already in the library never
+        keeps a second copy — the deploy's config left it at beets' default ("keep" in quiet
+        mode). We layer it via `--config`, which merges over BEETSDIR's config without disturbing
+        its library/directory paths, so it holds regardless of what the deploy's config sets.
+        `--quiet-fallback=asis` still lets a genuinely new but un-tagged album import as-is."""
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as ov:
+            ov.write("import:\n    duplicate_action: skip\n")
+            overrides = ov.name
+        try:
+            self._run(
+                "--config", overrides, "import", "-q", "--quiet-fallback=asis", path, timeout=600
+            )
+        finally:
+            os.unlink(overrides)
 
     def _run(self, *args: str, timeout: int) -> str:
         # No env= override: inherit the process environment so `beet` picks up BEETSDIR.
