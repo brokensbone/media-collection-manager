@@ -16,14 +16,43 @@ def _normalize(text: str) -> str:
     return _NOISE.sub(" ", text).lower().strip()
 
 
+# Edition words ignored when checking a title is present, so a plain download still matches a
+# "… (Deluxe)"/"… (Remastered)" edition in the funnel.
+_EDITION_NOISE = frozenset(
+    {
+        "deluxe",
+        "edition",
+        "remaster",
+        "remastered",
+        "expanded",
+        "anniversary",
+        "version",
+        "reissue",
+        "bonus",
+        "mono",
+        "stereo",
+    }
+)
+
+
 def best_match(name: str, targets: list[MatchTarget], threshold: float) -> int | None:
     """Fuzzy-match a download folder name against wanted albums (SPEC §12). Returns the id
     of the best-scoring target if it clears `threshold`, else None (the no-match tail — the
-    download is still recorded so the operator can hand-import it)."""
+    download is still recorded so the operator can hand-import it).
+
+    Gated on the target's *title* actually appearing in the download name, not just overall
+    similarity: a shared artist ("Billy Nomates", "BIG SPECIAL") otherwise carries the ratio
+    over the threshold and mis-attaches a different album by that artist (Metalhorse -> CACTI).
+    Edition words in the title are ignored for the gate so a plain download still matches a
+    deluxe/remastered edition."""
     query = _normalize(name)
+    name_tokens = _tokens(name)
     best_id: int | None = None
     best_score = threshold
     for t in targets:
+        core = _tokens(t.title) - _EDITION_NOISE or _tokens(t.title)
+        if not core or len(core & name_tokens) / len(core) < 0.5:
+            continue  # the album's title isn't really in this download name — not a match
         score = SequenceMatcher(None, query, _normalize(f"{t.artist} {t.title}")).ratio()
         if score >= best_score:
             best_score = score
