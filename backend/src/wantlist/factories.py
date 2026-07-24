@@ -160,8 +160,8 @@ def build_import_detection_service(
         ),
         repo=AlbumRepo(session_factory),
         match_threshold=settings.import_match_threshold,
-        jellyfin_tv_root=settings.jellyfin_tv_root,
-        jellyfin_film_root=settings.jellyfin_film_root,
+        tv_root=settings.tv_root,
+        film_root=settings.film_root,
         events=WorkerEventLog(session_factory),
     )
 

@@ -80,15 +80,15 @@ class ImportDetectionService:
         transmission: TransmissionClient,
         repo: AlbumRepo,
         match_threshold: float,
-        jellyfin_tv_root: str = "",
-        jellyfin_film_root: str = "",
+        tv_root: str = "",
+        film_root: str = "",
         events: EventSink | None = None,
     ):
         self._transmission = transmission
         self._repo = repo
         self._threshold = match_threshold
-        self._tv_root = jellyfin_tv_root
-        self._film_root = jellyfin_film_root
+        self._tv_root = tv_root
+        self._film_root = film_root
         self._events = events or NullEventSink()
 
     def poll(self) -> DetectResult:

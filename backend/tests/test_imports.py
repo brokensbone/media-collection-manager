@@ -526,8 +526,8 @@ def test_transmission_detection_classifies_music_tv_film_and_non_media(
         transmission=transmission,
         repo=AlbumRepo(sf),
         match_threshold=0.5,
-        jellyfin_tv_root="/tv",
-        jellyfin_film_root="/film",
+        tv_root="/tv",
+        film_root="/film",
     )
     assert service.poll().detected == 3
 

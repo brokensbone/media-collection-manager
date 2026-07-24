@@ -69,8 +69,8 @@ class Settings(BaseSettings):
     transmission_poll_seconds: int = 3600
     import_match_threshold: float = 0.5
     import_process_seconds: int = 30  # how often the worker imports queued acquisitions
-    jellyfin_tv_root: str = ""
-    jellyfin_film_root: str = ""
+    tv_root: str = ""
+    film_root: str = ""
 
     # Watch-dir import (§13, D15). Empty path = disabled. Bandcamp zips / dropped folders are
     # scanned, matched by embedded tags, and one-click imported; the drop is ours, so it's
