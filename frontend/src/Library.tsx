@@ -35,6 +35,12 @@ export function Library({
 
   return (
     <table>
+      <colgroup>
+        <col className="c-cover" />
+        <col className="c-artist" />
+        <col />
+        {!state && <col className="c-aux" />}
+      </colgroup>
       <tbody>
         {shown.map((a) => (
           <tr key={a.id}>

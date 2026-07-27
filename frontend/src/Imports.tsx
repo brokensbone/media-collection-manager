@@ -186,6 +186,12 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
       )}
       {shown.length > 0 && (
         <table>
+          <colgroup>
+            <col className="c-source" />
+            <col />
+            <col className="c-matched" />
+            <col className="c-actions3" />
+          </colgroup>
           <tbody>
             {shown.map((it) => (
               <tr key={it.id}>

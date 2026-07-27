@@ -78,6 +78,13 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
   return (
     <>
       <table>
+        <colgroup>
+          <col className="c-cover" />
+          <col className="c-artist" />
+          <col />
+          <col className="c-link" />
+          <col className="c-actions1" />
+        </colgroup>
         <tbody>
           {shown.map((it) => (
             <tr key={it.id}>

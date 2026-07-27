@@ -39,6 +39,12 @@ export function Releases({ onChange, query = '' }: { onChange?: () => void; quer
 
   return (
     <table>
+      <colgroup>
+        <col className="c-cover" />
+        <col className="c-artist" />
+        <col />
+        <col className="c-actions3" />
+      </colgroup>
       <tbody>
         {shown.map((it) => (
           <tr key={it.id}>

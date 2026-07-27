@@ -32,6 +32,12 @@ export function Owned({ refreshKey = 0, query = '' }: { refreshKey?: number; que
 
   return (
     <table>
+      <colgroup>
+        <col className="c-cover" />
+        <col className="c-artist" />
+        <col />
+        <col className="c-aux" />
+      </colgroup>
       <tbody>
         {shown.map((a) => (
           <tr key={a.beets_id}>
