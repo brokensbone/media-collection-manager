@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     transmission_ssh_port: int = 22
     transmission_ssh_user: str = ""
     transmission_ssh_key: str = ""  # path to the private key rsync's ssh should use
+    # Max seconds for a single torrent's rsync off the seedbox. Generous by default: a multi-GB
+    # film over a slow seedbox link can take hours, and the old 30-min cap failed them outright.
+    # Imports run one at a time, so a very large transfer does hold up the queue behind it.
+    transmission_transfer_timeout_seconds: int = 21600  # 6 hours
     import_inbox_path: str = "/inbox"
     transmission_poll_seconds: int = 3600
     import_match_threshold: float = 0.5

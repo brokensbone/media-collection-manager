@@ -184,6 +184,7 @@ def build_transmission_service(
             port=settings.transmission_ssh_port,
             user=settings.transmission_ssh_user,
             ssh_key=settings.transmission_ssh_key,
+            transfer_timeout=settings.transmission_transfer_timeout_seconds,
         ),
         api_configured=bool(settings.transmission_rpc_url),
         ssh_configured=bool(settings.transmission_ssh_host),
@@ -212,6 +213,7 @@ def build_import_runner(settings: Settings, session_factory: sessionmaker[Sessio
             port=settings.transmission_ssh_port,
             user=settings.transmission_ssh_user,
             ssh_key=settings.transmission_ssh_key,
+            transfer_timeout=settings.transmission_transfer_timeout_seconds,
         )
     )
     watchdir = WatchdirStager(

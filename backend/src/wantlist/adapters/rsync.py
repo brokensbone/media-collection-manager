@@ -8,11 +8,14 @@ class RsyncTransfer:
     untouched. `--files-from` reads the exact file list on stdin, relative to `download_dir`,
     so single-file, multi-file and mixed torrents all transfer precisely."""
 
-    def __init__(self, *, host: str, port: int, user: str, ssh_key: str) -> None:
+    def __init__(
+        self, *, host: str, port: int, user: str, ssh_key: str, transfer_timeout: int = 1800
+    ) -> None:
         self._host = host
         self._port = port
         self._user = user
         self._ssh_key = ssh_key
+        self._transfer_timeout = transfer_timeout
 
     def test(self) -> None:
         """Open an SSH session to the seedbox and run `true` — the Transmission page's SSH
@@ -44,5 +47,10 @@ class RsyncTransfer:
         source = f"{self._user}@{self._host}:{download_dir.rstrip('/')}/"
         argv = ["rsync", "-a", "-e", ssh, "--files-from=-", source, f"{dest.rstrip('/')}/"]
         subprocess.run(
-            argv, input="\n".join(files), text=True, capture_output=True, check=True, timeout=1800
+            argv,
+            input="\n".join(files),
+            text=True,
+            capture_output=True,
+            check=True,
+            timeout=self._transfer_timeout,
         )
