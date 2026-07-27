@@ -309,6 +309,14 @@ a {
   padding: 8px 10px;
 }
 
+/* Status-group heading in the Tasks view (In progress / Queued / Failed / Completed). */
+.task-group {
+  font-size: 13px;
+  font-weight: 500;
+  margin: 16px 0 4px;
+  color: var(--text);
+}
+
 /* Expanded failure log under a failed import row (click "Log"). */
 .import-log {
   margin: 0;

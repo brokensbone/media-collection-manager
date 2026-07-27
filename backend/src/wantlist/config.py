@@ -70,6 +70,9 @@ class Settings(BaseSettings):
     # Imports run one at a time, so a very large transfer does hold up the queue behind it.
     transmission_transfer_timeout_seconds: int = 21600  # 6 hours
     import_inbox_path: str = "/inbox"
+    # The Tasks view shows completed imports (imported/skipped) from this many days back; older
+    # completed imports live in the archive (reached from Tasks), not the default task list.
+    import_completed_window_days: int = 3
     transmission_poll_seconds: int = 3600
     import_match_threshold: float = 0.5
     import_process_seconds: int = 30  # how often the worker imports queued acquisitions

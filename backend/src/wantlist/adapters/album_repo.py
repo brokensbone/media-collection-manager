@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import exists, func, or_, select, update
+from sqlalchemy import and_, exists, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -108,6 +109,7 @@ class ImportRow:
     matched_state: str | None  # the matched album's state, so the UI can flag "already owned"
     archive_path: str | None
     error_detail: str | None  # why the last import attempt failed (failed rows only)
+    updated_at: str | None  # ISO time of the last state change; drives Tasks order + window
 
 
 @dataclass
@@ -628,36 +630,32 @@ class AlbumRepo:
             )
             session.commit()
 
-    def list_imports(self) -> list[ImportRow]:
-        """Recent acquisitions with their status, so the Import screen shows a task list that
-        persists (detected → queued → imported/failed) rather than rows vanishing on click.
-        Active ones (detected/queued) first, then the rest, each by download name. Dismissed
-        rows are hidden — kept only so their source-key stays in the seen-ledger."""
-        active = (ImportState.detected, ImportState.queued, ImportState.importing)
+    # Columns for an ImportRow, in the order _import_rows() unpacks them.
+    _IMPORT_COLS = (  # noqa: RUF012 (a fixed column spec, not mutable shared state)
+        PendingImport.id,
+        PendingImport.source,
+        PendingImport.name,
+        PendingImport.media_kind,
+        PendingImport.import_target,
+        PendingImport.classification_detail,
+        PendingImport.destination_path,
+        PendingImport.state,
+        PendingImport.matched_album_id,
+        Album.artist,
+        Album.title,
+        Album.state,
+        PendingImport.archive_path,
+        PendingImport.error_detail,
+        PendingImport.updated_at,
+    )
+
+    def _import_rows(self, *conditions: Any, order_by: Any) -> list[ImportRow]:
         with self._sf() as session:
             rows = session.execute(
-                select(
-                    PendingImport.id,
-                    PendingImport.source,
-                    PendingImport.name,
-                    PendingImport.media_kind,
-                    PendingImport.import_target,
-                    PendingImport.classification_detail,
-                    PendingImport.destination_path,
-                    PendingImport.state,
-                    PendingImport.matched_album_id,
-                    Album.artist,
-                    Album.title,
-                    Album.state,
-                    PendingImport.archive_path,
-                    PendingImport.error_detail,
-                )
+                select(*self._IMPORT_COLS)
                 .outerjoin(Album, Album.id == PendingImport.matched_album_id)
-                .where(PendingImport.state != ImportState.dismissed)
-                .order_by(
-                    PendingImport.state.in_(active).desc(),  # active first
-                    func.lower(PendingImport.name),
-                )
+                .where(*conditions)
+                .order_by(*order_by)
             )
             return [
                 ImportRow(
@@ -675,9 +673,52 @@ class AlbumRepo:
                     matched_state=r[11].value if r[11] is not None else None,
                     archive_path=r[12],
                     error_detail=r[13],
+                    updated_at=r[14].isoformat() if r[14] is not None else None,
                 )
                 for r in rows
             ]
+
+    def pending_imports(self) -> list[ImportRow]:
+        """The Import worklist: downloads still awaiting a decision (detected), including the
+        review tail. Once Import is clicked they leave here and become a Task."""
+        return self._import_rows(
+            PendingImport.state == ImportState.detected,
+            order_by=(func.lower(PendingImport.name),),
+        )
+
+    def task_imports(self, completed_since: datetime) -> list[ImportRow]:
+        """The Tasks view: everything acted on — in progress, queued, failed — plus completed
+        (imported/skipped) within the recent window. Newest activity first."""
+        terminal_recent = and_(
+            PendingImport.state.in_((ImportState.imported, ImportState.skipped)),
+            PendingImport.updated_at >= completed_since,
+        )
+        return self._import_rows(
+            or_(
+                PendingImport.state.in_(
+                    (ImportState.importing, ImportState.queued, ImportState.failed)
+                ),
+                terminal_recent,
+            ),
+            order_by=(PendingImport.updated_at.desc().nullslast(), PendingImport.id.desc()),
+        )
+
+    def completed_imports(self) -> list[ImportRow]:
+        """The archive: every completed import (imported/skipped), whatever its age. Newest
+        first. Reached from the Tasks view when the recent window isn't enough."""
+        return self._import_rows(
+            PendingImport.state.in_((ImportState.imported, ImportState.skipped)),
+            order_by=(PendingImport.updated_at.desc().nullslast(), PendingImport.id.desc()),
+        )
+
+    def list_imports(self) -> list[ImportRow]:
+        """Every non-dismissed acquisition with its status, active first. Broad query used by
+        detection tests; the UI uses the narrower pending/task/completed views."""
+        active = (ImportState.detected, ImportState.queued, ImportState.importing)
+        return self._import_rows(
+            PendingImport.state != ImportState.dismissed,
+            order_by=(PendingImport.state.in_(active).desc(), func.lower(PendingImport.name)),
+        )
 
     def transmission_ledger(self) -> list[TransmissionRow]:
         """Every Transmission torrent the app has seen, whatever its state — including ones
@@ -716,18 +757,30 @@ class AlbumRepo:
                 for r in rows
             ]
 
-    def count_active_imports(self) -> int:
-        """Imports awaiting a click or still processing — the dashboard's Import count."""
-        active = (ImportState.detected, ImportState.queued, ImportState.importing)
+    def _count_imports(self, states: tuple[ImportState, ...]) -> int:
         with self._sf() as session:
             return int(
                 session.scalar(
                     select(func.count())
                     .select_from(PendingImport)
-                    .where(PendingImport.state.in_(active))
+                    .where(PendingImport.state.in_(states))
                 )
                 or 0
             )
+
+    def count_pending_imports(self) -> int:
+        """Downloads awaiting an Import/Discard decision — the dashboard's Import count."""
+        return self._count_imports((ImportState.detected,))
+
+    def count_task_imports(self) -> int:
+        """In-flight and needs-attention imports (queued, importing, failed) — the Tasks count."""
+        return self._count_imports((ImportState.queued, ImportState.importing, ImportState.failed))
+
+    def count_active_imports(self) -> int:
+        """Detected + queued + importing — an import that isn't done yet, either way."""
+        return self._count_imports(
+            (ImportState.detected, ImportState.queued, ImportState.importing)
+        )
 
     def queue_import(self, import_id: int) -> None:
         """Mark an import for background processing. Allowed from detected (the Import click)
@@ -739,7 +792,7 @@ class AlbumRepo:
                     PendingImport.id == import_id,
                     PendingImport.state.in_((ImportState.detected, ImportState.failed)),
                 )
-                .values(state=ImportState.queued)
+                .values(state=ImportState.queued, updated_at=func.now())
             )
             session.commit()
 
@@ -758,7 +811,7 @@ class AlbumRepo:
             session.execute(
                 update(PendingImport)
                 .where(PendingImport.state == ImportState.importing)
-                .values(state=ImportState.queued)
+                .values(state=ImportState.queued, updated_at=func.now())
             )
             session.commit()
 
@@ -788,7 +841,7 @@ class AlbumRepo:
             session.execute(
                 update(PendingImport)
                 .where(PendingImport.id == import_id)
-                .values(state=state, error_detail=None)
+                .values(state=state, error_detail=None, updated_at=func.now())
             )
             session.commit()
 
@@ -798,7 +851,7 @@ class AlbumRepo:
             session.execute(
                 update(PendingImport)
                 .where(PendingImport.id == import_id)
-                .values(state=ImportState.failed, error_detail=error_detail)
+                .values(state=ImportState.failed, error_detail=error_detail, updated_at=func.now())
             )
             session.commit()
 

@@ -187,6 +187,9 @@ class PendingImport(Base):
     # click into a failed row and read the log instead of it dying silently. Cleared on retry.
     error_detail: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Last state change (Import click, import done/failed, retry). Drives the Tasks view's
+    # newest-first order and its "completed in the last N days" window. Null on older rows.
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
 
 class JobRun(Base):

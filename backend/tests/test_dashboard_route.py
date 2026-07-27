@@ -65,7 +65,8 @@ def test_dashboard_counts(clean_album_tables: sessionmaker[Session]) -> None:
         "releases": 0,
         "decide": 1,
         "acquire": 2,
-        "import": 0,
+        "import": 0,  # nothing awaiting an Import decision
+        "tasks": 0,  # nothing queued/importing/failed
         "owned": 3,
         "dismissed": 0,
         "resolved": 0,  # none of these have a release-group yet

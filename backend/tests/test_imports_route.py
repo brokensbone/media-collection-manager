@@ -33,10 +33,12 @@ def test_import_click_enqueues_and_row_persists_with_status(
     resp = client.post(f"/imports/{import_id}/import")
     assert resp.status_code == 204
 
-    # the row doesn't vanish — it stays, now queued for the worker to process
-    after = client.get("/imports").json()
-    assert len(after) == 1
-    assert after[0]["state"] == "queued"
+    # the row leaves the Import worklist (nothing left to decide) and becomes a queued Task
+    assert client.get("/imports").json() == []
+    tasks = client.get("/imports/tasks").json()
+    assert len(tasks) == 1
+    assert tasks[0]["id"] == import_id
+    assert tasks[0]["state"] == "queued"
 
 
 def test_scan_imports_forces_watchdir_detection(clean_album_tables: sessionmaker[Session]) -> None:

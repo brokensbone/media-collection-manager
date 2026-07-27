@@ -15,7 +15,21 @@ def _watchdir(request: Request) -> WatchdirDetectionService:
 
 @router.get("/imports")
 def import_queue(request: Request) -> list[ImportItem]:
-    return _service(request).queue()
+    """The Import worklist: downloads awaiting an Import/Discard decision."""
+    return _service(request).pending()
+
+
+@router.get("/imports/tasks")
+def import_tasks(request: Request) -> list[ImportItem]:
+    """Acted-on imports: in progress, queued, failed, plus recently completed."""
+    days = request.app.state.settings.import_completed_window_days
+    return _service(request).tasks(completed_window_days=days)
+
+
+@router.get("/imports/archive")
+def import_archive(request: Request) -> list[ImportItem]:
+    """Every completed import, however old (reached from the Tasks view)."""
+    return _service(request).archive()
 
 
 @router.post("/imports/scan")

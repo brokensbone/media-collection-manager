@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Protocol
 
-from .adapters.album_repo import AlbumRepo, ImportRecord
+from .adapters.album_repo import AlbumRepo, ImportRecord, ImportRow
 from .adapters.beets import BeetsAlbum
 from .adapters.event_log import NullEventSink
 from .adapters.unpack import dispose, unpack
@@ -56,6 +56,7 @@ class ImportItem:
     matched_owned: bool  # the matched album is already owned — importing would just duplicate it
     missing: bool  # the watch-dir file backing this drop is gone — offer removal, not import
     error_detail: str | None  # why the last attempt failed (failed rows only), for the log view
+    updated_at: str | None  # ISO time of the last state change (Tasks/Archive show "when")
 
 
 @dataclass
@@ -416,25 +417,40 @@ class ImportsService:
     def __init__(self, *, repo: AlbumRepo) -> None:
         self._repo = repo
 
-    def queue(self) -> list[ImportItem]:
-        return [
-            ImportItem(
-                id=r.id,
-                source=r.source,
-                name=r.name,
-                media_kind=r.media_kind,
-                import_target=r.import_target,
-                classification_detail=r.classification_detail,
-                destination_path=r.destination_path,
-                state=r.state,
-                matched_album_id=r.matched_album_id,
-                matched=f"{r.matched_artist} — {r.matched_title}" if r.matched_album_id else None,
-                matched_owned=r.matched_state == AlbumState.owned.value,
-                missing=self._is_missing(r.state, r.archive_path),
-                error_detail=r.error_detail,
-            )
-            for r in self._repo.list_imports()
-        ]
+    def pending(self) -> list[ImportItem]:
+        """The Import worklist: downloads awaiting an Import/Discard decision (§12/§13)."""
+        return [self._to_item(r) for r in self._repo.pending_imports()]
+
+    def tasks(self, *, completed_window_days: int) -> list[ImportItem]:
+        """The Tasks view: in-progress/queued/failed imports plus recently completed ones."""
+        since = self._clock_now() - timedelta(days=completed_window_days)
+        return [self._to_item(r) for r in self._repo.task_imports(since)]
+
+    def archive(self) -> list[ImportItem]:
+        """The completed archive: every finished import, however old."""
+        return [self._to_item(r) for r in self._repo.completed_imports()]
+
+    @staticmethod
+    def _clock_now() -> datetime:
+        return datetime.now(UTC)
+
+    def _to_item(self, r: ImportRow) -> ImportItem:
+        return ImportItem(
+            id=r.id,
+            source=r.source,
+            name=r.name,
+            media_kind=r.media_kind,
+            import_target=r.import_target,
+            classification_detail=r.classification_detail,
+            destination_path=r.destination_path,
+            state=r.state,
+            matched_album_id=r.matched_album_id,
+            matched=f"{r.matched_artist} — {r.matched_title}" if r.matched_album_id else None,
+            matched_owned=r.matched_state == AlbumState.owned.value,
+            missing=self._is_missing(r.state, r.archive_path),
+            error_detail=r.error_detail,
+            updated_at=r.updated_at,
+        )
 
     @staticmethod
     def _is_missing(state: str, archive_path: str | None) -> bool:
