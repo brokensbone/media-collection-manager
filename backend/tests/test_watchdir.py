@@ -6,7 +6,12 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from wantlist.adapters.album_repo import AlbumRepo
 from wantlist.adapters.tags import MediaFileTagReader
-from wantlist.imports import ImportRunner, WatchdirDetectionService, WatchdirStager
+from wantlist.imports import (
+    ImportRunner,
+    VideoLibraryImporter,
+    WatchdirDetectionService,
+    WatchdirStager,
+)
 from wantlist.models import Album, AlbumState, ImportSource, ImportState, Provenance
 
 from .fakes import FrozenClock, RecordingBeetsClient
@@ -157,6 +162,7 @@ def test_watchdir_import_unpacks_and_archives_original(
             )
         },
         beets=beets,
+        video=VideoLibraryImporter(),
         inbox=str(inbox),
     )
     runner.run(import_id)
@@ -200,6 +206,7 @@ def test_watchdir_import_delete_disposition(
             )
         },
         beets=RecordingBeetsClient(),
+        video=VideoLibraryImporter(),
         inbox=str(inbox),
     ).run(import_id)
 

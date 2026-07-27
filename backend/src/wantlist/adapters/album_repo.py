@@ -12,8 +12,10 @@ from ..models import (
     AlbumState,
     ImportSource,
     ImportState,
+    ImportTarget,
     JobRun,
     LinkSource,
+    MediaKind,
     NotificationState,
     PendingImport,
     PlayHistory,
@@ -95,6 +97,10 @@ class ImportRow:
     id: int
     source: str
     name: str
+    media_kind: str
+    import_target: str
+    classification_detail: str | None
+    destination_path: str | None
     state: str
     matched_album_id: int | None
     matched_artist: str | None
@@ -107,6 +113,10 @@ class ImportRow:
 class TransmissionRow:
     id: int
     name: str
+    media_kind: str
+    import_target: str
+    classification_detail: str | None
+    destination_path: str | None
     state: str
     matched: str | None  # "Artist — Title" of the matched album, if any
     has_audio: bool | None  # False = skipped as non-music; None = not screened
@@ -117,9 +127,12 @@ class ImportRecord:
     id: int
     source: str
     name: str
+    media_kind: str
+    import_target: str
     download_dir: str | None
     files: list[str]
     archive_path: str | None
+    destination_path: str | None
     matched_album_id: int | None
     state: str
 
@@ -561,6 +574,10 @@ class AlbumRepo:
         source: ImportSource,
         source_key: str,
         name: str,
+        media_kind: MediaKind = MediaKind.music,
+        import_target: ImportTarget = ImportTarget.beets,
+        classification_detail: str | None = None,
+        destination_path: str | None = None,
         download_dir: str | None = None,
         files: list[str] | None = None,
         archive_path: str | None = None,
@@ -575,6 +592,10 @@ class AlbumRepo:
                     source=source,
                     source_key=source_key,
                     name=name,
+                    media_kind=media_kind,
+                    import_target=import_target,
+                    classification_detail=classification_detail,
+                    destination_path=destination_path,
                     download_dir=download_dir,
                     files=files or [],
                     archive_path=archive_path,
@@ -598,6 +619,10 @@ class AlbumRepo:
                     PendingImport.id,
                     PendingImport.source,
                     PendingImport.name,
+                    PendingImport.media_kind,
+                    PendingImport.import_target,
+                    PendingImport.classification_detail,
+                    PendingImport.destination_path,
                     PendingImport.state,
                     PendingImport.matched_album_id,
                     Album.artist,
@@ -617,12 +642,16 @@ class AlbumRepo:
                     id=r[0],
                     source=r[1].value,
                     name=r[2],
-                    state=r[3].value,
-                    matched_album_id=r[4],
-                    matched_artist=r[5],
-                    matched_title=r[6],
-                    matched_state=r[7].value if r[7] is not None else None,
-                    archive_path=r[8],
+                    media_kind=r[3].value,
+                    import_target=r[4].value,
+                    classification_detail=r[5],
+                    destination_path=r[6],
+                    state=r[7].value,
+                    matched_album_id=r[8],
+                    matched_artist=r[9],
+                    matched_title=r[10],
+                    matched_state=r[11].value if r[11] is not None else None,
+                    archive_path=r[12],
                 )
                 for r in rows
             ]
@@ -636,6 +665,10 @@ class AlbumRepo:
                 select(
                     PendingImport.id,
                     PendingImport.name,
+                    PendingImport.media_kind,
+                    PendingImport.import_target,
+                    PendingImport.classification_detail,
+                    PendingImport.destination_path,
                     PendingImport.state,
                     Album.artist,
                     Album.title,
@@ -649,9 +682,13 @@ class AlbumRepo:
                 TransmissionRow(
                     id=r[0],
                     name=r[1],
-                    state=r[2].value,
-                    matched=f"{r[3]} — {r[4]}" if r[3] is not None else None,
-                    has_audio=r[5],
+                    media_kind=r[2].value,
+                    import_target=r[3].value,
+                    classification_detail=r[4],
+                    destination_path=r[5],
+                    state=r[6].value,
+                    matched=f"{r[7]} — {r[8]}" if r[7] is not None else None,
+                    has_audio=r[9],
                 )
                 for r in rows
             ]
@@ -711,9 +748,12 @@ class AlbumRepo:
                 id=row.id,
                 source=row.source.value,
                 name=row.name,
+                media_kind=row.media_kind.value,
+                import_target=row.import_target.value,
                 download_dir=row.download_dir,
                 files=list(row.files),
                 archive_path=row.archive_path,
+                destination_path=row.destination_path,
                 matched_album_id=row.matched_album_id,
                 state=row.state.value,
             )

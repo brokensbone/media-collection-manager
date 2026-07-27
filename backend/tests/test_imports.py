@@ -9,9 +9,11 @@ from wantlist.imports import (
     ImportRunner,
     ImportsService,
     TransmissionStager,
+    VideoLibraryImporter,
     WatchdirStager,
+    _classify_torrent,
 )
-from wantlist.models import Album, AlbumState, ImportSource, ImportState, Provenance
+from wantlist.models import Album, AlbumState, ImportSource, ImportState, ImportTarget, Provenance
 from wantlist.ports.spotify_api import SavedAlbum
 from wantlist.ports.transmission import Torrent
 from wantlist.reverse_match import ReverseMatcher
@@ -108,6 +110,7 @@ def _transmission_runner(repo: AlbumRepo, beets: object, inbox: str) -> ImportRu
         repo=repo,
         stagers={ImportSource.transmission: TransmissionStager(FakeFileTransfer())},
         beets=beets,  # type: ignore[arg-type]
+        video=VideoLibraryImporter(),
         inbox=inbox,
     )
 
@@ -268,6 +271,7 @@ def test_import_skips_and_keeps_source_when_beets_adds_nothing(
             )
         },
         beets=beets,
+        video=VideoLibraryImporter(),
         inbox=str(inbox),
         catalog=beets,
     ).run_queued()
@@ -330,6 +334,7 @@ def test_matched_import_links_owned_even_without_a_release_group(
         repo=repo,
         stagers={ImportSource.transmission: TransmissionStager(FakeFileTransfer())},
         beets=beets,
+        video=VideoLibraryImporter(),
         inbox=str(inbox),
         catalog=beets,
     ).run(import_id)
@@ -374,6 +379,7 @@ def test_unmatched_import_reverse_matches_to_owned(
         repo=repo,
         stagers={ImportSource.transmission: TransmissionStager(FakeFileTransfer())},
         beets=beets,
+        video=VideoLibraryImporter(),
         inbox=str(inbox),
         catalog=beets,
         reverse_matcher=reverse,
@@ -495,24 +501,205 @@ def test_discarding_a_watchdir_drop_deletes_its_file(
     assert service.queue() == []
 
 
-def test_transmission_detection_ignores_non_music_torrents(
+def test_transmission_detection_classifies_music_tv_film_and_non_media(
     clean_album_tables: sessionmaker[Session],
 ) -> None:
     sf = clean_album_tables
     transmission = StubTransmissionClient(
         [
             Torrent(hash="a", name="Some Album", download_dir="/d", files=["01.flac", "cover.jpg"]),
-            Torrent(hash="b", name="A Movie 2160p", download_dir="/d", files=["movie.mkv"]),
-            Torrent(hash="c", name="Some.App", download_dir="/d", files=["setup.exe"]),
+            Torrent(
+                hash="b",
+                name="The.Matrix.1999.2160p",
+                download_dir="/d",
+                files=["The.Matrix.1999.2160p.mkv"],
+            ),
+            Torrent(
+                hash="c",
+                name="Severance.S02E01.1080p",
+                download_dir="/d",
+                files=["Severance.S02E01.1080p.mkv"],
+            ),
+            Torrent(hash="d", name="Some.App", download_dir="/d", files=["setup.exe"]),
         ]
     )
     service = ImportDetectionService(
-        transmission=transmission, repo=AlbumRepo(sf), match_threshold=0.5
+        transmission=transmission,
+        repo=AlbumRepo(sf),
+        match_threshold=0.5,
+        tv_root="/tv",
+        film_root="/film",
     )
-    assert service.poll().detected == 1  # only the audio torrent is surfaced
+    assert service.poll().detected == 3
 
-    names = {r.name for r in AlbumRepo(sf).list_imports()}
-    assert names == {"Some Album"}  # movie/app hidden (recorded as dismissed)
+    rows = {r.name: r for r in AlbumRepo(sf).list_imports()}
+    assert set(rows) == {"Some Album", "Severance.S02E01.1080p", "The.Matrix.1999.2160p"}
+    assert rows["Some Album"].media_kind == "music"
+    assert rows["Severance.S02E01.1080p"].import_target == "tv"
+    assert rows["Severance.S02E01.1080p"].destination_path == "/tv/Severance/Season 02"
+    assert rows["The.Matrix.1999.2160p"].import_target == "film"
+    assert rows["The.Matrix.1999.2160p"].destination_path == "/film/The Matrix (1999)"
     # every hash is now ledgered, so a re-poll screens nothing again
-    assert AlbumRepo(sf).known_source_keys() == {"a", "b", "c"}
+    assert AlbumRepo(sf).known_source_keys() == {"a", "b", "c", "d"}
     assert service.poll().detected == 0
+
+
+def test_review_only_video_row_is_blocked_from_enqueue(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    sf = clean_album_tables
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="Mystery Video Pack",
+        import_target=ImportTarget.review,
+        download_dir="/d",
+        files=["disc1.mkv", "disc2.mkv"],
+        matched_album_id=None,
+    )
+
+    item = ImportsService(repo=repo).queue()[0]
+    ImportsService(repo=repo).enqueue(item.id)
+
+    assert repo.get_pending_import(item.id).state == ImportState.detected.value  # type: ignore[union-attr]
+
+
+def test_video_import_moves_staged_files_into_destination(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    sf = clean_album_tables
+    download_dir = tmp_path / "downloads"
+    release_dir = download_dir / "The.Matrix.1999.2160p"
+    release_dir.mkdir(parents=True)
+    (release_dir / "The.Matrix.1999.2160p.mkv").write_text("video")
+    (release_dir / "poster.jpg").write_text("art")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    film_root = tmp_path / "film"
+
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="The.Matrix.1999.2160p",
+        import_target=ImportTarget.film,
+        destination_path=str(film_root / "The Matrix (1999)"),
+        download_dir=str(download_dir),
+        files=[
+            "The.Matrix.1999.2160p/The.Matrix.1999.2160p.mkv",
+            "The.Matrix.1999.2160p/poster.jpg",
+        ],
+        matched_album_id=None,
+    )
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
+
+    _transmission_runner(repo, RecordingBeetsClient(), str(inbox)).run(import_id)
+
+    target = film_root / "The Matrix (1999)"
+    assert (target / "The.Matrix.1999.2160p.mkv").read_text() == "video"
+    assert (target / "poster.jpg").read_text() == "art"
+    assert repo.get_pending_import(import_id).state == ImportState.imported.value  # type: ignore[union-attr]
+
+
+def test_video_import_with_catalog_present_still_imports(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    # Production wires a catalog into the runner (for the music before/after diff). A video import
+    # never adds to the beets catalogue, so the "nothing new => skipped" no-op check must be gated
+    # to the beets target only — otherwise every real TV/film import is wrongly marked skipped and
+    # its files are never placed. (The other video test wires catalog=None, hiding this.)
+    sf = clean_album_tables
+    download_dir = tmp_path / "downloads"
+    release_dir = download_dir / "The.Matrix.1999.2160p"
+    release_dir.mkdir(parents=True)
+    (release_dir / "The.Matrix.1999.2160p.mkv").write_text("video")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    film_root = tmp_path / "film"
+
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="The.Matrix.1999.2160p",
+        import_target=ImportTarget.film,
+        destination_path=str(film_root / "The Matrix (1999)"),
+        download_dir=str(download_dir),
+        files=["The.Matrix.1999.2160p/The.Matrix.1999.2160p.mkv"],
+        matched_album_id=None,
+    )
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
+
+    beets = FakeBeetsLibrary()  # catalog wired as in prod; a video import leaves it empty
+    ImportRunner(
+        repo=repo,
+        stagers={ImportSource.transmission: TransmissionStager(FakeFileTransfer())},
+        beets=beets,
+        video=VideoLibraryImporter(),
+        inbox=str(inbox),
+        catalog=beets,
+    ).run(import_id)
+
+    assert (film_root / "The Matrix (1999)" / "The.Matrix.1999.2160p.mkv").read_text() == "video"
+    assert repo.get_pending_import(import_id).state == ImportState.imported.value  # type: ignore[union-attr]
+
+
+def test_video_reimport_skips_when_all_files_already_present(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    # Re-importing a pack already in the library is a no-op: don't overwrite, don't fail the whole
+    # import — mark it skipped, mirroring the beets duplicate path.
+    sf = clean_album_tables
+    download_dir = tmp_path / "downloads"
+    release_dir = download_dir / "The.Matrix.1999.2160p"
+    release_dir.mkdir(parents=True)
+    (release_dir / "The.Matrix.1999.2160p.mkv").write_text("new copy")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    target = tmp_path / "film" / "The Matrix (1999)"
+    target.mkdir(parents=True)
+    (target / "The.Matrix.1999.2160p.mkv").write_text("already here")  # pre-existing
+
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="The.Matrix.1999.2160p",
+        import_target=ImportTarget.film,
+        destination_path=str(target),
+        download_dir=str(download_dir),
+        files=["The.Matrix.1999.2160p/The.Matrix.1999.2160p.mkv"],
+        matched_album_id=None,
+    )
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
+
+    beets = FakeBeetsLibrary()
+    ImportRunner(
+        repo=repo,
+        stagers={ImportSource.transmission: TransmissionStager(FakeFileTransfer())},
+        beets=beets,
+        video=VideoLibraryImporter(),
+        inbox=str(inbox),
+        catalog=beets,
+    ).run(import_id)
+
+    assert (target / "The.Matrix.1999.2160p.mkv").read_text() == "already here"  # not overwritten
+    assert repo.get_pending_import(import_id).state == ImportState.skipped.value  # type: ignore[union-attr]
+
+
+def test_classify_torrent_sanitises_path_traversal_in_title() -> None:
+    # The show/film title is derived from an untrusted torrent name and used to build a filesystem
+    # destination. A leading-slash segment would make `Path(tv_root) / seg` discard tv_root, so
+    # the title must be reduced to a safe single path component under the root.
+    classified = _classify_torrent(
+        "/evil.S01E01.1080p",
+        ["/evil.S01E01.1080p.mkv"],
+        tv_root="/tv",
+        film_root="/film",
+        matched_album_id=None,
+    )
+    assert classified.destination_path == "/tv/Evil/Season 01"

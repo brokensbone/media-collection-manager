@@ -3,6 +3,10 @@ import { useCallback, useEffect, useState } from 'react'
 type Torrent = {
   id: number
   name: string
+  media_kind: 'music' | 'tv' | 'film' | 'unknown'
+  import_target: 'beets' | 'tv' | 'film' | 'review'
+  classification_detail: string | null
+  destination_path: string | null
   state: string
   matched: string | null
   has_audio: boolean | null
@@ -65,6 +69,7 @@ export function Transmission() {
               <tr>
                 <th>name</th>
                 <th>kind</th>
+                <th>destination</th>
                 <th>state</th>
                 <th>matched</th>
               </tr>
@@ -72,8 +77,14 @@ export function Transmission() {
             <tbody>
               {torrents.map((t) => (
                 <tr key={t.id}>
-                  <td>{t.name}</td>
-                  <td className="muted">{kind(t.has_audio)}</td>
+                  <td>
+                    <div>{t.name}</div>
+                    {t.classification_detail && (
+                      <div className="muted">{t.classification_detail}</div>
+                    )}
+                  </td>
+                  <td className="muted">{kind(t)}</td>
+                  <td className="muted">{t.destination_path ?? '—'}</td>
                   <td className="muted">{t.state}</td>
                   <td>{t.matched ?? <span className="muted">—</span>}</td>
                 </tr>
@@ -86,10 +97,12 @@ export function Transmission() {
   )
 }
 
-function kind(hasAudio: boolean | null): string {
-  if (hasAudio === false) return 'non-audio'
-  if (hasAudio) return 'audio'
-  return '—'
+function kind(torrent: Torrent): string {
+  if (torrent.media_kind === 'unknown' && torrent.has_audio === false) return 'non-media'
+  if (torrent.media_kind === 'music') return 'music'
+  if (torrent.media_kind === 'tv') return 'tv'
+  if (torrent.media_kind === 'film') return 'film'
+  return 'unknown'
 }
 
 function CheckLine({ label, check }: { label: string; check: Check }) {

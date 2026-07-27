@@ -24,6 +24,7 @@ from .imports import (
     ImportDetectionService,
     ImportRunner,
     TransmissionStager,
+    VideoLibraryImporter,
     WatchdirDetectionService,
     WatchdirStager,
 )
@@ -159,6 +160,8 @@ def build_import_detection_service(
         ),
         repo=AlbumRepo(session_factory),
         match_threshold=settings.import_match_threshold,
+        tv_root=settings.tv_root,
+        film_root=settings.film_root,
         events=WorkerEventLog(session_factory),
     )
 
@@ -228,6 +231,7 @@ def build_import_runner(settings: Settings, session_factory: sessionmaker[Sessio
             ImportSource.watchdir: watchdir,
         },
         beets=beets,
+        video=VideoLibraryImporter(),
         inbox=settings.import_inbox_path,
         catalog=beets,
         reverse_matcher=reverse_matcher,

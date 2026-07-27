@@ -21,13 +21,34 @@ afterEach(() => {
 describe('Transmission', () => {
   it('lists torrents seen, including non-audio ones', async () => {
     mockApi([
-      { id: 1, name: 'An Album', state: 'detected', matched: 'X — Y', has_audio: true },
-      { id: 2, name: 'A Movie', state: 'dismissed', matched: null, has_audio: false },
+      {
+        id: 1,
+        name: 'An Album',
+        media_kind: 'music',
+        import_target: 'beets',
+        classification_detail: 'Audio files detected.',
+        destination_path: null,
+        state: 'detected',
+        matched: 'X — Y',
+        has_audio: true,
+      },
+      {
+        id: 2,
+        name: 'A Movie',
+        media_kind: 'film',
+        import_target: 'film',
+        classification_detail: 'Detected a single-feature film.',
+        destination_path: '/film/A Movie (2024)',
+        state: 'detected',
+        matched: null,
+        has_audio: false,
+      },
     ])
     render(<Transmission />)
     expect(await screen.findByText('An Album')).toBeTruthy()
     expect(screen.getByText('A Movie')).toBeTruthy()
-    expect(screen.getByText('non-audio')).toBeTruthy()
+    expect(screen.getByText('/film/A Movie (2024)')).toBeTruthy()
+    expect(screen.getByText('film')).toBeTruthy()
   })
 
   it('runs a connection test and shows API and SSH results', async () => {

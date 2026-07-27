@@ -5,6 +5,10 @@ type Item = {
   id: number
   source: string
   name: string
+  media_kind: 'music' | 'tv' | 'film' | 'unknown'
+  import_target: 'beets' | 'tv' | 'film' | 'review'
+  classification_detail: string | null
+  destination_path: string | null
   state: 'detected' | 'queued' | 'importing' | 'imported' | 'skipped' | 'failed'
   matched_album_id: number | null
   matched: string | null
@@ -135,7 +139,14 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
             {shown.map((it) => (
               <tr key={it.id}>
                 <td className="muted">{it.source}</td>
-                <td>{it.name}</td>
+                <td>
+                  <div>{it.name}</div>
+                  <div className="muted">
+                    {labelKind(it.media_kind)}
+                    {it.classification_detail ? ` · ${it.classification_detail}` : ''}
+                  </div>
+                  {it.destination_path && <div className="muted">{it.destination_path}</div>}
+                </td>
                 <td>
                   {it.matched ?? <span className="muted">no match</span>}
                   {/* "already owned" is a pre-import warning; pointless once it's imported. */}
@@ -153,11 +164,19 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
                     </>
                   ) : (
                     <>
-                      {it.state === 'detected' && (
+                      {it.state === 'detected' && it.import_target !== 'review' && (
                         <>
                           <button type="button" onClick={() => enqueue(it.id)}>
                             Import
                           </button>{' '}
+                          <button type="button" onClick={() => discard(it.id)}>
+                            Discard
+                          </button>
+                        </>
+                      )}
+                      {it.state === 'detected' && it.import_target === 'review' && (
+                        <>
+                          <span className="muted">needs review</span>{' '}
                           <button type="button" onClick={() => discard(it.id)}>
                             Discard
                           </button>
@@ -190,4 +209,11 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
       )}
     </>
   )
+}
+
+function labelKind(kind: Item['media_kind']): string {
+  if (kind === 'tv') return 'TV'
+  if (kind === 'film') return 'Film'
+  if (kind === 'music') return 'Music'
+  return 'Unknown'
 }
