@@ -641,7 +641,10 @@ def _video_files(files: list[str]) -> list[str]:
 
 
 def _episode_match(value: str) -> tuple[str, int] | None:
-    cleaned = value.replace("_", " ").replace(".", " ")
+    # Match the basename only. A torrent's file entries are paths relative to the release folder
+    # (e.g. "Show.S02.Complete.1080p.JUNK/Show.S02E01.mkv"); taking "text before SxxEyy" from the
+    # whole path would fold the folder's season/quality tags into the show title.
+    cleaned = Path(value).name.replace("_", " ").replace(".", " ")
     for pattern in (_EPISODE_RE, _EPISODE_ALT_RE):
         match = pattern.search(cleaned)
         if match:
