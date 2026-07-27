@@ -84,6 +84,14 @@ class Settings(BaseSettings):
     # MusicBrainz resolution (§5, §11). Base URL overridable for tests/E2E (§14).
     musicbrainz_url: str = "https://musicbrainz.org/ws/2"
     musicbrainz_user_agent: str = "wantlist/0.1 ( https://github.com/EdwardSalkeld )"
-    musicbrainz_min_interval: float = 1.3  # MB asks for <= 1 req/sec; a little headroom vs 503s
+    musicbrainz_min_interval: float = 2.0  # MB asks for <= 1 req/sec; stay well under it (~0.5/s)
     musicbrainz_text_min_score: int = 90  # Tier-3 fuzzy accept threshold
     resolution_max_per_run: int = 100  # cap MB lookups per reconcile (cold-start politeness)
+    # Exponential backoff for the MB-absent tail (§11): after each "no match" an album waits
+    # base * 2**attempts (capped) before it's re-checked, so a release MB simply doesn't have
+    # isn't re-queried every hourly reconcile forever — it decays from hourly to ~weekly.
+    resolution_backoff_base_seconds: int = 3600  # first retry ~1h after a miss
+    resolution_backoff_cap_seconds: int = 604800  # never wait more than ~1 week
+    # Abort a resolution pass after this many consecutive "couldn't reach MusicBrainz" errors:
+    # MB is down/throttling, so stop hammering it (and the log) and retry next reconcile.
+    resolution_error_circuit_break: int = 8

@@ -57,6 +57,12 @@ class Album(Base):
     # Failed resolution attempts (§5). Resolution runs least-tried-first, so the MB-absent tail
     # sinks below fresh albums instead of clogging the front of the queue and starving them.
     resolution_attempts: Mapped[int] = mapped_column(default=0, server_default="0")
+    # When we last got a "no match" from MusicBrainz for this album. Used for exponential
+    # backoff: a repeatedly-absent album is re-checked ever less often (see albums_needing_
+    # resolution) instead of every hourly reconcile. Null = never attempted, so always due.
+    last_resolution_attempt: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
 
     state: Mapped[AlbumState] = mapped_column(SAEnum(AlbumState, name="album_state"))
     provenance: Mapped[Provenance] = mapped_column(SAEnum(Provenance, name="provenance"))
