@@ -65,6 +65,13 @@ export function Transmission() {
           </p>
         ) : (
           <table>
+            <colgroup>
+              <col />
+              <col className="c-kind" />
+              <col />
+              <col className="c-state" />
+              <col className="c-matched" />
+            </colgroup>
             <thead>
               <tr>
                 <th>name</th>

@@ -28,7 +28,7 @@ body {
   font-size: 14px;
 }
 .app {
-  max-width: 900px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 16px;
 }
@@ -88,10 +88,50 @@ table {
   width: 100%;
   border-collapse: collapse;
   font-variant-numeric: tabular-nums;
+  /* Fixed layout so column widths come from the colgroups below, not the cell contents — a row
+     changing (import → "queued" → "imported ✓", or a discard removing a row) must never reflow
+     the columns. Every main table sets a colgroup; the Activity feed opts back out (below). */
+  table-layout: fixed;
 }
 td {
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere; /* long unbroken names/paths wrap inside their fixed column */
+}
+/* Shared column widths so the funnel tables line up with each other (§8e). The title/name column
+   carries no width and soaks up the remaining pane; everything else is pinned. */
+col.c-cover {
+  width: 44px;
+}
+col.c-artist {
+  width: 200px;
+}
+col.c-actions3 {
+  width: 212px;
+} /* three buttons: Save/Want/Dismiss, Keep/Drop/Snooze, Retry/Discard */
+col.c-actions1 {
+  width: 150px;
+}
+col.c-aux {
+  width: 120px;
+}
+col.c-source {
+  width: 96px;
+}
+col.c-matched {
+  width: 260px;
+}
+col.c-link {
+  width: 100px;
+}
+col.c-why {
+  width: 220px;
+}
+col.c-kind {
+  width: 72px;
+}
+col.c-state {
+  width: 96px;
 }
 th {
   text-align: left;
@@ -269,9 +309,11 @@ a {
   padding: 8px 10px;
 }
 
-/* Activity feed (worker event tail) */
+/* Activity feed (worker event tail) — a log, not a funnel table: let it auto-size so the
+   timestamp column shrinks to content (via .ev-time width:1%) rather than a pinned width. */
 .activity {
   font-size: 13px;
+  table-layout: auto;
 }
 .activity .ev-time {
   white-space: nowrap;

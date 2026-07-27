@@ -69,6 +69,13 @@ export function Decide({ onChange, query = '' }: { onChange?: () => void; query?
 
   return (
     <table>
+      <colgroup>
+        <col className="c-cover" />
+        <col className="c-artist" />
+        <col />
+        <col className="c-why" />
+        <col className="c-actions3" />
+      </colgroup>
       <thead>
         <tr>
           <th className="cover-cell" />
