@@ -249,6 +249,49 @@ def test_run_marks_failed_and_can_be_retried(
     assert repo.get_pending_import(import_id).state == ImportState.imported.value  # type: ignore[union-attr]
 
 
+def test_failed_import_captures_error_detail_and_clears_it_on_retry(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    # A failed import must not die silently: the exception (and its traceback) are recorded on the
+    # row so the operator can read the log from the Import screen; a later success clears it.
+    sf = clean_album_tables
+    download_dir = tmp_path / "d"
+    download_dir.mkdir()
+    (download_dir / "x.flac").write_text("x")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="d",
+        download_dir=str(download_dir),
+        files=["x.flac"],
+        matched_album_id=None,
+    )
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
+
+    class BoomBeets:
+        def import_dir(self, path: str) -> None:
+            raise RuntimeError("beets blew up")
+
+    _transmission_runner(repo, BoomBeets(), str(inbox)).run_queued()
+    item = ImportsService(repo=repo).queue()[0]
+    assert item.state == ImportState.failed.value
+    assert item.error_detail is not None
+    assert "beets blew up" in item.error_detail
+    assert "RuntimeError" in item.error_detail  # the traceback/type is captured, not just failed
+
+    # a successful retry clears the stale error
+    repo.queue_import(import_id)
+    _transmission_runner(repo, RecordingBeetsClient(), str(inbox)).run_queued()
+    retried = ImportsService(repo=repo).queue()[0]
+    assert retried.state == ImportState.imported.value
+    assert retried.error_detail is None
+
+
 def test_import_skips_and_keeps_source_when_beets_adds_nothing(
     clean_album_tables: sessionmaker[Session], tmp_path: Path
 ) -> None:

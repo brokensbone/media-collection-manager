@@ -309,6 +309,22 @@ a {
   padding: 8px 10px;
 }
 
+/* Expanded failure log under a failed import row (click "Log"). */
+.import-log {
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow: auto;
+}
+
 /* Activity feed (worker event tail) — a log, not a funnel table: let it auto-size so the
    timestamp column shrinks to content (via .ev-time width:1%) rather than a pinned width. */
 .activity {

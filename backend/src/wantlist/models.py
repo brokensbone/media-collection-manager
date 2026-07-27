@@ -183,6 +183,9 @@ class PendingImport(Base):
     # Whether the download contains audio (§12 non-music filter). None = not screened (watch-dir
     # drops, older rows). Kept even for skipped torrents so the Transmission page can show them.
     has_audio: Mapped[bool | None] = mapped_column(default=None)
+    # Why the last import attempt failed (exception + stderr + traceback), so the operator can
+    # click into a failed row and read the log instead of it dying silently. Cleared on retry.
+    error_detail: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

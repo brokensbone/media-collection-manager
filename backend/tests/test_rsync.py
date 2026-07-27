@@ -10,6 +10,7 @@ def _capture(monkeypatch: Any) -> dict[str, Any]:
     def fake_run(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
         captured["argv"] = argv
         captured["input"] = kwargs.get("input")
+        captured["timeout"] = kwargs.get("timeout")
         return subprocess.CompletedProcess(argv, 0, "", "")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
@@ -33,6 +34,16 @@ def test_builds_a_copy_only_rsync_over_ssh(monkeypatch: Any, tmp_path: Any) -> N
     # exact file list on stdin, source is the remote download dir
     assert captured["input"] == "01.flac\n02.flac"
     assert "me@seedbox:/downloads/Album/" in argv
+
+
+def test_fetch_uses_the_configured_transfer_timeout(monkeypatch: Any, tmp_path: Any) -> None:
+    # A multi-GB film can take hours off a slow seedbox; the transfer timeout must be the
+    # configured value, not the old hardcoded 30 minutes that failed large files outright.
+    captured = _capture(monkeypatch)
+    RsyncTransfer(host="h", port=22, user="u", ssh_key="", transfer_timeout=21600).fetch(
+        download_dir="/d", files=["a"], dest=str(tmp_path / "s")
+    )
+    assert captured["timeout"] == 21600
 
 
 def test_omits_key_flag_when_unset(monkeypatch: Any, tmp_path: Any) -> None:

@@ -107,6 +107,7 @@ class ImportRow:
     matched_title: str | None
     matched_state: str | None  # the matched album's state, so the UI can flag "already owned"
     archive_path: str | None
+    error_detail: str | None  # why the last import attempt failed (failed rows only)
 
 
 @dataclass
@@ -649,6 +650,7 @@ class AlbumRepo:
                     Album.title,
                     Album.state,
                     PendingImport.archive_path,
+                    PendingImport.error_detail,
                 )
                 .outerjoin(Album, Album.id == PendingImport.matched_album_id)
                 .where(PendingImport.state != ImportState.dismissed)
@@ -672,6 +674,7 @@ class AlbumRepo:
                     matched_title=r[10],
                     matched_state=r[11].value if r[11] is not None else None,
                     archive_path=r[12],
+                    error_detail=r[13],
                 )
                 for r in rows
             ]
@@ -779,9 +782,23 @@ class AlbumRepo:
             )
 
     def mark_import(self, import_id: int, state: ImportState) -> None:
+        # Any non-failed transition clears a stale error from a previous attempt (e.g. a retry
+        # that's now importing, or that succeeded/skipped) so the UI never shows an old failure.
         with self._sf() as session:
             session.execute(
-                update(PendingImport).where(PendingImport.id == import_id).values(state=state)
+                update(PendingImport)
+                .where(PendingImport.id == import_id)
+                .values(state=state, error_detail=None)
+            )
+            session.commit()
+
+    def mark_import_failed(self, import_id: int, error_detail: str) -> None:
+        """Mark an import failed and record why, so a failed row can show its log (§12)."""
+        with self._sf() as session:
+            session.execute(
+                update(PendingImport)
+                .where(PendingImport.id == import_id)
+                .values(state=ImportState.failed, error_detail=error_detail)
             )
             session.commit()
 
