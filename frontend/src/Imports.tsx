@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { matchesQuery } from './filter'
 
 type Item = {
@@ -14,6 +14,7 @@ type Item = {
   matched: string | null
   matched_owned: boolean
   missing: boolean
+  error_detail: string | null
 }
 
 const STATUS: Record<Item['state'], string> = {
@@ -47,6 +48,7 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
   const [items, setItems] = useState<Item[] | null>(null)
   const [scanning, setScanning] = useState(false)
   const [typeFilter, setTypeFilter] = useState<'all' | ItemType>('all')
+  const [openLog, setOpenLog] = useState<number | null>(null) // failed row whose error is expanded
 
   // Optimistic actions that must outlive a poll: after clicking Import/Discard, an in-flight (or
   // next) /imports poll can still return the pre-action row and flash it back. So we hold the
@@ -194,72 +196,91 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
           </colgroup>
           <tbody>
             {shown.map((it) => (
-              <tr key={it.id}>
-                <td className="muted">{it.source}</td>
-                <td>
-                  <div>{it.name}</div>
-                  <div className="muted">
-                    {labelKind(it.media_kind)}
-                    {it.classification_detail ? ` · ${it.classification_detail}` : ''}
-                  </div>
-                  {it.destination_path && <div className="muted">{it.destination_path}</div>}
-                </td>
-                <td>
-                  {it.matched ?? <span className="muted">no match</span>}
-                  {/* "already owned" is a pre-import warning; pointless once it's imported. */}
-                  {it.matched_owned && it.state !== 'imported' && (
-                    <span className="badge">owned</span>
-                  )}
-                </td>
-                <td className="nowrap">
-                  {it.missing ? (
-                    <>
-                      <span className="muted">file no longer in watch folder</span>{' '}
-                      <button type="button" onClick={() => discard(it.id)}>
-                        Discard
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      {it.state === 'detected' && it.import_target !== 'review' && (
-                        <>
-                          <button type="button" onClick={() => enqueue(it.id)}>
-                            Import
-                          </button>{' '}
-                          <button type="button" onClick={() => discard(it.id)}>
-                            Discard
-                          </button>
-                        </>
-                      )}
-                      {it.state === 'detected' && it.import_target === 'review' && (
-                        <>
-                          <span className="muted">needs review</span>{' '}
-                          <button type="button" onClick={() => discard(it.id)}>
-                            Discard
-                          </button>
-                        </>
-                      )}
-                      {it.state === 'queued' && <span className="muted">{STATUS.queued}</span>}
-                      {it.state === 'importing' && (
-                        <span className="muted">{STATUS.importing}</span>
-                      )}
-                      {it.state === 'imported' && <span className="muted">{STATUS.imported}</span>}
-                      {it.state === 'skipped' && <span className="muted">{STATUS.skipped}</span>}
-                      {it.state === 'failed' && (
-                        <>
-                          <span className="muted">{STATUS.failed}</span>{' '}
-                          <button type="button" onClick={() => enqueue(it.id)}>
-                            Retry
-                          </button>{' '}
-                          <button type="button" onClick={() => discard(it.id)}>
-                            Discard
-                          </button>
-                        </>
-                      )}
-                    </>
-                  )}
-                </td>
-              </tr>
+              <Fragment key={it.id}>
+                <tr>
+                  <td className="muted">{it.source}</td>
+                  <td>
+                    <div>{it.name}</div>
+                    <div className="muted">
+                      {labelKind(it.media_kind)}
+                      {it.classification_detail ? ` · ${it.classification_detail}` : ''}
+                    </div>
+                    {it.destination_path && <div className="muted">{it.destination_path}</div>}
+                  </td>
+                  <td>
+                    {it.matched ?? <span className="muted">no match</span>}
+                    {/* "already owned" is a pre-import warning; pointless once it's imported. */}
+                    {it.matched_owned && it.state !== 'imported' && (
+                      <span className="badge">owned</span>
+                    )}
+                  </td>
+                  <td className="nowrap">
+                    {it.missing ? (
+                      <>
+                        <span className="muted">file no longer in watch folder</span>{' '}
+                        <button type="button" onClick={() => discard(it.id)}>
+                          Discard
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {it.state === 'detected' && it.import_target !== 'review' && (
+                          <>
+                            <button type="button" onClick={() => enqueue(it.id)}>
+                              Import
+                            </button>{' '}
+                            <button type="button" onClick={() => discard(it.id)}>
+                              Discard
+                            </button>
+                          </>
+                        )}
+                        {it.state === 'detected' && it.import_target === 'review' && (
+                          <>
+                            <span className="muted">needs review</span>{' '}
+                            <button type="button" onClick={() => discard(it.id)}>
+                              Discard
+                            </button>
+                          </>
+                        )}
+                        {it.state === 'queued' && <span className="muted">{STATUS.queued}</span>}
+                        {it.state === 'importing' && (
+                          <span className="muted">{STATUS.importing}</span>
+                        )}
+                        {it.state === 'imported' && (
+                          <span className="muted">{STATUS.imported}</span>
+                        )}
+                        {it.state === 'skipped' && <span className="muted">{STATUS.skipped}</span>}
+                        {it.state === 'failed' && (
+                          <>
+                            <span className="muted">{STATUS.failed}</span>{' '}
+                            {it.error_detail && (
+                              <button
+                                type="button"
+                                onClick={() => setOpenLog((cur) => (cur === it.id ? null : it.id))}
+                              >
+                                {openLog === it.id ? 'Hide log' : 'Log'}
+                              </button>
+                            )}{' '}
+                            <button type="button" onClick={() => enqueue(it.id)}>
+                              Retry
+                            </button>{' '}
+                            <button type="button" onClick={() => discard(it.id)}>
+                              Discard
+                            </button>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </td>
+                </tr>
+                {openLog === it.id && it.error_detail && (
+                  <tr>
+                    <td colSpan={4}>
+                      <pre className="import-log">{it.error_detail}</pre>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>

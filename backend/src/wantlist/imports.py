@@ -1,6 +1,7 @@
 import logging
 import re
 import shutil
+import traceback
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -54,6 +55,7 @@ class ImportItem:
     matched: str | None  # "Artist — Title" of the matched want, or None for the no-match tail
     matched_owned: bool  # the matched album is already owned — importing would just duplicate it
     missing: bool  # the watch-dir file backing this drop is gone — offer removal, not import
+    error_detail: str | None  # why the last attempt failed (failed rows only), for the log view
 
 
 @dataclass
@@ -314,8 +316,13 @@ class ImportRunner:
                 placed_video = self._video.import_dir(str(staging), rec.destination_path)
             else:
                 raise RuntimeError("import target is review-only")
-        except Exception:
-            self._repo.mark_import(import_id, ImportState.failed)
+        except Exception as exc:
+            detail = _error_detail(exc)
+            self._repo.mark_import_failed(import_id, detail)
+            # Log it (with the traceback) AND persist it on the row: a failed import must never
+            # die silently — the operator can read `detail` from the Import screen, and it's in
+            # the worker log too. Logged here (once, richly) rather than in run_queued's catch.
+            log.warning("import %s (%s) failed: %s", import_id, rec.name, exc, exc_info=True)
             self._events.emit(
                 job="import",
                 type="failed",
@@ -398,7 +405,7 @@ class ImportRunner:
             try:
                 self.run(import_id)
             except Exception:
-                log.warning("import %s failed", import_id)  # already marked failed in run()
+                pass  # run() already logged the traceback and recorded the error on the row
         return len(ids)
 
 
@@ -424,6 +431,7 @@ class ImportsService:
                 matched=f"{r.matched_artist} — {r.matched_title}" if r.matched_album_id else None,
                 matched_owned=r.matched_state == AlbumState.owned.value,
                 missing=self._is_missing(r.state, r.archive_path),
+                error_detail=r.error_detail,
             )
             for r in self._repo.list_imports()
         ]
@@ -601,6 +609,22 @@ def _classify_torrent(
         destination_path=None,
         state=ImportState.detected,
     )
+
+
+_ERROR_DETAIL_CAP = 6000  # keep the stored log readable and the row small
+
+
+def _error_detail(exc: BaseException) -> str:
+    """A human-readable failure log for a failed import: the exception, the subprocess stderr if
+    there is one (rsync/beets put the real reason there), then the traceback. Capped in length."""
+    parts = [f"{type(exc).__name__}: {exc}"]
+    stderr = getattr(exc, "stderr", None)  # CalledProcessError from rsync/beet carries the reason
+    if stderr:
+        text = stderr.decode(errors="replace") if isinstance(stderr, bytes) else str(stderr)
+        if text.strip():
+            parts.append(f"\nstderr:\n{text.strip()}")
+    parts.append("\n" + "".join(traceback.format_exception(exc)))
+    return "\n".join(parts)[:_ERROR_DETAIL_CAP]
 
 
 def _match_targets(repo: AlbumRepo) -> list[MatchTarget]:

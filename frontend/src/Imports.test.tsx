@@ -37,6 +37,7 @@ function item(over: Record<string, unknown> = {}) {
     state: 'detected',
     matched_album_id: null,
     matched: null,
+    error_detail: null,
     ...over,
   }
 }
@@ -134,6 +135,33 @@ describe('Imports', () => {
     render(<Imports />)
     expect(await screen.findByText('failed')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+  })
+
+  it('reveals the failure log for a failed row on demand', async () => {
+    mockApi([
+      item({
+        id: 3,
+        name: 'Bad.mkv',
+        state: 'failed',
+        error_detail: 'FileExistsError: destination file already exists: /mnt/redhdd/film/x.mkv',
+      }),
+    ])
+    render(<Imports />)
+    await screen.findByText('failed')
+    // the log is hidden until asked for
+    expect(screen.queryByText(/destination file already exists/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+    expect(screen.getByText(/destination file already exists/)).toBeTruthy()
+    // toggles back off
+    fireEvent.click(screen.getByRole('button', { name: 'Hide log' }))
+    expect(screen.queryByText(/destination file already exists/)).toBeNull()
+  })
+
+  it('offers no Log button when a failed row has no captured detail', async () => {
+    mockApi([item({ id: 3, name: 'Bad.zip', state: 'failed', error_detail: null })])
+    render(<Imports />)
+    await screen.findByText('failed')
+    expect(screen.queryByRole('button', { name: 'Log' })).toBeNull()
   })
 
   it('flags a match that is already owned', async () => {
