@@ -25,9 +25,28 @@ const STATUS: Record<Item['state'], string> = {
   failed: 'failed',
 }
 
+// The type a row belongs to for the filter bar. Keyed off import_target so the buckets are
+// mutually exclusive and match where the file actually goes: a mixed-season TV pack routed to
+// review shows under Review (needs attention), not TV — so each list is a clean batch to work.
+type ItemType = 'music' | 'tv' | 'film' | 'review'
+const TYPE_LABELS: [ItemType, string][] = [
+  ['music', 'Music'],
+  ['tv', 'TV'],
+  ['film', 'Film'],
+  ['review', 'Review'],
+]
+
+function itemType(it: Item): ItemType {
+  if (it.import_target === 'review') return 'review'
+  if (it.import_target === 'tv') return 'tv'
+  if (it.import_target === 'film') return 'film'
+  return 'music' // beets
+}
+
 export function Imports({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
   const [items, setItems] = useState<Item[] | null>(null)
   const [scanning, setScanning] = useState(false)
+  const [typeFilter, setTypeFilter] = useState<'all' | ItemType>('all')
 
   // Optimistic actions that must outlive a poll: after clicking Import/Discard, an in-flight (or
   // next) /imports poll can still return the pre-action row and flash it back. So we hold the
@@ -114,7 +133,15 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
 
   if (!items) return <p>Loading…</p>
 
-  const shown = items.filter((it) => matchesQuery(`${it.name} ${it.matched ?? ''}`, query))
+  const queryFiltered = items.filter((it) => matchesQuery(`${it.name} ${it.matched ?? ''}`, query))
+  const counts: Record<ItemType, number> = { music: 0, tv: 0, film: 0, review: 0 }
+  for (const it of queryFiltered) counts[itemType(it)]++
+  // Only worth a filter bar when more than one type is present; keep the active bucket visible
+  // even if it empties out (e.g. you import the last film) so you can always click back to All.
+  const present = TYPE_LABELS.filter(([k]) => counts[k] > 0)
+  const barTypes = TYPE_LABELS.filter(([k]) => counts[k] > 0 || typeFilter === k)
+  const shown =
+    typeFilter === 'all' ? queryFiltered : queryFiltered.filter((it) => itemType(it) === typeFilter)
 
   // Only reflect active work — imported rows persist in the list as history, so counting them
   // would make a single import read as "3 of 3". Imports run one at a time (at most one active).
@@ -131,9 +158,33 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
           {scanning ? 'Scanning…' : 'Scan watch folder'}
         </button>
       </div>
+      {present.length > 1 && (
+        <div className="dashboard">
+          <button
+            type="button"
+            className={typeFilter === 'all' ? 'stat active' : 'stat'}
+            onClick={() => setTypeFilter('all')}
+          >
+            <b>{queryFiltered.length}</b> all
+          </button>
+          {barTypes.map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              className={typeFilter === k ? 'stat active' : 'stat'}
+              onClick={() => setTypeFilter(k)}
+            >
+              <b>{counts[k]}</b> {label}
+            </button>
+          ))}
+        </div>
+      )}
       {items.length === 0 && <p>No downloads to import.</p>}
       {progress && <p className="resolving">{progress}</p>}
-      {items.length > 0 && (
+      {items.length > 0 && shown.length === 0 && (
+        <p className="muted">Nothing to show for this filter.</p>
+      )}
+      {shown.length > 0 && (
         <table>
           <tbody>
             {shown.map((it) => (

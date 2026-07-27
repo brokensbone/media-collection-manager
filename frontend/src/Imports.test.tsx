@@ -208,4 +208,49 @@ describe('Imports', () => {
     expect(await screen.findByText('needs review')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Import' })).toBeNull()
   })
+
+  it('filters the list by type and back to all', async () => {
+    mockApi([
+      item({ id: 1, name: 'A Song' }), // music (beets)
+      item({ id: 2, name: 'The Show S01', import_target: 'tv', media_kind: 'tv' }),
+      item({ id: 3, name: 'A Film', import_target: 'film', media_kind: 'film' }),
+    ])
+    render(<Imports />)
+    await screen.findByText('A Song')
+    // all three rows visible before filtering
+    expect(screen.getByText('The Show S01')).toBeTruthy()
+    expect(screen.getByText('A Film')).toBeTruthy()
+
+    // click the TV filter tab (accessible name includes its count, e.g. "1 TV")
+    fireEvent.click(screen.getByRole('button', { name: /\bTV$/ }))
+    await waitFor(() => expect(screen.queryByText('A Song')).toBeNull())
+    expect(screen.getByText('The Show S01')).toBeTruthy()
+    expect(screen.queryByText('A Film')).toBeNull()
+
+    // All brings everything back
+    fireEvent.click(screen.getByRole('button', { name: /\ball$/ }))
+    await waitFor(() => expect(screen.getByText('A Song')).toBeTruthy())
+    expect(screen.getByText('A Film')).toBeTruthy()
+  })
+
+  it('groups a review-target row under Review, not its media kind', async () => {
+    mockApi([
+      item({ id: 1, name: 'Clean Film', import_target: 'film', media_kind: 'film' }),
+      // a mixed-season TV pack routed to review — belongs under Review, not TV
+      item({ id: 2, name: 'Mixed Pack', import_target: 'review', media_kind: 'tv' }),
+    ])
+    render(<Imports />)
+    await screen.findByText('Clean Film')
+    fireEvent.click(screen.getByRole('button', { name: /\bReview$/ }))
+    await waitFor(() => expect(screen.queryByText('Clean Film')).toBeNull())
+    expect(screen.getByText('Mixed Pack')).toBeTruthy()
+  })
+
+  it('shows no type filter when only one type is present', async () => {
+    mockApi([item({ id: 1, name: 'A Song' }), item({ id: 2, name: 'Another Song' })])
+    render(<Imports />)
+    await screen.findByText('A Song')
+    expect(screen.queryByRole('button', { name: /Music$/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /\ball$/ })).toBeNull()
+  })
 })
