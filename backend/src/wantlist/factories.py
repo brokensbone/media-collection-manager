@@ -87,6 +87,9 @@ def build_resolution_service(
         repo=AlbumRepo(session_factory),
         tokens=build_auth_service(settings, session_factory),
         max_per_run=settings.resolution_max_per_run,
+        backoff_base_seconds=settings.resolution_backoff_base_seconds,
+        backoff_cap_seconds=settings.resolution_backoff_cap_seconds,
+        error_circuit_break=settings.resolution_error_circuit_break,
         events=WorkerEventLog(session_factory),
     )
 

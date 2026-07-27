@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import exists, func, select, update
+from sqlalchemy import exists, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -258,31 +258,51 @@ class AlbumRepo:
 
     # --- resolution (§5) -------------------------------------------------------------
 
-    def albums_needing_resolution(self) -> list[UnresolvedAlbum]:
-        """Non-dismissed albums without a release-group id yet (resolve-once, re-try tail).
+    def albums_needing_resolution(
+        self, *, backoff_base_seconds: int, backoff_cap_seconds: int
+    ) -> list[UnresolvedAlbum]:
+        """Non-dismissed albums without a release-group id that are *due* a resolution attempt.
         Least-tried first (then oldest): a capped pass always reaches fresh albums before
-        re-grinding the MB-absent tail, so repeated no-matches can't starve the queue (§5)."""
+        re-grinding the MB-absent tail, so repeated no-matches can't starve the queue (§5).
+
+        Due = never attempted, or the exponential backoff window since the last "no match" has
+        elapsed: min(cap, base * 2**attempts) seconds. So a release MB doesn't have decays from
+        hourly retries to at most ~weekly instead of being re-queried every reconcile (§11)."""
+        # power(2, attempts) with a big attempts count would overflow; the exponent is clamped
+        # (the cap dominates long before it matters — base * 2**20 already far exceeds a week).
+        window = func.least(
+            backoff_cap_seconds,
+            backoff_base_seconds * func.power(2, func.least(Album.resolution_attempts, 20)),
+        )
         with self._sf() as session:
             rows = session.execute(
                 select(Album.id, Album.spotify_id, Album.upc, Album.artist, Album.title)
                 .where(
                     Album.mb_releasegroup_id.is_(None),
                     Album.state != AlbumState.dismissed,
+                    or_(
+                        Album.last_resolution_attempt.is_(None),
+                        func.extract("epoch", func.now() - Album.last_resolution_attempt) >= window,
+                    ),
                 )
                 .order_by(Album.resolution_attempts.asc(), Album.id.asc())
             )
             return [UnresolvedAlbum(*row) for row in rows]
 
     def bump_resolution_attempts(self, album_ids: list[int]) -> None:
-        """Record a failed resolution attempt, so a repeatedly-unresolvable album sinks below
-        fresher ones in albums_needing_resolution's least-tried-first order."""
+        """Record a failed resolution attempt (a genuine "no match", not an upstream error), so
+        the album sinks in the least-tried order and its backoff window grows. Stamps the attempt
+        time so albums_needing_resolution can hold it back until the window elapses."""
         if not album_ids:
             return
         with self._sf() as session:
             session.execute(
                 update(Album)
                 .where(Album.id.in_(album_ids))
-                .values(resolution_attempts=Album.resolution_attempts + 1)
+                .values(
+                    resolution_attempts=Album.resolution_attempts + 1,
+                    last_resolution_attempt=func.now(),
+                )
             )
             session.commit()
 
