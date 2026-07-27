@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
 from wantlist.adapters.album_repo import AlbumRepo
@@ -13,7 +14,15 @@ from wantlist.imports import (
     WatchdirStager,
     _classify_torrent,
 )
-from wantlist.models import Album, AlbumState, ImportSource, ImportState, ImportTarget, Provenance
+from wantlist.models import (
+    Album,
+    AlbumState,
+    ImportSource,
+    ImportState,
+    ImportTarget,
+    MediaKind,
+    Provenance,
+)
 from wantlist.ports.spotify_api import SavedAlbum
 from wantlist.ports.transmission import Torrent
 from wantlist.reverse_match import ReverseMatcher
@@ -703,3 +712,95 @@ def test_classify_torrent_sanitises_path_traversal_in_title() -> None:
         matched_album_id=None,
     )
     assert classified.destination_path == "/tv/Evil/Season 01"
+
+
+# Real season packs from the operator's Transmission client. A torrent's file entries are paths
+# relative to the release folder, so the show title must be derived from the file *basename* — not
+# the whole path, which would fold the folder's season/quality tags into the show name (e.g.
+# "Twin Peaks S02 Complete" instead of "Twin Peaks").
+@pytest.mark.parametrize(
+    ("name", "files", "expected_dest"),
+    [
+        # season pack: folder carries "S02.Complete.1080p…", episodes are S02Exx — title must be
+        # just "Twin Peaks", not "Twin Peaks S02 Complete"
+        (
+            "Twin.Peaks.S02.Complete.1080p.WEB-DL.DD5.1.H.264-TRU",
+            [
+                "Twin.Peaks.S02.Complete.1080p.WEB-DL.DD5.1.H.264-TRU/"
+                "Twin.Peaks.S02E01.May.the.Giant.Be.with.You.1080p.WEB-DL.DD5.1.H.264-TRU.mkv",
+            ],
+            "/tv/Twin Peaks/Season 02",
+        ),
+        # space-separated "Season N" folder; episode files repeat the show name — no duplication
+        (
+            "Monkey Dust Season 2",
+            ["Monkey Dust Season 2/Monkey Dust S02E06.avi"],
+            "/tv/Monkey Dust/Season 02",
+        ),
+        # "Series N" naming; season taken from the S02Exx episode tag
+        (
+            "Danger 5 Series 2",
+            ["Danger 5 Series 2/Danger.5.S02E04.A.Sack.of.Christmas.720p.WEB-DL.mkv"],
+            "/tv/Danger 5/Season 02",
+        ),
+        # long dotted name + DVDRip tag in the folder — title stays clean
+        (
+            "The.Peter.Serafinowicz.Show.S01.DVDRip.XviD-HAGGiS",
+            [
+                "The.Peter.Serafinowicz.Show.S01.DVDRip.XviD-HAGGiS/"
+                "The.Peter.Serafinowicz.Show.S01E06.DVDRip.XviD-HAGGiS.avi",
+            ],
+            "/tv/The Peter Serafinowicz Show/Season 01",
+        ),
+        # lowercase episode tag + trailing "PAL DVD" release junk in the filename
+        (
+            "Green Wing S01 PAL DVD DD2.0 x264 JCH",
+            [
+                "Green Wing S01 PAL DVD DD2.0 x264 JCH/"
+                "Green Wing s01e01 - Caroline's First Day PAL DVD.mkv"
+            ],
+            "/tv/Green Wing/Season 01",
+        ),
+        # regression guard: a single loose episode file (no release folder) must stay clean
+        (
+            "no.offence.s01e04.720p.hdtv.x264-tla.mkv",
+            ["no.offence.s01e04.720p.hdtv.x264-tla.mkv"],
+            "/tv/No Offence/Season 01",
+        ),
+        # the episode file tags win over the folder: folder says S09 but files are S08Exx, and
+        # S08 is what Jellyfin reads from the filenames, so Season 08 is the right destination
+        (
+            "Adventure.Time.S09.720p.WEBRip.AAC2.0-BTN",
+            [
+                "Adventure.Time.S09.720p.WEBRip.AAC2.0-BTN/Adventure.Time.S08E15.Orb.PREAiR.720p.WEBRip.x264-SRS.mkv"
+            ],
+            "/tv/Adventure Time/Season 08",
+        ),
+    ],
+)
+def test_classify_derives_clean_show_title_for_real_season_packs(
+    name: str, files: list[str], expected_dest: str
+) -> None:
+    classified = _classify_torrent(
+        name, files, tv_root="/tv", film_root="/film", matched_album_id=None
+    )
+    assert classified.import_target == ImportTarget.tv
+    assert classified.destination_path == expected_dest
+
+
+def test_classify_sends_mixed_season_pack_to_review() -> None:
+    # A real pack mixing a season-0 special (S00E13) with season-3 episodes has no single season,
+    # so it goes to review rather than mis-filing the special under Season 03.
+    classified = _classify_torrent(
+        "NTSF.SD.SUV.S03.1080p.WEB-DL.DD5.1.H.264-BTN",
+        [
+            "NTSF.SD.SUV.S03.1080p.WEB-DL.DD5.1.H.264-BTN/NTSF.SD.SUV.S00E13.Inertia.1080p.mkv",
+            "NTSF.SD.SUV.S03.1080p.WEB-DL.DD5.1.H.264-BTN/NTSF.SD.SUV.S03E01.Comic.Con-Air.1080p.mkv",
+        ],
+        tv_root="/tv",
+        film_root="/film",
+        matched_album_id=None,
+    )
+    assert classified.media_kind == MediaKind.tv
+    assert classified.import_target == ImportTarget.review
+    assert classified.destination_path is None
