@@ -19,7 +19,8 @@ def dashboard(request: Request) -> dict[str, int]:
         "releases": counts.get("suggested", 0),
         "decide": len(state.decide_service.queue()),
         "acquire": len(state.acquire_service.queue()),
-        "import": state.album_repo.count_active_imports(),
+        "import": state.album_repo.count_pending_imports(),  # awaiting an Import/Discard decision
+        "tasks": state.album_repo.count_task_imports(),  # queued / importing / failed
         "owned": owned,
         "dismissed": counts.get("dismissed", 0),
         # cold-start resolution progress (§5): how many albums have a MusicBrainz release-group

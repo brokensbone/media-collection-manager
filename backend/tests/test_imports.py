@@ -1,6 +1,8 @@
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from sqlalchemy import update
 from sqlalchemy.orm import Session, sessionmaker
 
 from wantlist.adapters.album_repo import AlbumRepo
@@ -21,6 +23,7 @@ from wantlist.models import (
     ImportState,
     ImportTarget,
     MediaKind,
+    PendingImport,
     Provenance,
 )
 from wantlist.ports.spotify_api import SavedAlbum
@@ -85,7 +88,7 @@ def test_detection_matches_an_album_still_in_decide(
 
     rows = {r.name: r for r in AlbumRepo(sf).list_imports()}
     assert rows["Patrick_Wolf-Lupercalia-2011"].matched_album_id == album_id
-    item = ImportsService(repo=AlbumRepo(sf)).queue()[0]
+    item = ImportsService(repo=AlbumRepo(sf)).pending()[0]
     assert item.matched_owned is False  # matched a Decide album, not owned
 
 
@@ -110,7 +113,7 @@ def test_detection_matches_an_already_owned_album(
     rows = {r.name: r for r in AlbumRepo(sf).list_imports()}
     assert rows["Patrick_Wolf-Lupercalia-2011"].matched_album_id == album_id
     # the row must flag that the match is already owned, so the operator knows to discard it
-    item = ImportsService(repo=AlbumRepo(sf)).queue()[0]
+    item = ImportsService(repo=AlbumRepo(sf)).pending()[0]
     assert item.matched_owned is True
 
 
@@ -170,18 +173,21 @@ def test_clicking_import_enqueues_and_worker_processes_it(
         matched_album_id=None,
     )
     service = ImportsService(repo=repo)
-    import_id = service.queue()[0].id
+    import_id = service.pending()[0].id
 
-    # the "click" only enqueues — the row stays, now marked queued (no blocking import)
+    # the "click" enqueues and moves the row out of the pending worklist into Tasks (queued)
     service.enqueue(import_id)
-    assert service.queue()[0].state == "queued"
+    assert service.pending() == []
+    tasks = service.tasks(completed_window_days=7)
+    assert (tasks[0].id, tasks[0].state) == (import_id, "queued")
     assert repo.count_active_imports() == 1
 
     # the worker then processes queued imports in the background
     processed = _transmission_runner(repo, RecordingBeetsClient(), str(inbox)).run_queued()
     assert processed == 1
     assert (download_dir / "01.flac").read_text() == "track one"  # source untouched (§12)
-    assert service.queue()[0].state == "imported"  # row persists, now shows success
+    done = service.tasks(completed_window_days=7)
+    assert (done[0].id, done[0].state) == (import_id, "imported")  # now a completed task
     assert repo.count_active_imports() == 0
 
 
@@ -278,7 +284,8 @@ def test_failed_import_captures_error_detail_and_clears_it_on_retry(
             raise RuntimeError("beets blew up")
 
     _transmission_runner(repo, BoomBeets(), str(inbox)).run_queued()
-    item = ImportsService(repo=repo).queue()[0]
+    # failed imports are tasks, not pending decisions
+    item = ImportsService(repo=repo).tasks(completed_window_days=7)[0]
     assert item.state == ImportState.failed.value
     assert item.error_detail is not None
     assert "beets blew up" in item.error_detail
@@ -287,7 +294,7 @@ def test_failed_import_captures_error_detail_and_clears_it_on_retry(
     # a successful retry clears the stale error
     repo.queue_import(import_id)
     _transmission_runner(repo, RecordingBeetsClient(), str(inbox)).run_queued()
-    retried = ImportsService(repo=repo).queue()[0]
+    retried = ImportsService(repo=repo).tasks(completed_window_days=7)[0]
     assert retried.state == ImportState.imported.value
     assert retried.error_detail is None
 
@@ -440,8 +447,9 @@ def test_unmatched_import_reverse_matches_to_owned(
     owned = AlbumRepo(sf).list_albums("owned")
     assert [(a.artist, a.title, a.owned) for a in owned] == [("Mclusky", "The World", True)]
 
-    # the import row is linked to the album it produced, not left showing "no match"
-    item = ImportsService(repo=AlbumRepo(sf)).queue()[0]
+    # the import row is linked to the album it produced, not left showing "no match" — it's a
+    # completed task now, not a pending decision
+    item = ImportsService(repo=AlbumRepo(sf)).tasks(completed_window_days=7)[0]
     assert item.matched == "Mclusky — The World"
     assert item.matched_album_id == owned[0].id
 
@@ -468,7 +476,7 @@ def test_imports_service_queue_labels_match(
         matched_album_id=None,
     )
 
-    queue = {i.name: i for i in ImportsService(repo=repo).queue()}
+    queue = {i.name: i for i in ImportsService(repo=repo).pending()}
     assert queue["Burial-Untrue"].matched == "Burial — Untrue"
     assert queue["Burial-Untrue"].source == "transmission"
     assert queue["Mystery.zip"].matched is None
@@ -505,7 +513,7 @@ def test_queue_flags_watchdir_drop_whose_file_is_gone(
         matched_album_id=None,
     )
 
-    queue = {i.name: i for i in ImportsService(repo=repo).queue()}
+    queue = {i.name: i for i in ImportsService(repo=repo).pending()}
     assert queue["Here.zip"].missing is False  # file present
     assert queue["Gone.zip"].missing is True  # file removed → offer removal, not import
     assert queue["Torrent"].missing is False  # transmission has no local file to check
@@ -527,9 +535,9 @@ def test_discard_hides_the_row_but_keeps_its_source_key(
         matched_album_id=None,
     )
     service = ImportsService(repo=repo)
-    import_id = service.queue()[0].id
+    import_id = service.pending()[0].id
     service.discard(import_id)
-    assert service.queue() == []  # hidden from the list
+    assert service.pending() == []  # hidden from the list
     assert "h1" in repo.known_source_keys()  # still known → won't re-detect
 
 
@@ -548,9 +556,9 @@ def test_discarding_a_watchdir_drop_deletes_its_file(
         matched_album_id=None,
     )
     service = ImportsService(repo=repo)
-    service.discard(service.queue()[0].id)
+    service.discard(service.pending()[0].id)
     assert not drop.exists()  # a discarded drop is removed from the watch folder
-    assert service.queue() == []
+    assert service.pending() == []
 
 
 def test_transmission_detection_classifies_music_tv_film_and_non_media(
@@ -611,7 +619,7 @@ def test_review_only_video_row_is_blocked_from_enqueue(
         matched_album_id=None,
     )
 
-    item = ImportsService(repo=repo).queue()[0]
+    item = ImportsService(repo=repo).pending()[0]
     ImportsService(repo=repo).enqueue(item.id)
 
     assert repo.get_pending_import(item.id).state == ImportState.detected.value  # type: ignore[union-attr]
@@ -741,6 +749,42 @@ def test_video_reimport_skips_when_all_files_already_present(
 
     assert (target / "The.Matrix.1999.2160p.mkv").read_text() == "already here"  # not overwritten
     assert repo.get_pending_import(import_id).state == ImportState.skipped.value  # type: ignore[union-attr]
+
+
+def test_import_views_split_into_pending_tasks_and_archive(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    sf = clean_album_tables
+    repo = AlbumRepo(sf)
+    svc = ImportsService(repo=repo)
+    for key, name in [("d", "det"), ("q", "que"), ("f", "fail"), ("r", "recent"), ("o", "old")]:
+        repo.add_pending_import(
+            source=ImportSource.transmission,
+            source_key=key,
+            name=name,
+            download_dir="/d",
+            files=["x.flac"],
+            matched_album_id=None,
+        )
+    ids = {r.name: r.id for r in repo.list_imports()}
+    repo.queue_import(ids["que"])
+    repo.mark_import_failed(ids["fail"], "boom")
+    repo.mark_import(ids["recent"], ImportState.imported)
+    repo.mark_import(ids["old"], ImportState.imported)
+    # age the "old" completed import well past the window
+    with sf() as session:
+        session.execute(
+            update(PendingImport)
+            .where(PendingImport.id == ids["old"])
+            .values(updated_at=datetime.now(UTC) - timedelta(days=10))
+        )
+        session.commit()
+
+    assert {i.name for i in svc.pending()} == {"det"}  # only the undecided download
+    # active work + completed within the window, but not the old completed one
+    assert {i.name for i in svc.tasks(completed_window_days=3)} == {"que", "fail", "recent"}
+    # the archive has every completed import, however old
+    assert {i.name for i in svc.archive()} == {"recent", "old"}
 
 
 def test_classify_torrent_sanitises_path_traversal_in_title() -> None:

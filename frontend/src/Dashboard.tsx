@@ -5,6 +5,7 @@ type Counts = {
   decide: number
   acquire: number
   import: number
+  tasks: number
   owned: number
   dismissed: number
 }
@@ -20,6 +21,7 @@ const TILES: { key: keyof Counts; label: string }[] = [
   { key: 'decide', label: 'decide' },
   { key: 'acquire', label: 'acquire' },
   { key: 'import', label: 'import' },
+  { key: 'tasks', label: 'tasks' },
   { key: 'owned', label: 'owned' },
   { key: 'dismissed', label: 'dismissed' },
 ]

@@ -10,11 +10,23 @@ import { Library } from './Library'
 import { Owned } from './Owned'
 import { Releases } from './Releases'
 import { SpotifyStatus } from './SpotifyStatus'
+import { Tasks } from './Tasks'
 import { Transmission } from './Transmission'
 
-type View = 'app' | 'guide' | 'transmission' | 'activity'
+// 'archive' is the completed-imports archive — reached only from a link inside the Tasks view,
+// not the tile row or the top nav.
+type View = 'app' | 'guide' | 'transmission' | 'activity' | 'archive'
 
-const SECTIONS: Section[] = ['all', 'releases', 'decide', 'acquire', 'import', 'owned', 'dismissed']
+const SECTIONS: Section[] = [
+  'all',
+  'releases',
+  'decide',
+  'acquire',
+  'import',
+  'tasks',
+  'owned',
+  'dismissed',
+]
 
 // The active tab lives in the URL hash (#guide, #transmission, #acquire, …) so a refresh or
 // a shared link restores the same view.
@@ -23,6 +35,7 @@ function readHash(): { view: View; section: Section } {
   if (h === 'guide') return { view: 'guide', section: 'all' }
   if (h === 'transmission') return { view: 'transmission', section: 'all' }
   if (h === 'activity') return { view: 'activity', section: 'all' }
+  if (h === 'archive') return { view: 'archive', section: 'all' }
   if ((SECTIONS as string[]).includes(h)) return { view: 'app', section: h as Section }
   return { view: 'app', section: 'all' }
 }
@@ -55,6 +68,7 @@ export default function App() {
     { key: 'decide', heading: 'Decide', node: <Decide onChange={bump} query={query} /> },
     { key: 'acquire', heading: 'Acquire', node: <Acquire onChange={bump} query={query} /> },
     { key: 'import', heading: 'Import', node: <Imports onChange={bump} query={query} /> },
+    { key: 'tasks', heading: 'Tasks', node: <Tasks onChange={bump} query={query} /> },
     {
       key: 'owned',
       heading: 'Owned',
@@ -102,6 +116,11 @@ export default function App() {
         <Transmission />
       ) : view === 'activity' ? (
         <Activity />
+      ) : view === 'archive' ? (
+        <section>
+          <h2>Completed archive</h2>
+          <Tasks onChange={bump} archive />
+        </section>
       ) : (
         <>
           <Dashboard refreshKey={refresh} active={section} onSelect={setSection} />
