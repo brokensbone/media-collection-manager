@@ -12,6 +12,7 @@ function mockOwned(body: unknown) {
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  window.location.hash = ''
 })
 
 describe('Owned', () => {
@@ -65,5 +66,50 @@ describe('Owned', () => {
     mockOwned([])
     render(<Owned />)
     expect(await screen.findByText(/Nothing here/)).toBeTruthy()
+  })
+
+  it('gives each row a shareable permalink to that beets entry', async () => {
+    mockOwned([
+      {
+        beets_id: 'b7',
+        artist: 'A',
+        title: 'Dupe',
+        album_id: null,
+        has_art: false,
+        on_spotify: false,
+        spotify_id: null,
+      },
+    ])
+    render(<Owned />)
+    await screen.findByText('Dupe')
+    expect(screen.getByTitle('Link to this album').getAttribute('href')).toBe('#owned?sel=b7')
+  })
+
+  it('highlights the row named by #owned?sel= in the URL', async () => {
+    window.location.hash = 'owned?sel=b7'
+    mockOwned([
+      {
+        beets_id: 'b7',
+        artist: 'A',
+        title: 'Dupe',
+        album_id: null,
+        has_art: false,
+        on_spotify: false,
+        spotify_id: null,
+      },
+      {
+        beets_id: 'b8',
+        artist: 'A',
+        title: 'Other',
+        album_id: null,
+        has_art: false,
+        on_spotify: false,
+        spotify_id: null,
+      },
+    ])
+    const { container } = render(<Owned />)
+    await screen.findByText('Dupe')
+    expect(container.querySelector('#owned-b7')?.className).toContain('linked')
+    expect(container.querySelector('#owned-b8')?.className ?? '').not.toContain('linked')
   })
 })

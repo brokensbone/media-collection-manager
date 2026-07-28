@@ -164,6 +164,21 @@ tr.sel td {
 tbody tr:hover td {
   background: var(--surface);
 }
+/* A row reached by a shared per-row link (#…?sel=…) — same accent as keyboard selection. */
+tr.linked td {
+  background: var(--surface);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+/* The per-row permalink handle (a quiet "#" that yields a shareable URL for that entry). */
+.row-link {
+  color: var(--muted);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  padding: 0 2px;
+}
+.row-link:hover {
+  color: var(--accent);
+}
 button {
   border: 1px solid var(--border);
   background: transparent;
