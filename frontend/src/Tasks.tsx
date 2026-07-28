@@ -29,8 +29,29 @@ export function Tasks({
   archive?: boolean
 }) {
   const [items, setItems] = useState<ImportItem[] | null>(null)
-  const [openLog, setOpenLog] = useState<number | null>(null)
+  // The expanded failure log is mirrored in the URL (#tasks?log=42) so a specific failure is
+  // shareable/deep-linkable; the archive has no failed rows, so it never uses this.
+  const [openLog, setOpenLog] = useState<number | null>(() => (archive ? null : logFromHash()))
   const removed = useRef<Set<number>>(new Set())
+
+  const toggleLog = useCallback(
+    (id: number) => {
+      setOpenLog((cur) => {
+        const next = cur === id ? null : id
+        if (!archive) window.location.hash = next === null ? 'tasks' : `tasks?log=${next}`
+        return next
+      })
+    },
+    [archive],
+  )
+
+  // Follow the URL: a shared #tasks?log=42 link (or back/forward) opens that failure's log.
+  useEffect(() => {
+    if (archive) return
+    const onHash = () => setOpenLog(logFromHash())
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [archive])
 
   const refresh = useCallback(() => {
     fetch(archive ? '/imports/archive' : '/imports/tasks')
@@ -63,6 +84,12 @@ export function Tasks({
     [onChange, refresh],
   )
 
+  // Bring a deep-linked failure into view once its row has rendered.
+  useEffect(() => {
+    if (openLog == null || !items) return
+    document.getElementById(`task-${openLog}`)?.scrollIntoView?.({ block: 'center' })
+  }, [openLog, items])
+
   if (!items) return <p>Loading…</p>
 
   const shown = query
@@ -82,7 +109,7 @@ export function Tasks({
       <tbody>
         {list.map((it) => (
           <Fragment key={it.id}>
-            <tr>
+            <tr id={`task-${it.id}`}>
               <td className="muted">{it.source}</td>
               <td>
                 <div>{it.name}</div>
@@ -99,10 +126,7 @@ export function Tasks({
                   <>
                     {' '}
                     {it.error_detail && (
-                      <button
-                        type="button"
-                        onClick={() => setOpenLog((cur) => (cur === it.id ? null : it.id))}
-                      >
+                      <button type="button" onClick={() => toggleLog(it.id)}>
                         {openLog === it.id ? 'Hide log' : 'Log'}
                       </button>
                     )}{' '}
@@ -169,4 +193,12 @@ export function Tasks({
 
 function setHash(h: string): void {
   window.location.hash = h
+}
+
+// The `log` param from a #tasks?log=42 URL, or null.
+function logFromHash(): number | null {
+  const query = window.location.hash.split('?')[1] ?? ''
+  const raw = new URLSearchParams(query).get('log')
+  const id = raw ? Number(raw) : Number.NaN
+  return Number.isInteger(id) ? id : null
 }
