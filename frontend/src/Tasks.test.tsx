@@ -35,6 +35,7 @@ function item(over: Record<string, unknown> = {}) {
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  window.location.hash = ''
 })
 
 describe('Tasks', () => {
@@ -80,6 +81,25 @@ describe('Tasks', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     const posted = fetchMock.mock.calls.find((c) => c[1]?.method === 'POST')
     expect(posted?.[0]).toBe('/imports/5/import')
+  })
+
+  it('mirrors an opened failure log into the URL for sharing', async () => {
+    window.location.hash = 'tasks'
+    mockApi([item({ id: 5, name: 'Bad.mkv', state: 'failed', error_detail: 'the reason' })])
+    render(<Tasks />)
+    await screen.findByText('failed')
+    fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+    expect(window.location.hash).toBe('#tasks?log=5')
+    expect(screen.getByText('the reason')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Hide log' }))
+    expect(window.location.hash).toBe('#tasks')
+  })
+
+  it('opens the deep-linked failure log named in the URL on load', async () => {
+    window.location.hash = 'tasks?log=7'
+    mockApi([item({ id: 7, name: 'Bad.mkv', state: 'failed', error_detail: 'the deep reason' })])
+    render(<Tasks />)
+    expect(await screen.findByText('the deep reason')).toBeTruthy()
   })
 
   it('in archive mode fetches /imports/archive and shows a back link', async () => {

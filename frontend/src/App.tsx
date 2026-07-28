@@ -29,9 +29,10 @@ const SECTIONS: Section[] = [
 ]
 
 // The active tab lives in the URL hash (#guide, #transmission, #acquire, …) so a refresh or
-// a shared link restores the same view.
+// a shared link restores the same view. A view may carry a query (e.g. #tasks?log=42 deep-links
+// a failure log), so match on the path part before '?'.
 function readHash(): { view: View; section: Section } {
-  const h = window.location.hash.replace(/^#/, '')
+  const h = window.location.hash.replace(/^#/, '').split('?')[0]
   if (h === 'guide') return { view: 'guide', section: 'all' }
   if (h === 'transmission') return { view: 'transmission', section: 'all' }
   if (h === 'activity') return { view: 'activity', section: 'all' }
@@ -47,7 +48,11 @@ export default function App() {
 
   useEffect(() => {
     const target = view === 'app' ? section : view
-    if (window.location.hash.replace(/^#/, '') !== target) window.location.hash = target
+    // Compare only the path part: a view is free to keep its own query (e.g. #tasks?log=42), and
+    // rewriting it here would clobber that. Only write when the actual view/section changed.
+    if (window.location.hash.replace(/^#/, '').split('?')[0] !== target) {
+      window.location.hash = target
+    }
   }, [view, section])
 
   useEffect(() => {
