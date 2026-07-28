@@ -34,7 +34,9 @@ def test_owned_release_group_ids_via_beetsdir(
     assert owned == {"rg-1", "rg-2"}  # the id-less album contributes a blank line, dropped
 
 
-def test_import_dir_skips_duplicates_and_uses_asis(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_import_dir_skips_duplicates_uses_asis_and_traps_directory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     captured: dict[str, Any] = {}
 
     def fake_run(argv: list[str], **kwargs: Any) -> object:
@@ -44,6 +46,7 @@ def test_import_dir_skips_duplicates_and_uses_asis(monkeypatch: pytest.MonkeyPat
 
         class Result:
             stdout = ""
+            stderr = ""  # the -vv trap reads stderr for the resolved directory
 
         return Result()
 
@@ -52,9 +55,31 @@ def test_import_dir_skips_duplicates_and_uses_asis(monkeypatch: pytest.MonkeyPat
     BeetsClient().import_dir("/drop")
 
     argv = captured["argv"]
-    assert argv[0] == "beet" and argv[1] == "--config"
-    assert argv[3:] == ["import", "-q", "--quiet-fallback=asis", "/drop"]
+    # `-vv` (diagnostic trap) then `--config <overlay>` are global opts before the subcommand.
+    assert argv[0] == "beet" and argv[1] == "-vv" and argv[2] == "--config"
+    assert argv[4:] == ["import", "-q", "--quiet-fallback=asis", "/drop"]
     assert "duplicate_action: skip" in captured["override"]
+
+
+def test_trap_flags_default_directory_and_passes_the_configured_one(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setenv("HOME", "/root")
+    client = BeetsClient()
+    good = (
+        "data directory: /mnt/ssd4tb/record-library\n"
+        "library database: /mnt/ssd4tb/record-library/beets.db\n"
+        "library directory: /home/edward/.config/beets/library\n"
+    )
+    with caplog.at_level("INFO", logger="wantlist.adapters.beets"):
+        client._trap_import_directory("/drop", good)
+    assert "directory ok" in caplog.text and "/home/edward" in caplog.text
+
+    caplog.clear()
+    bad = "library directory: /root/Music\n"  # beets fell back to its default → the bug
+    with caplog.at_level("INFO", logger="wantlist.adapters.beets"):
+        client._trap_import_directory("/drop", bad)
+    assert "DEFAULT (wrong) library directory" in caplog.text
 
 
 def _locked_error(argv: list[str]) -> subprocess.CalledProcessError:
