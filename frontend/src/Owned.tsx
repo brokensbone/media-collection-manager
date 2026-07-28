@@ -16,6 +16,9 @@ type OwnedAlbum = {
 
 export function Owned({ refreshKey = 0, query = '' }: { refreshKey?: number; query?: string }) {
   const [albums, setAlbums] = useState<OwnedAlbum[] | null>(null)
+  // The linked/highlighted album is carried in the URL (#owned?sel=<beets_id>) so a specific
+  // library entry can be shared by link — e.g. to point at one of a pair of duplicates.
+  const [sel, setSel] = useState<string | null>(() => selFromHash())
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey is a manual refetch trigger
   useEffect(() => {
@@ -24,6 +27,19 @@ export function Owned({ refreshKey = 0, query = '' }: { refreshKey?: number; que
       .then(setAlbums)
       .catch(() => setAlbums([]))
   }, [refreshKey])
+
+  // Follow the URL so a shared #owned?sel=… link (or back/forward) highlights that row.
+  useEffect(() => {
+    const onHash = () => setSel(selFromHash())
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+
+  // Bring a linked album into view once its row has rendered.
+  useEffect(() => {
+    if (!sel || !albums) return
+    document.getElementById(`owned-${sel}`)?.scrollIntoView?.({ block: 'center' })
+  }, [sel, albums])
 
   if (!albums) return <p>Loading…</p>
   if (albums.length === 0) return <p>Nothing here.</p>
@@ -40,14 +56,33 @@ export function Owned({ refreshKey = 0, query = '' }: { refreshKey?: number; que
       </colgroup>
       <tbody>
         {shown.map((a) => (
-          <tr key={a.beets_id}>
+          <tr
+            key={a.beets_id}
+            id={`owned-${a.beets_id}`}
+            className={sel === a.beets_id ? 'linked' : undefined}
+          >
             <Cover id={a.album_id ?? 0} hasArt={a.has_art} spotifyId={a.spotify_id} />
             <td>{a.artist}</td>
             <td>{a.title}</td>
-            <td className="muted">{a.on_spotify ? 'on Spotify' : ''}</td>
+            <td className="muted nowrap">
+              {a.on_spotify ? 'on Spotify ' : ''}
+              <a
+                className="row-link"
+                href={`#owned?sel=${encodeURIComponent(a.beets_id)}`}
+                title="Link to this album"
+              >
+                #
+              </a>
+            </td>
           </tr>
         ))}
       </tbody>
     </table>
   )
+}
+
+// The `sel` param from a #owned?sel=… URL, or null.
+function selFromHash(): string | null {
+  const query = window.location.hash.split('?')[1] ?? ''
+  return new URLSearchParams(query).get('sel')
 }
