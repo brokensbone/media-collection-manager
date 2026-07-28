@@ -160,6 +160,10 @@ tr.sel td {
   background: var(--surface);
   box-shadow: inset 2px 0 0 var(--accent);
 }
+/* Subtle hover so it's clear which row the cursor (and its action buttons) belong to. */
+tbody tr:hover td {
+  background: var(--surface);
+}
 button {
   border: 1px solid var(--border);
   background: transparent;
