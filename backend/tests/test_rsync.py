@@ -28,6 +28,10 @@ def test_builds_a_copy_only_rsync_over_ssh(monkeypatch: Any, tmp_path: Any) -> N
     # copy-only — seeding must never be disturbed (§12)
     assert "--remove-source-files" not in argv
     assert "--delete" not in argv
+    # --old-args: treat --files-from names literally so wildcard chars in a release folder name
+    # (e.g. "[FLAC]") aren't glob-expanded on the sender, which pulls in extra files that rsync
+    # 3.4 then rejects as "unrequested" and aborts the transfer.
+    assert "--old-args" in argv
     # ssh with the configured port + key, headless (no prompts, trust-on-first-use)
     ssh = argv[argv.index("-e") + 1]
     assert ssh == "ssh -p 2222 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i /keys/id"

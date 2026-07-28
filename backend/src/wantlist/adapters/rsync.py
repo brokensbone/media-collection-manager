@@ -45,7 +45,21 @@ class RsyncTransfer:
         if self._ssh_key:
             ssh += f" -i {self._ssh_key}"
         source = f"{self._user}@{self._host}:{download_dir.rstrip('/')}/"
-        argv = ["rsync", "-a", "-e", ssh, "--files-from=-", source, f"{dest.rstrip('/')}/"]
+        # --old-args: our --files-from names are exact paths, but a release folder like
+        # "Album (2001) [FLAC]" contains rsync wildcard chars ([ ]). rsync 3.4's default arg
+        # handling expands them on the sender, which pulls in extra files (art scans not in the
+        # torrent); the hardened receiver then rejects those as "unrequested" and aborts the whole
+        # transfer (code 4). --old-args treats every name literally, so we fetch exactly our list.
+        argv = [
+            "rsync",
+            "-a",
+            "--old-args",
+            "-e",
+            ssh,
+            "--files-from=-",
+            source,
+            f"{dest.rstrip('/')}/",
+        ]
         subprocess.run(
             argv,
             input="\n".join(files),
