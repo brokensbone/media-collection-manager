@@ -196,6 +196,13 @@ tr.linked td {
   height: 13px;
   display: block;
 }
+/* On selected/linked/hovered rows the row bg becomes --surface — the same as the pill bg, so
+   the pills lose their chip shape. Drop them to the page bg there to keep them distinct. */
+tr.sel .pill,
+tr.linked .pill,
+tbody tr:hover .pill {
+  background: var(--bg);
+}
 .pill:hover {
   color: var(--text);
   border-color: var(--accent);
