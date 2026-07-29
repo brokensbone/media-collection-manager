@@ -103,7 +103,7 @@ export function Tasks({
       <colgroup>
         <col className="c-source" />
         <col />
-        <col className="c-aux" />
+        <col className="c-when" />
         <col className="c-actions3" />
       </colgroup>
       <tbody>
