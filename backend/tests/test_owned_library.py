@@ -52,6 +52,29 @@ def test_owned_library_is_the_full_beets_catalogue_enriched(
     assert owned[1].spotify_id is None
 
 
+def test_owned_library_enriches_an_as_is_album_by_beets_id(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    sf = clean_album_tables
+    # An as-is album with NO release-group id, linked to a Spotify row directly by beets id
+    # (D21 reverse-match). The rgid join can't reach it; the beets-id fallback must.
+    _add(
+        sf,
+        spotify_id="s2",
+        artist="A",
+        title="As-Is",
+        state=AlbumState.owned,
+        mb_releasegroup_id=None,
+        owned_beets_id="b9",
+    )
+    album_id = next(a.id for a in AlbumRepo(sf).list_albums())
+
+    owned = _svc(sf, [BeetsAlbum("b9", "A", "As-Is", None)]).owned_library()
+
+    assert owned[0].album_id == album_id
+    assert owned[0].on_spotify is True and owned[0].spotify_id == "s2"
+
+
 def test_owned_library_shows_cover_from_the_matching_album(
     clean_album_tables: sessionmaker[Session],
 ) -> None:

@@ -14,6 +14,7 @@ const API_PREFIXES = [
   '/decide',
   '/releases',
   '/imports',
+  '/owned',
   '/dashboard',
   '/health',
   '/metrics',

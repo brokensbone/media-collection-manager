@@ -51,10 +51,15 @@ class LibraryAssistService:
         """The Owned view: the whole beets catalogue (what you actually own), enriched from the
         DB where a release-group matches — cover art and whether it's also in your Spotify saves.
         beets is the source of truth for ownership; Spotify is overlaid where it lines up."""
-        enrichment = self._repo.enrichment_by_release_group()
+        by_rgid = self._repo.enrichment_by_release_group()
+        by_beets = self._repo.enrichment_by_beets_id()
         owned: list[OwnedAlbum] = []
         for a in self._catalog.all_albums():
-            match = enrichment.get(a.mb_releasegroup_id) if a.mb_releasegroup_id else None
+            # Prefer the release-group join (a saved/tracked album), fall back to a row linked
+            # directly by beets id — the only way an as-is album with no rgid gets enriched.
+            match = (
+                by_rgid.get(a.mb_releasegroup_id) if a.mb_releasegroup_id else None
+            ) or by_beets.get(a.beets_id)
             owned.append(
                 OwnedAlbum(
                     beets_id=a.beets_id,

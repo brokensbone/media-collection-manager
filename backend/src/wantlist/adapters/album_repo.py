@@ -1002,6 +1002,26 @@ class AlbumRepo:
                     )
             return out
 
+    def enrichment_by_beets_id(self) -> dict[str, OwnedEnrichment]:
+        """Per beets id, the album row explicitly linked to it via `owned_beets_id` (D21
+        reverse-match / manual link). The rgid join can't reach as-is albums that have no
+        release-group id, but their reverse-match rows carry the beets id — so this is the Owned
+        view's fallback enrichment for them (cover art + Spotify out-link)."""
+        with self._sf() as session:
+            has_art = exists().where(AlbumArt.album_id == Album.id)
+            rows = session.execute(
+                select(Album.owned_beets_id, Album.id, has_art, Album.spotify_id)
+                .where(Album.owned_beets_id.is_not(None))
+                .order_by(has_art.desc(), Album.id)
+            )
+            out: dict[str, OwnedEnrichment] = {}
+            for beets_id, album_id, art, spotify_id in rows:
+                if beets_id not in out:
+                    out[beets_id] = OwnedEnrichment(
+                        album_id=album_id, has_art=bool(art), spotify_id=spotify_id
+                    )
+            return out
+
     def list_albums(self, state: str | None = None) -> list[AlbumSummary]:
         with self._sf() as session:
             has_art = exists().where(AlbumArt.album_id == Album.id)
