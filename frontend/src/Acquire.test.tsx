@@ -39,6 +39,15 @@ describe('Acquire', () => {
     expect(link.getAttribute('href')).toBe('https://bandcamp.com/search?q=A+T1')
   })
 
+  it('shows a Redacted search link (artist+title tab-separated) per item', async () => {
+    mockApi([item({ artist: 'Horse Meat Disco', title: 'Love And Dancing' })])
+    render(<Acquire />)
+    const link = await screen.findByRole('link', { name: 'Redacted' })
+    expect(link.getAttribute('href')).toBe(
+      'https://redacted.sh/torrents.php?searchstr=Horse+Meat+Disco%09Love+And+Dancing',
+    )
+  })
+
   it('has no Mark ordered action', async () => {
     mockApi([item()])
     render(<Acquire />)

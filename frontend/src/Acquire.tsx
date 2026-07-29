@@ -21,6 +21,12 @@ type Candidate = {
   has_release_group: boolean
 }
 
+// A Redacted torrent search for the album. Artist and title go in tab-separated — Redacted's
+// own copy links use a tab between them — which URLSearchParams encodes as %09 (spaces as +).
+function redactedUrl(artist: string, title: string): string {
+  return `https://redacted.sh/torrents.php?${new URLSearchParams({ searchstr: `${artist}\t${title}` })}`
+}
+
 export function Acquire({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
   const [items, setItems] = useState<Item[] | null>(null)
   const [owning, setOwning] = useState<Item | null>(null) // the album being marked owned
@@ -97,6 +103,10 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
               <td>
                 <a href={it.bandcamp_url} target="_blank" rel="noreferrer">
                   Bandcamp
+                </a>
+                <br />
+                <a href={redactedUrl(it.artist, it.title)} target="_blank" rel="noreferrer">
+                  Redacted
                 </a>
               </td>
               <td className="nowrap">
