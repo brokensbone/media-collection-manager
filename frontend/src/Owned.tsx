@@ -93,38 +93,40 @@ export function Owned({ refreshKey = 0, query = '' }: { refreshKey?: number; que
             <td>{a.artist}</td>
             <td>{a.title}</td>
             <td className="links">
-              <a
-                className="pill"
-                href={`#owned?sel=${encodeURIComponent(a.beets_id)}`}
-                title="Link to this album"
-                aria-label="Link to this album"
-              >
-                <LinkIcon />
-              </a>
-              {a.spotify_id ? (
+              <div className="pill-row">
                 <a
-                  className="pill pill-sp"
-                  href={`https://open.spotify.com/album/${a.spotify_id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Open on Spotify"
-                  aria-label="Open on Spotify"
+                  className="pill"
+                  href={`#owned?sel=${encodeURIComponent(a.beets_id)}`}
+                  title="Link to this album"
+                  aria-label="Link to this album"
                 >
-                  <SpotifyIcon />
+                  <LinkIcon />
                 </a>
-              ) : null}
-              {a.mb_releasegroup_id ? (
-                <a
-                  className="pill pill-mb"
-                  href={`https://musicbrainz.org/release-group/${a.mb_releasegroup_id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Open on MusicBrainz"
-                  aria-label="Open on MusicBrainz"
-                >
-                  MB
-                </a>
-              ) : null}
+                {a.spotify_id ? (
+                  <a
+                    className="pill pill-sp"
+                    href={`https://open.spotify.com/album/${a.spotify_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Open on Spotify"
+                    aria-label="Open on Spotify"
+                  >
+                    <SpotifyIcon />
+                  </a>
+                ) : null}
+                {a.mb_releasegroup_id ? (
+                  <a
+                    className="pill pill-mb"
+                    href={`https://musicbrainz.org/release-group/${a.mb_releasegroup_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Open on MusicBrainz"
+                    aria-label="Open on MusicBrainz"
+                  >
+                    MB
+                  </a>
+                ) : null}
+              </div>
             </td>
           </tr>
         ))}

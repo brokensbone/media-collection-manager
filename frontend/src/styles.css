@@ -97,6 +97,8 @@ td {
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
   overflow-wrap: anywhere; /* long unbroken names/paths wrap inside their fixed column */
+  vertical-align: middle; /* center cell content against tall cells (covers) so highlighted
+                             rows read as one clean band rather than baseline-offset content */
 }
 /* Shared column widths so the funnel tables line up with each other (§8e). The title/name column
    carries no width and soaks up the remaining pane; everything else is pinned. */
@@ -174,7 +176,10 @@ tr.linked td {
   box-shadow: inset 2px 0 0 var(--accent);
 }
 /* Per-row link pills: permalink (chain), Spotify, MusicBrainz — shown only where they apply. */
-.links {
+/* The pills live in a normal table-cell (so it shares the row's height/vertical-centring); the
+   flex layout goes on an inner wrapper — a display:flex <td> drops out of the table box model
+   and gives the highlight an uneven band around the pills. */
+.pill-row {
   display: flex;
   gap: 6px;
   align-items: center;
