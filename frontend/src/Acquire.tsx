@@ -21,10 +21,26 @@ type Candidate = {
   has_release_group: boolean
 }
 
-// A Redacted torrent search for the album. Artist and title go in tab-separated — Redacted's
-// own copy links use a tab between them — which URLSearchParams encodes as %09 (spaces as +).
-function redactedUrl(artist: string, title: string): string {
-  return `https://redacted.sh/torrents.php?${new URLSearchParams({ searchstr: `${artist}\t${title}` })}`
+// A tracker torrent-search URL for the album. Artist and title go in tab-separated — the
+// trackers' own copy links put a tab between them — which URLSearchParams encodes as %09
+// (spaces as +). `extra` carries any fixed query params a tracker's basic search needs.
+function trackerSearch(
+  base: string,
+  artist: string,
+  title: string,
+  extra: Record<string, string> = {},
+): string {
+  return `${base}?${new URLSearchParams({ searchstr: `${artist}\t${title}`, ...extra })}`
+}
+
+// Orpheus's basic search needs these fixed params alongside searchstr.
+const ORPHEUS_PARAMS = {
+  tags_type: '1',
+  order: 'time',
+  sort: 'desc',
+  group_results: '1',
+  action: 'basic',
+  searchsubmit: '1',
 }
 
 export function Acquire({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
@@ -100,13 +116,29 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
                 {it.title}
                 {it.possibly_owned && <div className="muted">possibly owned: {it.owned_hint}</div>}
               </td>
-              <td>
+              <td className="nowrap">
                 <a href={it.bandcamp_url} target="_blank" rel="noreferrer">
                   Bandcamp
                 </a>
                 <br />
-                <a href={redactedUrl(it.artist, it.title)} target="_blank" rel="noreferrer">
-                  Redacted
+                <a
+                  href={trackerSearch('https://redacted.sh/torrents.php', it.artist, it.title)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Red
+                </a>{' '}
+                <a
+                  href={trackerSearch(
+                    'https://orpheus.network/torrents.php',
+                    it.artist,
+                    it.title,
+                    ORPHEUS_PARAMS,
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Ops
                 </a>
               </td>
               <td className="nowrap">
