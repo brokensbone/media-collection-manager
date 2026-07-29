@@ -28,7 +28,7 @@ body {
   font-size: 14px;
 }
 .app {
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 16px;
 }
@@ -114,6 +114,10 @@ col.c-actions1 {
 }
 col.c-aux {
   width: 120px;
+}
+/* Full "DD/MM/YYYY, HH:MM:SS" timestamp (nowrap) — needs ~165px or it overflows its cell. */
+col.c-when {
+  width: 172px;
 }
 col.c-source {
   width: 112px;
