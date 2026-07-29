@@ -169,15 +169,44 @@ tr.linked td {
   background: var(--surface);
   box-shadow: inset 2px 0 0 var(--accent);
 }
-/* The per-row permalink handle (a quiet "#" that yields a shareable URL for that entry). */
-.row-link {
+/* Per-row link pills: permalink (chain), Spotify, MusicBrainz — shown only where they apply. */
+.links {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
   color: var(--muted);
   text-decoration: none;
   font-family: var(--font-mono);
-  padding: 0 2px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
 }
-.row-link:hover {
-  color: var(--accent);
+.pill svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+.pill:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.pill-sp:hover {
+  color: #1db954; /* Spotify green */
+  border-color: #1db954;
+}
+.pill-mb:hover {
+  color: #ba478f; /* MusicBrainz magenta */
+  border-color: #ba478f;
 }
 button {
   border: 1px solid var(--border);

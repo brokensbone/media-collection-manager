@@ -16,7 +16,7 @@ afterEach(() => {
 })
 
 describe('Owned', () => {
-  it('lists the whole library, flagging albums also on Spotify', async () => {
+  it('lists the whole library, with Sp/Mb out-links where it lines up', async () => {
     mockOwned([
       {
         beets_id: 'b1',
@@ -26,6 +26,7 @@ describe('Owned', () => {
         has_art: true,
         on_spotify: true,
         spotify_id: 'spot1',
+        mb_releasegroup_id: 'rg1',
       },
       {
         beets_id: 'b2',
@@ -35,12 +36,40 @@ describe('Owned', () => {
         has_art: false,
         on_spotify: false,
         spotify_id: null,
+        mb_releasegroup_id: null,
       },
     ])
     const { container } = render(<Owned />)
     await screen.findByText('Matched')
     expect(container.textContent).toContain('Only In Beets')
-    expect(container.textContent).toContain('on Spotify')
+    expect(screen.getByTitle('Open on Spotify').getAttribute('href')).toContain(
+      'open.spotify.com/album/spot1',
+    )
+    expect(screen.getByTitle('Open on MusicBrainz').getAttribute('href')).toContain(
+      'musicbrainz.org/release-group/rg1',
+    )
+  })
+
+  it('shows an Mb link from the release-group even when not on Spotify, and omits absent ones', async () => {
+    mockOwned([
+      {
+        beets_id: 'b3',
+        artist: 'C',
+        title: 'Ripped',
+        album_id: null,
+        has_art: false,
+        on_spotify: false,
+        spotify_id: null,
+        mb_releasegroup_id: 'rg3',
+      },
+    ])
+    render(<Owned />)
+    await screen.findByText('Ripped')
+    expect(screen.getByTitle('Open on MusicBrainz').getAttribute('href')).toContain(
+      'musicbrainz.org/release-group/rg3',
+    )
+    expect(screen.queryByTitle('Open on Spotify')).toBeNull() // no spotify_id → no Sp link
+    expect(screen.getByTitle('Link to this album')).toBeTruthy() // permalink always present
   })
 
   it('links a matched cover to the album on Spotify in a new tab', async () => {
