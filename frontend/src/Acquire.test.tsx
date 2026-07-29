@@ -39,6 +39,20 @@ describe('Acquire', () => {
     expect(link.getAttribute('href')).toBe('https://bandcamp.com/search?q=A+T1')
   })
 
+  it('shows Red + Ops tracker search links (artist+title tab-separated) per item', async () => {
+    mockApi([item({ artist: 'Horse Meat Disco', title: 'Love And Dancing' })])
+    render(<Acquire />)
+    const red = await screen.findByRole('link', { name: 'Red' })
+    expect(red.getAttribute('href')).toBe(
+      'https://redacted.sh/torrents.php?searchstr=Horse+Meat+Disco%09Love+And+Dancing',
+    )
+    const ops = await screen.findByRole('link', { name: 'Ops' })
+    expect(ops.getAttribute('href')).toBe(
+      'https://orpheus.network/torrents.php?searchstr=Horse+Meat+Disco%09Love+And+Dancing' +
+        '&tags_type=1&order=time&sort=desc&group_results=1&action=basic&searchsubmit=1',
+    )
+  })
+
   it('has no Mark ordered action', async () => {
     mockApi([item()])
     render(<Acquire />)
