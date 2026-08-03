@@ -58,6 +58,14 @@ def test_search_library_then_mark_owned_with_link(
     assert owned.owned is True
 
 
+def test_return_to_saved_endpoint(clean_album_tables: sessionmaker[Session]) -> None:
+    client, repo = _client(clean_album_tables)
+    album_id = client.get("/acquire").json()[0]["id"]
+    resp = client.post(f"/albums/{album_id}/return-to-saved")
+    assert resp.status_code == 204
+    assert {a.title: a.state for a in repo.list_albums()} == {"Want It": "saved"}
+
+
 def test_queue_exposes_possibly_owned(clean_album_tables: sessionmaker[Session]) -> None:
     client, _ = _client(clean_album_tables, [BeetsAlbum("9", "A", "Want It (Remaster)", None)])
     item = client.get("/acquire").json()[0]

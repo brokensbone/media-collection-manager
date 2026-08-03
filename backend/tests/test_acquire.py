@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -72,6 +73,37 @@ def test_reconcile_promotes_wanted_to_owned(
     # once the files land in beets, reconcile flips the want to owned (no separate order step)
     OwnershipReconciler(beets=StubOwnedReleaseGroups({"rg-1"}), repo=AlbumRepo(sf)).reconcile()
     assert {a.title: a.owned for a in AlbumRepo(sf).list_albums()} == {"bought": True}
+
+
+def test_return_to_saved_restores_plain_saved_state(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    sf = clean_album_tables
+    saved_at = datetime.now(UTC) - timedelta(days=14)
+    with sf() as session:
+        session.add(
+            Album(
+                spotify_id="oops",
+                artist="A",
+                title="Oops",
+                state=AlbumState.wanted,
+                provenance=Provenance.spotify_save,
+                saved_at=saved_at,
+                verdict_at=datetime.now(UTC) - timedelta(days=1),
+                snoozed_until=datetime.now(UTC) + timedelta(days=2),
+            )
+        )
+        session.commit()
+
+    _svc(sf).return_to_saved(_id(sf, "Oops"))
+
+    restored = next(a for a in AlbumRepo(sf).list_albums() if a.title == "Oops")
+    assert restored.state == "saved"
+    with sf() as session:
+        album = session.query(Album).filter(Album.id == restored.id).one()
+        assert album.saved_at == saved_at
+        assert album.verdict_at is None
+        assert album.snoozed_until is None
 
 
 def test_queue_flags_possibly_already_owned(clean_album_tables: sessionmaker[Session]) -> None:

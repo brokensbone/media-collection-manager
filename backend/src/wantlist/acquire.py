@@ -48,3 +48,6 @@ class AcquireService:
 
     def mark_owned(self, album_id: int, beets_id: str | None = None) -> None:
         self._repo.mark_owned_manual(album_id, beets_id)
+
+    def return_to_saved(self, album_id: int) -> None:
+        self._repo.return_want_to_saved(album_id)

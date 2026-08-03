@@ -464,6 +464,16 @@ class AlbumRepo:
             )
             session.commit()
 
+    def return_want_to_saved(self, album_id: int) -> None:
+        """Undo an acquire decision by moving a `wanted` album back to plain `saved`."""
+        with self._sf() as session:
+            session.execute(
+                update(Album)
+                .where(Album.id == album_id, Album.state == AlbumState.wanted)
+                .values(state=AlbumState.saved, verdict_at=None, snoozed_until=None)
+            )
+            session.commit()
+
     def tracked_release_group_ids(self) -> set[str]:
         """Release-group ids already on some album row — so a reverse-matched import (D21)
         doesn't duplicate an album a want already covers (reconcile owns those)."""

@@ -1,25 +1,25 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Cover } from './Cover'
-import { Modal } from './Modal'
-import { matchesQuery } from './filter'
+import { useCallback, useEffect, useState } from "react";
+import { Cover } from "./Cover";
+import { Modal } from "./Modal";
+import { matchesQuery } from "./filter";
 
 type Item = {
-  id: number
-  artist: string
-  title: string
-  has_art: boolean
-  bandcamp_url: string
-  possibly_owned: boolean
-  owned_hint: string | null
-  spotify_id: string | null
-}
+  id: number;
+  artist: string;
+  title: string;
+  has_art: boolean;
+  bandcamp_url: string;
+  possibly_owned: boolean;
+  owned_hint: string | null;
+  spotify_id: string | null;
+};
 
 type Candidate = {
-  beets_id: string
-  artist: string
-  title: string
-  has_release_group: boolean
-}
+  beets_id: string;
+  artist: string;
+  title: string;
+  has_release_group: boolean;
+};
 
 // A tracker torrent-search URL for the album. Artist and title go in tab-separated — the
 // trackers' own copy links put a tab between them — which URLSearchParams encodes as %09
@@ -30,72 +30,91 @@ function trackerSearch(
   title: string,
   extra: Record<string, string> = {},
 ): string {
-  return `${base}?${new URLSearchParams({ searchstr: `${artist}\t${title}`, ...extra })}`
+  return `${base}?${new URLSearchParams({ searchstr: `${artist}\t${title}`, ...extra })}`;
 }
 
 // Orpheus's basic search needs these fixed params alongside searchstr.
 const ORPHEUS_PARAMS = {
-  tags_type: '1',
-  order: 'time',
-  sort: 'desc',
-  group_results: '1',
-  action: 'basic',
-  searchsubmit: '1',
-}
+  tags_type: "1",
+  order: "time",
+  sort: "desc",
+  group_results: "1",
+  action: "basic",
+  searchsubmit: "1",
+};
 
-export function Acquire({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
-  const [items, setItems] = useState<Item[] | null>(null)
-  const [owning, setOwning] = useState<Item | null>(null) // the album being marked owned
-  const [q, setQ] = useState('')
-  const [results, setResults] = useState<Candidate[] | null>(null)
+export function Acquire({
+  onChange,
+  query = "",
+}: {
+  onChange?: () => void;
+  query?: string;
+}) {
+  const [items, setItems] = useState<Item[] | null>(null);
+  const [owning, setOwning] = useState<Item | null>(null); // the album being marked owned
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<Candidate[] | null>(null);
 
   useEffect(() => {
-    fetch('/acquire')
+    fetch("/acquire")
       .then((r) => r.json())
       .then(setItems)
-      .catch(() => setItems([]))
-  }, [])
+      .catch(() => setItems([]));
+  }, []);
 
   // Search the library while the Mark-owned modal is open.
   useEffect(() => {
-    if (!owning) return
-    let cancelled = false
+    if (!owning) return;
+    let cancelled = false;
     fetch(`/library/search?q=${encodeURIComponent(q)}`)
       .then((r) => r.json())
       .then((r) => !cancelled && setResults(r))
-      .catch(() => !cancelled && setResults([]))
+      .catch(() => !cancelled && setResults([]));
     return () => {
-      cancelled = true
-    }
-  }, [owning, q])
+      cancelled = true;
+    };
+  }, [owning, q]);
 
   const remove = useCallback((id: number) => {
-    setItems((list) => (list ? list.filter((it) => it.id !== id) : list))
-  }, [])
+    setItems((list) => (list ? list.filter((it) => it.id !== id) : list));
+  }, []);
 
   const openOwn = useCallback((it: Item) => {
-    setOwning(it)
-    setQ(`${it.artist} ${it.title}`)
-    setResults(null)
-  }, [])
+    setOwning(it);
+    setQ(`${it.artist} ${it.title}`);
+    setResults(null);
+  }, []);
 
   const markOwned = useCallback(
     (id: number, beetsId?: string) => {
       fetch(`/albums/${id}/mark-owned`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ beets_id: beetsId ?? null }),
-      }).then(() => onChange?.())
-      remove(id)
-      setOwning(null)
+      }).then(() => onChange?.());
+      remove(id);
+      setOwning(null);
     },
     [remove, onChange],
-  )
+  );
 
-  if (!items) return <p>Loading…</p>
-  if (items.length === 0) return <p>Nothing to acquire.</p>
+  const returnToSaved = useCallback(
+    (id: number) => {
+      fetch(`/albums/${id}/return-to-saved`, { method: "POST" }).then(() =>
+        onChange?.(),
+      );
+      remove(id);
+      setOwning(null);
+    },
+    [remove, onChange],
+  );
 
-  const shown = items.filter((it) => matchesQuery(`${it.artist} ${it.title}`, query))
+  if (!items) return <p>Loading…</p>;
+  if (items.length === 0) return <p>Nothing to acquire.</p>;
+
+  const shown = items.filter((it) =>
+    matchesQuery(`${it.artist} ${it.title}`, query),
+  );
 
   return (
     <>
@@ -114,7 +133,9 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
               <td>{it.artist}</td>
               <td>
                 {it.title}
-                {it.possibly_owned && <div className="muted">possibly owned: {it.owned_hint}</div>}
+                {it.possibly_owned && (
+                  <div className="muted">possibly owned: {it.owned_hint}</div>
+                )}
               </td>
               <td className="nowrap">
                 <a href={it.bandcamp_url} target="_blank" rel="noreferrer">
@@ -122,15 +143,19 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
                 </a>
                 <br />
                 <a
-                  href={trackerSearch('https://redacted.sh/torrents.php', it.artist, it.title)}
+                  href={trackerSearch(
+                    "https://redacted.sh/torrents.php",
+                    it.artist,
+                    it.title,
+                  )}
                   target="_blank"
                   rel="noreferrer"
                 >
                   Red
-                </a>{' '}
+                </a>{" "}
                 <a
                   href={trackerSearch(
-                    'https://orpheus.network/torrents.php',
+                    "https://orpheus.network/torrents.php",
                     it.artist,
                     it.title,
                     ORPHEUS_PARAMS,
@@ -142,6 +167,9 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
                 </a>
               </td>
               <td className="nowrap">
+                <button type="button" onClick={() => returnToSaved(it.id)}>
+                  Back to saved
+                </button>{" "}
                 <button type="button" onClick={() => openOwn(it)}>
                   Mark owned…
                 </button>
@@ -168,7 +196,9 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
             {results === null ? (
               <span className="muted">Searching…</span>
             ) : results.length === 0 ? (
-              <span className="muted">No library matches — try a different search.</span>
+              <span className="muted">
+                No library matches — try a different search.
+              </span>
             ) : (
               results.map((c) => (
                 <button
@@ -177,7 +207,9 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
                   onClick={() => markOwned(owning.id, c.beets_id)}
                 >
                   {c.artist} — {c.title}
-                  {!c.has_release_group && <span className="muted"> · no MB id</span>}
+                  {!c.has_release_group && (
+                    <span className="muted"> · no MB id</span>
+                  )}
                 </button>
               ))
             )}
@@ -190,5 +222,5 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
         </Modal>
       )}
     </>
-  )
+  );
 }
