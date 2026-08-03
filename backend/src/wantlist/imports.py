@@ -57,6 +57,7 @@ class ImportItem:
     missing: bool  # the watch-dir file backing this drop is gone — offer removal, not import
     error_detail: str | None  # why the last attempt failed (failed rows only), for the log view
     updated_at: str | None  # ISO time of the last state change (Tasks/Archive show "when")
+    created_at: str | None  # ISO time first detected — the Import list groups by discovery day
 
 
 @dataclass
@@ -450,6 +451,7 @@ class ImportsService:
             missing=self._is_missing(r.state, r.archive_path),
             error_detail=r.error_detail,
             updated_at=r.updated_at,
+            created_at=r.created_at,
         )
 
     @staticmethod
