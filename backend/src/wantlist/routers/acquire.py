@@ -28,3 +28,8 @@ def library_search(q: str, request: Request) -> list[LinkCandidate]:
 @router.post("/albums/{album_id}/mark-owned", status_code=204)
 def mark_owned(album_id: int, request: Request, body: MarkOwnedBody | None = None) -> None:
     _service(request).mark_owned(album_id, (body or MarkOwnedBody()).beets_id)
+
+
+@router.post("/albums/{album_id}/return-to-saved", status_code=204)
+def return_to_saved(album_id: int, request: Request) -> None:
+    _service(request).return_to_saved(album_id)

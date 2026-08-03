@@ -43,7 +43,13 @@ const ORPHEUS_PARAMS = {
   searchsubmit: '1',
 }
 
-export function Acquire({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
+export function Acquire({
+  onChange,
+  query = '',
+}: {
+  onChange?: () => void
+  query?: string
+}) {
   const [items, setItems] = useState<Item[] | null>(null)
   const [owning, setOwning] = useState<Item | null>(null) // the album being marked owned
   const [q, setQ] = useState('')
@@ -86,6 +92,15 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ beets_id: beetsId ?? null }),
       }).then(() => onChange?.())
+      remove(id)
+      setOwning(null)
+    },
+    [remove, onChange],
+  )
+
+  const returnToSaved = useCallback(
+    (id: number) => {
+      fetch(`/albums/${id}/return-to-saved`, { method: 'POST' }).then(() => onChange?.())
       remove(id)
       setOwning(null)
     },
@@ -142,6 +157,9 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
                 </a>
               </td>
               <td className="nowrap">
+                <button type="button" onClick={() => returnToSaved(it.id)}>
+                  Back to saved
+                </button>{' '}
                 <button type="button" onClick={() => openOwn(it)}>
                   Mark owned…
                 </button>
@@ -177,7 +195,7 @@ export function Acquire({ onChange, query = '' }: { onChange?: () => void; query
                   onClick={() => markOwned(owning.id, c.beets_id)}
                 >
                   {c.artist} — {c.title}
-                  {!c.has_release_group && <span className="muted"> · no MB id</span>}
+                  {!c.has_release_group && <span className="muted"> {'· no MB id'}</span>}
                 </button>
               ))
             )}

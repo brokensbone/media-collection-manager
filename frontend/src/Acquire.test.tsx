@@ -94,13 +94,17 @@ describe('Acquire', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Mark owned…' }))
 
     expect(await screen.findByRole('dialog')).toBeTruthy()
-    const result = await screen.findByRole('button', { name: /Only \(Remaster\)/ })
+    const result = await screen.findByRole('button', {
+      name: /Only \(Remaster\)/,
+    })
     fireEvent.click(result)
     await screen.findByText(/Nothing to acquire/)
 
     const posted = fetchMock.mock.calls.find((c) => c[1]?.method === 'POST')
     expect(posted?.[0]).toBe('/albums/9/mark-owned')
-    expect(JSON.parse((posted?.[1] as { body: string }).body)).toEqual({ beets_id: 'b7' })
+    expect(JSON.parse((posted?.[1] as { body: string }).body)).toEqual({
+      beets_id: 'b7',
+    })
   })
 
   it('mark owned without a link posts a null beets_id', async () => {
@@ -108,12 +112,27 @@ describe('Acquire', () => {
     render(<Acquire />)
     await screen.findByText('Only')
     fireEvent.click(screen.getByRole('button', { name: 'Mark owned…' }))
-    const noLink = await screen.findByRole('button', { name: 'Mark owned without a link' })
+    const noLink = await screen.findByRole('button', {
+      name: 'Mark owned without a link',
+    })
     fireEvent.click(noLink)
     await screen.findByText(/Nothing to acquire/)
 
     const posted = fetchMock.mock.calls.find((c) => c[1]?.method === 'POST')
     expect(posted?.[0]).toBe('/albums/9/mark-owned')
-    expect(JSON.parse((posted?.[1] as { body: string }).body)).toEqual({ beets_id: null })
+    expect(JSON.parse((posted?.[1] as { body: string }).body)).toEqual({
+      beets_id: null,
+    })
+  })
+
+  it('can return a wanted album to saved', async () => {
+    const fetchMock = mockApi([item({ id: 9, title: 'Only' })])
+    render(<Acquire />)
+    await screen.findByText('Only')
+    fireEvent.click(screen.getByRole('button', { name: 'Back to saved' }))
+    await screen.findByText(/Nothing to acquire/)
+
+    const posted = fetchMock.mock.calls.find((c) => c[0] === '/albums/9/return-to-saved')
+    expect(posted?.[1]).toEqual({ method: 'POST' })
   })
 })
