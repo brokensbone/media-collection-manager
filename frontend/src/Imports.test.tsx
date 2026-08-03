@@ -29,6 +29,7 @@ function item(over: Record<string, unknown> = {}) {
     missing: false,
     error_detail: null,
     updated_at: null,
+    created_at: '2026-07-29T10:00:00Z',
     ...over,
   }
 }
@@ -139,6 +140,19 @@ describe('Imports', () => {
     fireEvent.click(screen.getByRole('button', { name: /\bReview$/ }))
     await waitFor(() => expect(screen.queryByText('Clean Film')).toBeNull())
     expect(screen.getByText('Mixed Pack')).toBeTruthy()
+  })
+
+  it('partitions rows into discovery-day groups, newest day first', async () => {
+    mockApi([
+      item({ id: 1, name: 'Older Drop', created_at: '2026-07-27T09:00:00Z' }),
+      item({ id: 2, name: 'Newer Drop', created_at: '2026-07-29T09:00:00Z' }),
+    ])
+    render(<Imports />)
+    await screen.findByText('Newer Drop')
+    // two day-group headings, and the newer day's rows come first in document order
+    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(2)
+    const body = document.body.textContent ?? ''
+    expect(body.indexOf('Newer Drop')).toBeLessThan(body.indexOf('Older Drop'))
   })
 
   it('shows no type filter when only one type is present', async () => {

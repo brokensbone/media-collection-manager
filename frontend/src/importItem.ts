@@ -17,6 +17,7 @@ export type ImportItem = {
   missing: boolean
   error_detail: string | null
   updated_at: string | null
+  created_at: string | null
 }
 
 export function labelKind(kind: ImportItem['media_kind']): string {
@@ -31,4 +32,16 @@ export function whenLabel(iso: string | null): string {
   const d = new Date(iso)
   const today = new Date().toDateString() === d.toDateString()
   return today ? d.toLocaleTimeString() : d.toLocaleString()
+}
+
+// A discovery-day heading for grouping the Import list: "Today" / "Yesterday" / a plain date.
+export function dayLabel(iso: string | null): string {
+  if (!iso) return 'Unknown date'
+  const d = new Date(iso)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
+  if (d.toDateString() === today.toDateString()) return 'Today'
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }

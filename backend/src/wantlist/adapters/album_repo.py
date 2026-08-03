@@ -110,6 +110,7 @@ class ImportRow:
     archive_path: str | None
     error_detail: str | None  # why the last import attempt failed (failed rows only)
     updated_at: str | None  # ISO time of the last state change; drives Tasks order + window
+    created_at: str | None  # ISO time the drop was first detected; the Import list's discovery day
 
 
 @dataclass
@@ -647,6 +648,7 @@ class AlbumRepo:
         PendingImport.archive_path,
         PendingImport.error_detail,
         PendingImport.updated_at,
+        PendingImport.created_at,
     )
 
     def _import_rows(self, *conditions: Any, order_by: Any) -> list[ImportRow]:
@@ -674,6 +676,7 @@ class AlbumRepo:
                     archive_path=r[12],
                     error_detail=r[13],
                     updated_at=r[14].isoformat() if r[14] is not None else None,
+                    created_at=r[15].isoformat() if r[15] is not None else None,
                 )
                 for r in rows
             ]
@@ -683,7 +686,12 @@ class AlbumRepo:
         review tail. Once Import is clicked they leave here and become a Task."""
         return self._import_rows(
             PendingImport.state == ImportState.detected,
-            order_by=(func.lower(PendingImport.name),),
+            # Newest discovery first so freshly-added drops surface at the top; the UI groups by
+            # discovery day. Name is only a stable tiebreak within a day.
+            order_by=(
+                PendingImport.created_at.desc().nullslast(),
+                func.lower(PendingImport.name),
+            ),
         )
 
     def task_imports(self, completed_since: datetime) -> list[ImportRow]:

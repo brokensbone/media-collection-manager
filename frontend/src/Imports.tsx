@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { matchesQuery } from './filter'
-import { type ImportItem, labelKind } from './importItem'
+import { type ImportItem, dayLabel, labelKind } from './importItem'
 
 // The type a row belongs to for the filter bar. Keyed off import_target so the buckets are
 // mutually exclusive and match where the file actually goes: a mixed-season TV pack routed to
@@ -93,6 +93,73 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
   const shown =
     typeFilter === 'all' ? queryFiltered : queryFiltered.filter((it) => itemType(it) === typeFilter)
 
+  // Partition into discovery-day groups, newest first, so freshly-added drops are easy to find
+  // instead of scattering alphabetically. created_at is immutable, so this order never reshuffles.
+  const sorted = [...shown].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
+  const groups: { key: string; label: string; rows: ImportItem[] }[] = []
+  for (const it of sorted) {
+    const key = it.created_at ? new Date(it.created_at).toDateString() : 'unknown'
+    const g = groups.find((x) => x.key === key)
+    if (g) g.rows.push(it)
+    else groups.push({ key, label: dayLabel(it.created_at), rows: [it] })
+  }
+
+  const table = (rows: ImportItem[]) => (
+    <table>
+      <colgroup>
+        <col className="c-source" />
+        <col />
+        <col className="c-matched" />
+        <col className="c-actions3" />
+      </colgroup>
+      <tbody>
+        {rows.map((it) => (
+          <tr key={it.id}>
+            <td className="muted">{it.source}</td>
+            <td>
+              <div>{it.name}</div>
+              <div className="muted">
+                {labelKind(it.media_kind)}
+                {it.classification_detail ? ` · ${it.classification_detail}` : ''}
+              </div>
+              {it.destination_path && <div className="muted">{it.destination_path}</div>}
+            </td>
+            <td>
+              {it.matched ?? <span className="muted">no match</span>}
+              {it.matched_owned && <span className="badge">owned</span>}
+            </td>
+            <td className="nowrap">
+              {it.missing ? (
+                <>
+                  <span className="muted">file no longer in watch folder</span>{' '}
+                  <button type="button" onClick={() => act(it.id, 'DELETE')}>
+                    Discard
+                  </button>
+                </>
+              ) : it.import_target === 'review' ? (
+                <>
+                  <span className="muted">needs review</span>{' '}
+                  <button type="button" onClick={() => act(it.id, 'DELETE')}>
+                    Discard
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" onClick={() => act(it.id, 'POST')}>
+                    Import
+                  </button>{' '}
+                  <button type="button" onClick={() => act(it.id, 'DELETE')}>
+                    Discard
+                  </button>
+                </>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+
   return (
     <>
       <div className="inline-actions">
@@ -125,61 +192,14 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
       {items.length > 0 && shown.length === 0 && (
         <p className="muted">Nothing to show for this filter.</p>
       )}
-      {shown.length > 0 && (
-        <table>
-          <colgroup>
-            <col className="c-source" />
-            <col />
-            <col className="c-matched" />
-            <col className="c-actions3" />
-          </colgroup>
-          <tbody>
-            {shown.map((it) => (
-              <tr key={it.id}>
-                <td className="muted">{it.source}</td>
-                <td>
-                  <div>{it.name}</div>
-                  <div className="muted">
-                    {labelKind(it.media_kind)}
-                    {it.classification_detail ? ` · ${it.classification_detail}` : ''}
-                  </div>
-                  {it.destination_path && <div className="muted">{it.destination_path}</div>}
-                </td>
-                <td>
-                  {it.matched ?? <span className="muted">no match</span>}
-                  {it.matched_owned && <span className="badge">owned</span>}
-                </td>
-                <td className="nowrap">
-                  {it.missing ? (
-                    <>
-                      <span className="muted">file no longer in watch folder</span>{' '}
-                      <button type="button" onClick={() => act(it.id, 'DELETE')}>
-                        Discard
-                      </button>
-                    </>
-                  ) : it.import_target === 'review' ? (
-                    <>
-                      <span className="muted">needs review</span>{' '}
-                      <button type="button" onClick={() => act(it.id, 'DELETE')}>
-                        Discard
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" onClick={() => act(it.id, 'POST')}>
-                        Import
-                      </button>{' '}
-                      <button type="button" onClick={() => act(it.id, 'DELETE')}>
-                        Discard
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      {groups.map((g) => (
+        <section key={g.key}>
+          <h3 className="task-group">
+            {g.label} <span className="muted">({g.rows.length})</span>
+          </h3>
+          {table(g.rows)}
+        </section>
+      ))}
     </>
   )
 }
