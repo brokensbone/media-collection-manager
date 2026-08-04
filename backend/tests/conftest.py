@@ -12,9 +12,11 @@ from wantlist.models import (
     AlbumArt,
     Base,
     BeetsAlbumCache,
+    Box,
     JobRun,
     PendingImport,
     PlayHistory,
+    RecordBox,
     SeenRelease,
     WorkerEvent,
 )
@@ -39,6 +41,8 @@ def clean_album_tables(pg_session_factory: sessionmaker[Session]) -> sessionmake
     """A session factory with the album tables emptied first (shared container is reused)."""
     with pg_session_factory() as session:
         session.execute(delete(WorkerEvent))
+        session.execute(delete(RecordBox))
+        session.execute(delete(Box))
         session.execute(delete(BeetsAlbumCache))
         session.execute(delete(AlbumArt))
         session.execute(delete(PlayHistory))

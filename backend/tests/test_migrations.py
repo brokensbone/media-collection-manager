@@ -7,13 +7,21 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 from testcontainers.postgres import PostgresContainer
 
 from wantlist.app import create_app
 from wantlist.config import Settings
 
-EXPECTED_TABLES = {"album", "play_history", "album_art", "spotify_auth", "alembic_version"}
+EXPECTED_TABLES = {
+    "album",
+    "play_history",
+    "album_art",
+    "spotify_auth",
+    "box",
+    "record_box",
+    "alembic_version",
+}
 
 
 @pytest.fixture(scope="module")
@@ -32,6 +40,14 @@ def test_migrations_create_all_tables(pg_url: str) -> None:
     tables = set(inspect(engine).get_table_names())
     engine.dispose()
     assert EXPECTED_TABLES <= tables
+
+
+def test_migration_seeds_the_root_collection(pg_url: str) -> None:
+    engine = create_engine(pg_url)
+    with engine.connect() as conn:
+        roots = conn.execute(text("SELECT name FROM box WHERE parent_id IS NULL")).fetchall()
+    engine.dispose()
+    assert [r[0] for r in roots] == ["Collection"]  # exactly one seeded root
 
 
 def test_health_ok_against_real_postgres(pg_url: str) -> None:

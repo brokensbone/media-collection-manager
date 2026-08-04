@@ -12,12 +12,28 @@ _LOCK_RETRIES = 4
 _LOCK_BACKOFF = 1.5  # seconds; grows per attempt
 
 
+def _year(raw: str) -> int | None:
+    """beets prints `0` (or blank) for an album with no year — treat both as absent."""
+    raw = raw.strip()
+    return int(raw) if raw.isdigit() and raw != "0" else None
+
+
 @dataclass
 class BeetsAlbum:
     beets_id: str
     artist: str
     title: str
     mb_releasegroup_id: str | None
+    # Curation facets (crates §1): surfaced read-only for the boxes feature's future split
+    # suggestions. `secondary_types` is beets' `$albumtypes` verbatim (primary + secondary, e.g.
+    # "album; compilation"); the rest map 1:1 to beets fields. All optional — beets emits an
+    # empty field when a value is absent, and much of a personal library will lack labels/country.
+    year: int | None = None
+    media: str | None = None  # physical/source format: CD, "12\" Vinyl", Digital Media, …
+    label: str | None = None
+    country: str | None = None
+    secondary_types: str | None = None  # beets $albumtypes (raw); MB secondary types live here
+    genre: str | None = None
 
 
 class BeetsClient:
@@ -31,16 +47,45 @@ class BeetsClient:
         out = self._run("list", "-a", "-f", "$mb_releasegroupid", timeout=120)
         return {line.strip() for line in out.splitlines() if line.strip()}
 
+    # beets format fields dumped per album, in BeetsAlbum's field order. `$albumtypes` carries the
+    # MB secondary types (crates §1); the rest map straight onto BeetsAlbum.
+    _ALBUM_FIELDS = (  # noqa: RUF012 (a fixed field spec, not mutable shared state)
+        "$id",
+        "$albumartist",
+        "$album",
+        "$mb_releasegroupid",
+        "$year",
+        "$media",
+        "$label",
+        "$country",
+        "$albumtypes",
+        "$genre",
+    )
+
     def all_albums(self) -> list[BeetsAlbum]:
-        """Every album in the library as (id, artist, title, rgid) — the catalogue behind the
-        D17 link-candidate suggestions and the "possibly already owned?" hint (§5/§7)."""
-        fmt = _SEP.join(["$id", "$albumartist", "$album", "$mb_releasegroupid"])
+        """Every album in the library — the catalogue behind the D17 link-candidate suggestions,
+        the "possibly already owned?" hint (§5/§7), and the crates facets (§1). Curation facets
+        (year, format, label, country, secondary types, genre) ride along read-only."""
+        fmt = _SEP.join(self._ALBUM_FIELDS)
         albums = []
         for line in self._run("list", "-a", "-f", fmt, timeout=120).splitlines():
             if not line.strip():
                 continue
-            beets_id, artist, title, rgid = line.split(_SEP)
-            albums.append(BeetsAlbum(beets_id, artist, title, rgid or None))
+            bid, artist, title, rgid, year, media, label, country, types, genre = line.split(_SEP)
+            albums.append(
+                BeetsAlbum(
+                    beets_id=bid,
+                    artist=artist,
+                    title=title,
+                    mb_releasegroup_id=rgid or None,
+                    year=_year(year),
+                    media=media or None,
+                    label=label or None,
+                    country=country or None,
+                    secondary_types=types or None,
+                    genre=genre or None,
+                )
+            )
         return albums
 
     def import_dir(self, path: str) -> None:

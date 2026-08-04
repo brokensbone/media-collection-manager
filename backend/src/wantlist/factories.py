@@ -5,6 +5,7 @@ from .adapters.album_repo import AlbumRepo
 from .adapters.art_fetcher import fetch_image
 from .adapters.beets import BeetsClient
 from .adapters.beets_cache import BeetsCatalogCache
+from .adapters.box_repo import BoxRepo
 from .adapters.clock import SystemClock
 from .adapters.event_log import WorkerEventLog
 from .adapters.mb_resolver import HttpxMusicBrainzResolver
@@ -19,6 +20,7 @@ from .alerts import AlertsService
 from .artist_watch import ArtistWatchService
 from .auth_service import AuthService
 from .config import Settings
+from .crates import CrateService
 from .decide import DecideService
 from .imports import (
     ImportDetectionService,
@@ -252,6 +254,14 @@ def build_library_assist_service(
     return LibraryAssistService(
         repo=AlbumRepo(session_factory),
         catalog=BeetsCatalogCache(session_factory),
+    )
+
+
+def build_crate_service(settings: Settings, session_factory: sessionmaker[Session]) -> CrateService:
+    return CrateService(
+        repo=BoxRepo(session_factory),
+        library=build_library_assist_service(settings, session_factory),
+        soft_cap=settings.crate_soft_cap,
     )
 
 

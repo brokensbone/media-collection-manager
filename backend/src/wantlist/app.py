@@ -10,6 +10,7 @@ from .db import make_engine, make_session_factory
 from .factories import (
     build_acquire_service,
     build_auth_service,
+    build_crate_service,
     build_decide_service,
     build_library_assist_service,
     build_releases_service,
@@ -21,6 +22,7 @@ from .metrics import MetricsService
 from .routers import acquire as acquire_router
 from .routers import art as art_router
 from .routers import auth as auth_router
+from .routers import crates as crates_router
 from .routers import dashboard as dashboard_router
 from .routers import decide as decide_router
 from .routers import events as events_router
@@ -44,6 +46,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.decide_service = build_decide_service(settings, session_factory)
     app.state.acquire_service = build_acquire_service(settings, session_factory)
     app.state.library_assist_service = build_library_assist_service(settings, session_factory)
+    app.state.crate_service = build_crate_service(settings, session_factory)
     app.state.releases_service = build_releases_service(settings, session_factory)
     app.state.imports_service = ImportsService(repo=AlbumRepo(session_factory))
     app.state.watchdir_detection_service = build_watchdir_detection_service(
@@ -58,6 +61,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router.router)
     app.include_router(art_router.router)
     app.include_router(library_router.router)
+    app.include_router(crates_router.router)
     app.include_router(decide_router.router)
     app.include_router(acquire_router.router)
     app.include_router(dashboard_router.router)

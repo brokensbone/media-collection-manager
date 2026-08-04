@@ -36,6 +36,13 @@ class OwnedAlbum:
     has_art: bool
     on_spotify: bool  # also present in your Spotify saves/library
     spotify_id: str | None  # set iff on_spotify — lets the cover link to the album on Spotify
+    # Curation facets from beets (crates §1), read-only.
+    year: int | None
+    media: str | None
+    label: str | None
+    country: str | None
+    secondary_types: str | None
+    genre: str | None
 
 
 class LibraryAssistService:
@@ -70,6 +77,12 @@ class LibraryAssistService:
                     has_art=match.has_art if match else False,
                     on_spotify=bool(match and match.spotify_id),
                     spotify_id=match.spotify_id if match else None,
+                    year=a.year,
+                    media=a.media,
+                    label=a.label,
+                    country=a.country,
+                    secondary_types=a.secondary_types,
+                    genre=a.genre,
                 )
             )
         owned.sort(key=lambda o: (o.artist.lower(), o.title.lower()))

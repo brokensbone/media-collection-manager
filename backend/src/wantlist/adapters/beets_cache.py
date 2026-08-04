@@ -22,9 +22,29 @@ class BeetsCatalogCache:
                     BeetsAlbumCache.artist,
                     BeetsAlbumCache.title,
                     BeetsAlbumCache.mb_releasegroup_id,
+                    BeetsAlbumCache.year,
+                    BeetsAlbumCache.media,
+                    BeetsAlbumCache.label,
+                    BeetsAlbumCache.country,
+                    BeetsAlbumCache.secondary_types,
+                    BeetsAlbumCache.genre,
                 )
             )
-            return [BeetsAlbum(bid, artist, title, rgid) for bid, artist, title, rgid in rows]
+            return [
+                BeetsAlbum(
+                    beets_id=r[0],
+                    artist=r[1],
+                    title=r[2],
+                    mb_releasegroup_id=r[3],
+                    year=r[4],
+                    media=r[5],
+                    label=r[6],
+                    country=r[7],
+                    secondary_types=r[8],
+                    genre=r[9],
+                )
+                for r in rows
+            ]
 
     def replace(self, albums: list[BeetsAlbum]) -> None:
         with self._sf() as session:
@@ -38,6 +58,12 @@ class BeetsCatalogCache:
                             "artist": a.artist,
                             "title": a.title,
                             "mb_releasegroup_id": a.mb_releasegroup_id,
+                            "year": a.year,
+                            "media": a.media,
+                            "label": a.label,
+                            "country": a.country,
+                            "secondary_types": a.secondary_types,
+                            "genre": a.genre,
                         }
                         for a in albums
                     ],

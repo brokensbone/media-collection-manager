@@ -10,6 +10,7 @@ const API_PREFIXES = [
   '/auth',
   '/art',
   '/albums',
+  '/crates',
   '/acquire',
   '/decide',
   '/releases',

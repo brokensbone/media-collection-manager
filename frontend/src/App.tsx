@@ -2,6 +2,7 @@ import './styles.css'
 import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { Acquire } from './Acquire'
 import { Activity } from './Activity'
+import { Crates } from './Crates'
 import { Dashboard, type Section } from './Dashboard'
 import { Decide } from './Decide'
 import { Guide } from './Guide'
@@ -15,7 +16,7 @@ import { Transmission } from './Transmission'
 
 // 'archive' is the completed-imports archive — reached only from a link inside the Tasks view,
 // not the tile row or the top nav.
-type View = 'app' | 'guide' | 'transmission' | 'activity' | 'archive'
+type View = 'app' | 'guide' | 'transmission' | 'activity' | 'archive' | 'crates'
 
 const SECTIONS: Section[] = [
   'all',
@@ -37,6 +38,7 @@ function readHash(): { view: View; section: Section } {
   if (h === 'transmission') return { view: 'transmission', section: 'all' }
   if (h === 'activity') return { view: 'activity', section: 'all' }
   if (h === 'archive') return { view: 'archive', section: 'all' }
+  if (h === 'crates') return { view: 'crates', section: 'all' }
   if ((SECTIONS as string[]).includes(h)) return { view: 'app', section: h as Section }
   return { view: 'app', section: 'all' }
 }
@@ -112,6 +114,13 @@ export default function App() {
           >
             {view === 'activity' ? 'Dashboard' : 'Activity'}
           </button>
+          <button
+            type="button"
+            className="linklike"
+            onClick={() => setView(view === 'crates' ? 'app' : 'crates')}
+          >
+            {view === 'crates' ? 'Dashboard' : 'Crates'}
+          </button>
           <SpotifyStatus />
         </div>
       </header>
@@ -121,6 +130,8 @@ export default function App() {
         <Transmission />
       ) : view === 'activity' ? (
         <Activity />
+      ) : view === 'crates' ? (
+        <Crates />
       ) : view === 'archive' ? (
         <section>
           <h2>Completed archive</h2>
