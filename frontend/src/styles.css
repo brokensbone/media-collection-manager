@@ -440,3 +440,133 @@ a {
 .cover-cell a:hover .cover {
   opacity: 0.8;
 }
+
+/* Crates — nested boxes for organising the collection. */
+.crumbs {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 4px 0 10px;
+}
+.crumb-sep {
+  color: var(--border);
+}
+.crumb-here {
+  color: var(--text);
+}
+.crate-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.crate-tools {
+  display: flex;
+  gap: 12px;
+}
+.cap-meter {
+  margin: 8px 0 14px;
+}
+.cap-bar {
+  height: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.cap-fill {
+  height: 100%;
+  background: var(--accent);
+}
+.cap-meter.over .cap-fill {
+  background: #d9822b; /* amber once the loose pile is over the soft cap */
+}
+.cap-label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.cap-meter.over .cap-label {
+  color: #d9822b;
+}
+.crate-error {
+  color: #d9534f;
+  font-size: 13px;
+}
+.tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+.tile {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.tile:hover {
+  border-color: var(--accent);
+}
+.tile-name {
+  font-weight: 500;
+}
+.tile-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.tile-new {
+  cursor: default;
+  gap: 4px;
+}
+.tile-new input {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 3px 6px;
+  font: inherit;
+  width: 130px;
+}
+.move-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.move-bar select,
+.move-new input {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 3px 6px;
+  font: inherit;
+}
+.move-new {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+table.loose {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+table.loose td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+table.loose .c-check {
+  width: 28px;
+}
