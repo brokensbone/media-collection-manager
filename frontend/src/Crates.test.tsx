@@ -75,4 +75,55 @@ describe('Crates', () => {
     render(<Crates />)
     expect(await screen.findByText(/consider splitting/)).toBeTruthy()
   })
+
+  it('previews split suggestions and applies the chosen one', async () => {
+    const suggestions = [
+      {
+        key: 'decade',
+        label: 'Decade',
+        groups: [
+          { name: '2000s', count: 24 },
+          { name: '2010s', count: 21 },
+        ],
+        covers: 45,
+        leaves: 12,
+      },
+    ]
+    const fetchMock = vi.fn((url: string, opts?: { method?: string; body?: string }) => {
+      if (opts?.method) return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+      const body = url.endsWith('/split-suggestions') ? suggestions : boxView()
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(body) })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<Crates />)
+    await screen.findByRole('heading', { name: 'Collection' })
+    fireEvent.click(screen.getByRole('button', { name: '✨ Suggest a split' }))
+
+    expect(await screen.findByText(/2000s \(24\)/)).toBeTruthy()
+    expect(screen.getByText(/leaves 12/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    await waitFor(() => {
+      const posted = fetchMock.mock.calls.find(
+        (c) => c[0] === '/crates/box/1/split' && c[1]?.method === 'POST',
+      )
+      expect(posted).toBeTruthy()
+      expect(String(posted?.[1]?.body)).toContain('decade')
+    })
+  })
+
+  it('reports when no clean split is found', async () => {
+    const fetchMock = vi.fn((url: string, opts?: { method?: string }) => {
+      if (opts?.method) return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+      const body = url.endsWith('/split-suggestions') ? [] : boxView()
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(body) })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<Crates />)
+    await screen.findByRole('heading', { name: 'Collection' })
+    fireEvent.click(screen.getByRole('button', { name: '✨ Suggest a split' }))
+    expect(await screen.findByText('No clean split found — file by hand.')).toBeTruthy()
+  })
 })

@@ -533,6 +533,27 @@ a {
   font: inherit;
   width: 130px;
 }
+.suggest-split {
+  color: var(--muted);
+}
+.splits {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 16px;
+}
+.split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.split-desc {
+  font-size: 13px;
+}
 .move-bar {
   display: flex;
   align-items: center;
