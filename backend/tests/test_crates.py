@@ -217,6 +217,22 @@ def test_type_facet_maps_secondary_types_and_ignores_studio_albums(
     assert cand.leaves == 1  # the studio album stays loose
 
 
+def test_a_lone_dominant_mixtapes_extraction_still_surfaces(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    # The flagship first split: even when DJ-mixes are the only secondary-type category (one
+    # dominant group among mostly studio albums), the extraction must be offered — pulling a
+    # category *out* skips the dominance penalty that rightly filters a lone partition group.
+    catalog = [_album(f"mix{i}", types="Album; DJ-mix") for i in range(20)] + [
+        _album(f"lp{i}", types="Album") for i in range(30)
+    ]
+    svc = _svc(clean_album_tables, catalog)
+    cand = _by_key(svc.suggest_splits(svc.view(None).id)).get("type")
+    assert cand is not None
+    assert [(g.name, g.count) for g in cand.groups] == [("Mixtapes", 20)]
+    assert cand.leaves == 30  # the studio albums stay loose
+
+
 def test_a_single_dominant_group_is_penalised_out(
     clean_album_tables: sessionmaker[Session],
 ) -> None:

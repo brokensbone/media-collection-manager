@@ -104,12 +104,16 @@ class Facet:
     key: str
     label: str  # human axis name for the UI ("Decade", "Format", …)
     value: Callable[[BoxRecord], str | None]
+    # An extraction facet pulls a category *out* (Mixtapes, Compilations…) rather than partitioning
+    # the box. That's inherently "one bucket", so it skips the dominance penalty and a lone group
+    # still counts — otherwise the flagship "pull out the mixtapes" offer would never surface.
+    extraction: bool = False
 
 
 _FACETS: tuple[Facet, ...] = (
     Facet("decade", "Decade", _decade),
     Facet("format", "Format", lambda r: r.media),
-    Facet("type", "Type", _type),
+    Facet("type", "Type", _type, extraction=True),
     Facet("label", "Label", lambda r: r.label),
     Facet("country", "Country", lambda r: r.country),
     Facet("genre", "Genre", lambda r: r.genre),
@@ -260,10 +264,16 @@ class CrateService:
             n = len(kept)
             moved = sum(sizes)
             biggest_frac = max(sizes) / moved
-            card_factor = 1.0 if 2 <= n <= 8 else 0.6 if n == 1 else 0.5 if 9 <= n <= 15 else 0.2
             size_factor = min(1.0, moved / 12)  # rewards organising a real chunk, not the whole box
-            dom_penalty = 0.4 if biggest_frac > 0.85 else 0.0
-            score = card_factor * size_factor - dom_penalty
+            if facet.extraction:
+                # Extraction: a lone category is fine, and "one bucket" is the whole point — no
+                # dominance penalty. So pulling out ~38 mixtapes surfaces near the top.
+                card_factor = 1.0 if 1 <= n <= 8 else 0.5 if n <= 15 else 0.2
+                score = card_factor * size_factor
+            else:
+                # Partition: a single group is no split, and one value dominating is a weak divide.
+                card_factor = 1.0 if 2 <= n <= 8 else 0.6 if n == 1 else 0.5 if n <= 15 else 0.2
+                score = card_factor * size_factor - (0.4 if biggest_frac > 0.85 else 0.0)
             if score <= 0.2:
                 continue
             groups = [
