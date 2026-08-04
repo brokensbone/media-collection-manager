@@ -85,3 +85,35 @@ def test_rename_endpoint(clean_album_tables: sessionmaker[Session]) -> None:
     child = client.post("/crates/box", json={"name": "Old", "parent_id": root_id}).json()
     assert client.patch(f"/crates/box/{child['id']}", json={"name": "New"}).status_code == 204
     assert client.get(f"/crates/box/{child['id']}").json()["name"] == "New"
+
+
+def _decade_catalog() -> list[BeetsAlbum]:
+    def yr(bid: str, year: int) -> BeetsAlbum:
+        return BeetsAlbum(bid, "A", bid, None, year=year)
+
+    return [yr(f"y{i}", 2007) for i in range(3)] + [yr(f"z{i}", 2013) for i in range(3)]
+
+
+def test_split_suggestions_endpoint(clean_album_tables: sessionmaker[Session]) -> None:
+    client = _client(clean_album_tables, _decade_catalog())
+    root_id = client.get("/crates/box").json()["id"]
+    body = client.get(f"/crates/box/{root_id}/split-suggestions").json()
+    decade = next(c for c in body if c["key"] == "decade")
+    assert [(g["name"], g["count"]) for g in decade["groups"]] == [("2000s", 3), ("2010s", 3)]
+    assert decade["leaves"] == 0
+
+
+def test_apply_split_endpoint(clean_album_tables: sessionmaker[Session]) -> None:
+    client = _client(clean_album_tables, _decade_catalog())
+    root_id = client.get("/crates/box").json()["id"]
+    resp = client.post(f"/crates/box/{root_id}/split", json={"facet": "decade"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["loose_count"] == 0
+    assert {c["name"] for c in body["children"]} == {"2000s", "2010s"}
+
+
+def test_apply_split_unknown_facet_is_400(clean_album_tables: sessionmaker[Session]) -> None:
+    client = _client(clean_album_tables, _catalog())
+    root_id = client.get("/crates/box").json()["id"]
+    assert client.post(f"/crates/box/{root_id}/split", json={"facet": "bogus"}).status_code == 400

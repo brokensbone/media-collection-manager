@@ -24,6 +24,18 @@ type BoxView = {
   over_cap: boolean
 }
 
+// A proposed way to divide this box's loose records into sub-boxes (crates §4). Mirrors the
+// backend's SplitCandidate: one axis, the groups it would create, and how many records it leaves
+// loose.
+type SplitGroup = { name: string; count: number }
+type SplitCandidate = {
+  key: string
+  label: string
+  groups: SplitGroup[]
+  covers: number
+  leaves: number
+}
+
 // The box being viewed lives in the URL (#crates?box=<id>) so descending, breadcrumbs and the
 // browser back button all work. No box param = the root Collection.
 function boxIdFromHash(): number | null {
@@ -43,6 +55,8 @@ export function Crates() {
   const [error, setError] = useState<string | null>(null)
   const [newSub, setNewSub] = useState('')
   const [newTarget, setNewTarget] = useState('')
+  // null = the split panel is closed; an array (possibly empty) = suggestions have been fetched.
+  const [splits, setSplits] = useState<SplitCandidate[] | null>(null)
 
   useEffect(() => {
     const onHash = () => setBoxId(boxIdFromHash())
@@ -57,6 +71,7 @@ export function Crates() {
       .then((v: BoxView) => {
         setView(v)
         setSelected(new Set())
+        setSplits(null) // stale after any reload — the loose set it was computed from has changed
       })
       .catch(() => setView(null))
   }, [boxId])
@@ -151,6 +166,22 @@ export function Crates() {
     }
   }
 
+  const suggestSplit = async () => {
+    setError(null)
+    const r = await fetch(`/crates/box/${view.id}/split-suggestions`)
+    setSplits(r.ok ? await r.json() : [])
+  }
+
+  const applySplit = async (facet: string) => {
+    if (
+      await act(`/crates/box/${view.id}/split`, {
+        method: 'POST',
+        body: JSON.stringify({ facet }),
+      })
+    )
+      load() // reload shows the new sub-boxes and clears the (now stale) suggestions panel
+  }
+
   const isRoot = view.parent_id == null
   const capPct = Math.min(100, Math.round((view.loose_count / Math.max(1, view.soft_cap)) * 100))
 
@@ -216,7 +247,30 @@ export function Crates() {
             Add
           </button>
         </div>
+        <button type="button" className="tile suggest-split" onClick={suggestSplit}>
+          ✨ Suggest a split
+        </button>
       </div>
+
+      {splits !== null &&
+        (splits.length === 0 ? (
+          <p className="muted">No clean split found — file by hand.</p>
+        ) : (
+          <div className="splits">
+            {splits.map((s) => (
+              <div key={s.key} className="split">
+                <span className="split-desc">
+                  <strong>{s.label}</strong> —{' '}
+                  {s.groups.map((g) => `${g.name} (${g.count})`).join(' · ')} — leaves {s.leaves}{' '}
+                  loose
+                </span>
+                <button type="button" onClick={() => applySplit(s.key)}>
+                  Apply
+                </button>
+              </div>
+            ))}
+          </div>
+        ))}
 
       {ids.length > 0 && (
         <div className="move-bar">

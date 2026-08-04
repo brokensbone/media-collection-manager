@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from wantlist.adapters.album_repo import AlbumRepo
 from wantlist.adapters.beets import BeetsAlbum
 from wantlist.adapters.box_repo import BoxRepo
-from wantlist.crates import BoxNotEmpty, CrateError, CrateService
+from wantlist.crates import BoxNotEmpty, CrateError, CrateService, SplitCandidate
 from wantlist.library_assist import LibraryAssistService
 
 from .fakes import StubLibraryCatalog
@@ -142,3 +142,145 @@ def test_rename_box(clean_album_tables: sessionmaker[Session]) -> None:
     child = svc.create_box(name="Electronic", parent_id=root.id)
     svc.rename_box(child.id, "Techno")
     assert svc.view(child.id).name == "Techno"
+
+
+# --- suggested splits (crates §4) --------------------------------------------------------
+
+
+def _album(
+    bid: str,
+    *,
+    year: int | None = None,
+    media: str | None = None,
+    label: str | None = None,
+    country: str | None = None,
+    types: str | None = None,
+    genre: str | None = None,
+) -> BeetsAlbum:
+    return BeetsAlbum(
+        beets_id=bid,
+        artist="A",
+        title=bid,
+        mb_releasegroup_id=None,
+        year=year,
+        media=media,
+        label=label,
+        country=country,
+        secondary_types=types,
+        genre=genre,
+    )
+
+
+def _by_key(candidates: list[SplitCandidate]) -> dict[str, SplitCandidate]:
+    return {c.key: c for c in candidates}
+
+
+def test_decade_facet_buckets_years_into_decades(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    catalog = [_album(f"y{i}", year=2007) for i in range(3)] + [
+        _album(f"z{i}", year=2013) for i in range(3)
+    ]
+    svc = _svc(clean_album_tables, catalog)
+    cand = _by_key(svc.suggest_splits(svc.view(None).id))["decade"]
+    assert cand.label == "Decade"
+    assert [(g.name, g.count) for g in cand.groups] == [("2000s", 3), ("2010s", 3)]
+    assert cand.covers == 6 and cand.leaves == 0
+
+
+def test_groups_below_the_minimum_are_dropped_and_left_loose(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    # CD and vinyl each clear MIN_GROUP; the 2 cassettes fall short and stay loose.
+    catalog = (
+        [_album(f"c{i}", media="CD") for i in range(4)]
+        + [_album(f"v{i}", media="12″ Vinyl") for i in range(4)]
+        + [_album(f"t{i}", media="Cassette") for i in range(2)]
+    )
+    svc = _svc(clean_album_tables, catalog)
+    cand = _by_key(svc.suggest_splits(svc.view(None).id))["format"]
+    assert [(g.name, g.count) for g in cand.groups] == [("12″ Vinyl", 4), ("CD", 4)]
+    assert cand.covers == 8 and cand.leaves == 2
+
+
+def test_type_facet_maps_secondary_types_and_ignores_studio_albums(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    catalog = [_album(f"m{i}", types="Album; DJ-mix") for i in range(3)] + [
+        _album(f"c{i}", types="Album; Compilation") for i in range(3)
+    ]
+    # A plain studio album has only the primary type — no split value.
+    catalog += [_album("plain", types="Album")]
+    svc = _svc(clean_album_tables, catalog)
+    cand = _by_key(svc.suggest_splits(svc.view(None).id))["type"]
+    assert {(g.name, g.count) for g in cand.groups} == {("Mixtapes", 3), ("Compilations", 3)}
+    assert cand.leaves == 1  # the studio album stays loose
+
+
+def test_a_lone_dominant_mixtapes_extraction_still_surfaces(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    # The flagship first split: even when DJ-mixes are the only secondary-type category (one
+    # dominant group among mostly studio albums), the extraction must be offered — pulling a
+    # category *out* skips the dominance penalty that rightly filters a lone partition group.
+    catalog = [_album(f"mix{i}", types="Album; DJ-mix") for i in range(20)] + [
+        _album(f"lp{i}", types="Album") for i in range(30)
+    ]
+    svc = _svc(clean_album_tables, catalog)
+    cand = _by_key(svc.suggest_splits(svc.view(None).id)).get("type")
+    assert cand is not None
+    assert [(g.name, g.count) for g in cand.groups] == [("Mixtapes", 20)]
+    assert cand.leaves == 30  # the studio albums stay loose
+
+
+def test_a_single_dominant_group_is_penalised_out(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    # Only one label clears MIN_GROUP, so the "split" is really a lone extraction: the single-group
+    # card factor plus the dominance penalty keep it at 0.2, below the strict surfacing threshold.
+    catalog = [_album(f"big{i}", label="Big") for i in range(20)] + [_album("bare")]
+    svc = _svc(clean_album_tables, catalog)
+    assert "label" not in _by_key(svc.suggest_splits(svc.view(None).id))
+
+
+def test_no_facet_has_a_group_yields_no_suggestions(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    svc = _svc(clean_album_tables, _two_records())  # two bare records, no facet values
+    assert svc.suggest_splits(svc.view(None).id) == []
+
+
+def test_apply_split_files_records_into_per_value_sub_boxes(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    catalog = [_album(f"y{i}", year=2007) for i in range(3)] + [
+        _album(f"z{i}", year=2013) for i in range(3)
+    ]
+    svc = _svc(clean_album_tables, catalog)
+    root_id = svc.view(None).id
+    view = svc.apply_split(root_id, "decade")
+
+    assert view.loose_count == 0
+    by_name = {c.name: c for c in view.children}
+    assert by_name["2000s"].total_count == 3 and by_name["2010s"].total_count == 3
+
+
+def test_apply_split_is_idempotent_on_child_name(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    catalog = [_album(f"y{i}", year=2007) for i in range(3)]
+    svc = _svc(clean_album_tables, catalog)
+    root_id = svc.view(None).id
+    svc.apply_split(root_id, "decade")
+    svc.apply_split(root_id, "decade")  # a second run must not create a duplicate "2000s"
+
+    view = svc.view(root_id)
+    assert [c.name for c in view.children] == ["2000s"]
+
+
+def test_apply_split_rejects_an_unknown_facet(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    svc = _svc(clean_album_tables, _two_records())
+    with pytest.raises(CrateError):
+        svc.apply_split(svc.view(None).id, "nonsense")

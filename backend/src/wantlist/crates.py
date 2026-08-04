@@ -1,7 +1,11 @@
+import re
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from .adapters.box_repo import BoxRepo, BoxRow
 from .library_assist import LibraryAssistService, OwnedAlbum
+
+MIN_GROUP = 3  # a facet value needs at least this many records to be worth its own sub-box
 
 
 class CrateError(Exception):
@@ -54,6 +58,82 @@ class BoxView:
     total_count: int
     soft_cap: int
     over_cap: bool  # loose_count > soft_cap → the UI nudges a split (never a hard gate)
+
+
+# --- suggested splits (crates §4) ------------------------------------------------------
+
+# MB primary release types (beets' $albumtypes leads with these); a "type" split keys on the
+# *secondary* types, so we skip the primary and treat their absence as "a normal studio album".
+_PRIMARY_TYPES = frozenset({"album", "single", "ep", "broadcast", "other"})
+
+# Friendly, pluralised box names for the secondary types worth their own crate. MB spells the
+# mix type "Mixtape/Street"; splitting on "/" (below) reduces it to "mixtape", which lands here.
+_TYPE_NAMES = {
+    "dj-mix": "Mixtapes",
+    "mixtape": "Mixtapes",
+    "compilation": "Compilations",
+    "live": "Live",
+    "soundtrack": "Soundtracks",
+}
+
+
+def _decade(r: BoxRecord) -> str | None:
+    return None if r.year is None else f"{(r.year // 10) * 10}s"
+
+
+def _type(r: BoxRecord) -> str | None:
+    """The box name for a record's secondary type, or None for a plain studio album. beets joins
+    types with "; " (and MB names can carry "," or "/"); we take the first *secondary* one, mapping
+    recognised types to a friendly plural and otherwise passing the raw type through."""
+    if not r.secondary_types:
+        return None
+    parts = [p.strip() for p in re.split(r"[;,/]", r.secondary_types) if p.strip()]
+    secondary = [p for p in parts if p.lower() not in _PRIMARY_TYPES]
+    for p in secondary:
+        mapped = _TYPE_NAMES.get(p.lower())
+        if mapped is not None:
+            return mapped
+    return secondary[0] if secondary else None
+
+
+@dataclass(frozen=True)
+class Facet:
+    """One axis a box can be split along. `value` derives a record's group — which is also the
+    name of the sub-box it would be filed into (crates §4)."""
+
+    key: str
+    label: str  # human axis name for the UI ("Decade", "Format", …)
+    value: Callable[[BoxRecord], str | None]
+    # An extraction facet pulls a category *out* (Mixtapes, Compilations…) rather than partitioning
+    # the box. That's inherently "one bucket", so it skips the dominance penalty and a lone group
+    # still counts — otherwise the flagship "pull out the mixtapes" offer would never surface.
+    extraction: bool = False
+
+
+_FACETS: tuple[Facet, ...] = (
+    Facet("decade", "Decade", _decade),
+    Facet("format", "Format", lambda r: r.media),
+    Facet("type", "Type", _type, extraction=True),
+    Facet("label", "Label", lambda r: r.label),
+    Facet("country", "Country", lambda r: r.country),
+    Facet("genre", "Genre", lambda r: r.genre),
+)
+_FACET_BY_KEY = {f.key: f for f in _FACETS}
+
+
+@dataclass
+class SplitGroup:
+    name: str
+    count: int
+
+
+@dataclass
+class SplitCandidate:
+    key: str
+    label: str
+    groups: list[SplitGroup]  # kept groups (count >= MIN_GROUP), sorted by count desc
+    covers: int  # records this split would file into sub-boxes
+    leaves: int  # records left loose here (no value, or in a sub-MIN group)
 
 
 class CrateService:
@@ -165,7 +245,101 @@ class CrateService:
         self._repo.assign(self._in_box(box_id, beets_ids), child.id)
         return child
 
+    def suggest_splits(self, box_id: int) -> list[SplitCandidate]:
+        """Rank ways to divide this box's loose records into single-facet sub-boxes (crates §4).
+        Each facet's partition is scored on cardinality (2–8 groups is ideal), how big a chunk it
+        organises, and whether one value dominates; the strongest few are offered as a preview."""
+        if self._repo.get(box_id) is None:
+            raise CrateError(f"no such box {box_id}")
+        loose = self._loose_records(box_id)
+        loose_total = len(loose)
+
+        scored: list[tuple[float, SplitCandidate]] = []
+        for facet in _FACETS:
+            counts = self._facet_counts(facet, loose)
+            kept = {name: n for name, n in counts.items() if n >= MIN_GROUP}
+            if not kept:
+                continue
+            sizes = list(kept.values())
+            n = len(kept)
+            moved = sum(sizes)
+            biggest_frac = max(sizes) / moved
+            size_factor = min(1.0, moved / 12)  # rewards organising a real chunk, not the whole box
+            if facet.extraction:
+                # Extraction: a lone category is fine, and "one bucket" is the whole point — no
+                # dominance penalty. So pulling out ~38 mixtapes surfaces near the top.
+                card_factor = 1.0 if 1 <= n <= 8 else 0.5 if n <= 15 else 0.2
+                score = card_factor * size_factor
+            else:
+                # Partition: a single group is no split, and one value dominating is a weak divide.
+                card_factor = 1.0 if 2 <= n <= 8 else 0.6 if n == 1 else 0.5 if n <= 15 else 0.2
+                score = card_factor * size_factor - (0.4 if biggest_frac > 0.85 else 0.0)
+            if score <= 0.2:
+                continue
+            groups = [
+                SplitGroup(name=name, count=n_)
+                for name, n_ in sorted(kept.items(), key=lambda kv: (-kv[1], kv[0].lower()))
+            ]
+            scored.append(
+                (
+                    score,
+                    SplitCandidate(
+                        key=facet.key,
+                        label=facet.label,
+                        groups=groups,
+                        covers=moved,
+                        leaves=loose_total - moved,
+                    ),
+                )
+            )
+        scored.sort(key=lambda s: s[0], reverse=True)  # stable: ties keep facet order
+        return [c for _, c in scored[:4]]
+
+    def apply_split(self, box_id: int, facet_key: str) -> BoxView:
+        """File this box's loose records into per-value sub-boxes along `facet_key` — the bulk form
+        of the manual file-down verb (crates §4). Records with no value, or in a sub-MIN group, stay
+        loose. Reuses a same-named child if one already exists, so re-applying is idempotent."""
+        if self._repo.get(box_id) is None:
+            raise CrateError(f"no such box {box_id}")
+        facet = _FACET_BY_KEY.get(facet_key)
+        if facet is None:
+            raise CrateError(f"unknown split facet {facet_key!r}")
+
+        by_value: dict[str, list[str]] = {}
+        for r in self._loose_records(box_id):
+            v = facet.value(r)
+            if v is not None:
+                by_value.setdefault(v, []).append(r.beets_id)
+
+        for name, beets_ids in by_value.items():
+            if len(beets_ids) < MIN_GROUP:
+                continue
+            child = self._get_or_create_child(box_id, name)
+            self.file_down(box_id, beets_ids, child_box_id=child.id)
+        return self.view(box_id)
+
     # --- internals -------------------------------------------------------------------
+
+    def _loose_records(self, box_id: int) -> list[BoxRecord]:
+        root_id = self._repo.root().id  # get-or-create first, so list_boxes includes it
+        boxes = {b.id: b for b in self._repo.list_boxes()}
+        records = self._library.owned_library()
+        effective = self._effective_boxes(records, boxes, root_id)
+        return [self._record(r) for r in records if effective.get(r.beets_id) == box_id]
+
+    def _facet_counts(self, facet: Facet, loose: list[BoxRecord]) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for r in loose:
+            v = facet.value(r)
+            if v is not None:
+                counts[v] = counts.get(v, 0) + 1
+        return counts
+
+    def _get_or_create_child(self, box_id: int, name: str) -> BoxRow:
+        for b in self._repo.list_boxes():
+            if b.parent_id == box_id and b.name == name:
+                return b
+        return self._repo.create(name, box_id)
 
     def _in_box(self, box_id: int, beets_ids: list[str]) -> list[str]:
         """Restrict a move to records actually loose in the source box, so a stale selection can't

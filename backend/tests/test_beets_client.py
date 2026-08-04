@@ -54,6 +54,22 @@ def test_all_albums_parses_facets(monkeypatch: pytest.MonkeyPatch) -> None:
             ]
         ),
         sep.join(["b2", "X", "Untagged", "", "0", "", "", "", "", ""]),
+        # beets emits the literal template token (e.g. `$media`) for a field it can't resolve on an
+        # album — must be treated as absent, not become a bogus "$media" value/crate.
+        sep.join(
+            [
+                "b3",
+                "Y",
+                "NoMedia",
+                "",
+                "2020",
+                "$media",
+                "$label",
+                "$country",
+                "$albumtypes",
+                "$genre",
+            ]
+        ),
     ]
 
     def fake_run(argv: list[str], **kwargs: Any) -> object:
@@ -72,6 +88,10 @@ def test_all_albums_parses_facets(monkeypatch: pytest.MonkeyPatch) -> None:
     b = by_id["b2"]  # empty facets and a `0` year all collapse to None
     assert b.mb_releasegroup_id is None and b.year is None and b.media is None
     assert b.label is None and b.country is None and b.secondary_types is None and b.genre is None
+    c = by_id["b3"]  # leaked `$…` tokens collapse to None (but a real year still parses)
+    assert c.year == 2020
+    assert c.media is None and c.label is None and c.country is None
+    assert c.secondary_types is None and c.genre is None
 
 
 def test_import_dir_skips_duplicates_uses_asis_and_traps_directory(

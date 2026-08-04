@@ -18,6 +18,14 @@ def _year(raw: str) -> int | None:
     return int(raw) if raw.isdigit() and raw != "0" else None
 
 
+def _facet(raw: str) -> str | None:
+    """A curation-facet field value, or None when absent. beets emits the literal template token
+    (e.g. `$media`) for a field it can't resolve on an album — not an empty string — so a leaked
+    `$…` token must be treated as absent too, or it becomes a bogus "$media" crate."""
+    raw = raw.strip()
+    return None if not raw or raw.startswith("$") else raw
+
+
 @dataclass
 class BeetsAlbum:
     beets_id: str
@@ -79,11 +87,11 @@ class BeetsClient:
                     title=title,
                     mb_releasegroup_id=rgid or None,
                     year=_year(year),
-                    media=media or None,
-                    label=label or None,
-                    country=country or None,
-                    secondary_types=types or None,
-                    genre=genre or None,
+                    media=_facet(media),
+                    label=_facet(label),
+                    country=_facet(country),
+                    secondary_types=_facet(types),
+                    genre=_facet(genre),
                 )
             )
         return albums
