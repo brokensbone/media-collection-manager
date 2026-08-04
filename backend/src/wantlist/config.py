@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     saves_poll_seconds: int = 3600
     art_target_px: int = 300
 
+    # Crates (§2): soft cap on a box's loose (direct) record count — a UI nudge to split, never
+    # a hard gate. Tunable.
+    crate_soft_cap: int = 50
+
     # Verdict / Decide (§6a): the "forgotten" (time) and "listened" (play-history) triggers.
     verdict_forgotten_days: int = 21
     verdict_snooze_days: int = 14

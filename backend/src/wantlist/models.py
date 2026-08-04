@@ -248,6 +248,36 @@ class BeetsAlbumCache(Base):
     genre: Mapped[str | None] = mapped_column(default=None)
 
 
+class Box(Base):
+    """A crate: a named node in a strict tree over the owned library (crates §2). `parent_id`
+    null marks the single root, "Collection". A record lives in exactly one box (see RecordBox)."""
+
+    __tablename__ = "box"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    # NO ACTION (the default), not RESTRICT: integrity is still enforced (can't orphan a child),
+    # but the check defers to statement end so a bulk delete of a whole tree works. App-level
+    # deletes only ever remove a childless leaf anyway (§2).
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("box.id"), default=None, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class RecordBox(Base):
+    """Which box an owned record sits in (crates §2). Keyed by beets id — the catalogue's
+    identity — so it survives beets_album_cache's delete+insert refresh. A record with NO row
+    here is in the root Collection: that is how new imports default in without an import hook,
+    and why the seed doesn't need to enumerate the whole library."""
+
+    __tablename__ = "record_box"
+
+    beets_id: Mapped[str] = mapped_column(primary_key=True)
+    box_id: Mapped[int] = mapped_column(ForeignKey("box.id"), index=True)
+
+
 class NotificationState(Base):
     """Single-row dedup flags so alerts (§8d) fire once per episode, not every poll."""
 
