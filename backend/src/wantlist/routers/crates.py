@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from ..adapters.box_repo import BoxRow
-from ..crates import BoxNotEmpty, BoxView, CrateError, CrateService
+from ..crates import BoxNotEmpty, BoxView, CrateError, CrateService, SplitCandidate
 
 router = APIRouter(tags=["crates"])
 
@@ -26,6 +26,10 @@ class FileDownBody(BaseModel):
     beets_ids: list[str]
     child_box_id: int | None = None  # an existing direct sub-box
     new_box_name: str | None = None  # or create+file into a fresh sub-box in one call
+
+
+class SplitBody(BaseModel):
+    facet: str
 
 
 def _service(request: Request) -> CrateService:
@@ -83,3 +87,14 @@ def file_down(box_id: int, body: FileDownBody, request: Request) -> BoxRow:
             new_box_name=body.new_box_name,
         )
     )
+
+
+@router.get("/crates/box/{box_id}/split-suggestions")
+def split_suggestions(box_id: int, request: Request) -> list[SplitCandidate]:
+    """Ranked ways to divide this box's loose records into sub-boxes (crates §4)."""
+    return _guard(lambda: _service(request).suggest_splits(box_id))
+
+
+@router.post("/crates/box/{box_id}/split")
+def apply_split(box_id: int, body: SplitBody, request: Request) -> BoxView:
+    return _guard(lambda: _service(request).apply_split(box_id, body.facet))
