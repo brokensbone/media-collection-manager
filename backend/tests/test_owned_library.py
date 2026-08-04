@@ -99,3 +99,28 @@ def test_owned_library_shows_cover_from_the_matching_album(
 def test_owned_count_is_the_catalogue_size(clean_album_tables: sessionmaker[Session]) -> None:
     catalog = [BeetsAlbum("b1", "A", "One", None), BeetsAlbum("b2", "B", "Two", "rg-2")]
     assert _svc(clean_album_tables, catalog).owned_count() == 2
+
+
+def test_owned_library_carries_beets_facets(clean_album_tables: sessionmaker[Session]) -> None:
+    catalog = [
+        BeetsAlbum(
+            "b1",
+            "Burial",
+            "Untrue",
+            "rg-1",
+            year=2007,
+            media='12" Vinyl',
+            label="Hyperdub",
+            country="GB",
+            secondary_types="album",
+            genre="Dubstep",
+        )
+    ]
+    owned = _svc(clean_album_tables, catalog).owned_library()[0]
+    assert (owned.year, owned.media, owned.label, owned.country) == (
+        2007,
+        '12" Vinyl',
+        "Hyperdub",
+        "GB",
+    )
+    assert owned.secondary_types == "album" and owned.genre == "Dubstep"

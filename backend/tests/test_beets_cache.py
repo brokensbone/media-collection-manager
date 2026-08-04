@@ -24,3 +24,26 @@ def test_replace_is_a_full_swap_not_an_append(clean_album_tables: sessionmaker[S
     cache.replace([BeetsAlbum("new", "B", "Here", "rg-9")])
     ids = {a.beets_id for a in cache.all_albums()}
     assert ids == {"new"}  # the previous snapshot is gone, not accumulated
+
+
+def test_facets_round_trip(clean_album_tables: sessionmaker[Session]) -> None:
+    cache = BeetsCatalogCache(clean_album_tables)
+    cache.replace(
+        [
+            BeetsAlbum(
+                "b1",
+                "Burial",
+                "Untrue",
+                "rg-1",
+                year=2007,
+                media='12" Vinyl',
+                label="Hyperdub",
+                country="GB",
+                secondary_types="album",
+                genre="Dubstep",
+            )
+        ]
+    )
+    got = cache.all_albums()[0]
+    assert (got.year, got.media, got.label) == (2007, '12" Vinyl', "Hyperdub")
+    assert (got.country, got.secondary_types, got.genre) == ("GB", "album", "Dubstep")

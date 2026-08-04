@@ -34,6 +34,46 @@ def test_owned_release_group_ids_via_beetsdir(
     assert owned == {"rg-1", "rg-2"}  # the id-less album contributes a blank line, dropped
 
 
+def test_all_albums_parses_facets(monkeypatch: pytest.MonkeyPatch) -> None:
+    sep = beets_mod._SEP
+    # One fully-tagged album and one with the facet fields empty (beets emits `0` for a missing
+    # year), to prove the split maps positionally and blanks/zeroes become None.
+    rows = [
+        sep.join(
+            [
+                "b1",
+                "Burial",
+                "Untrue",
+                "rg-1",
+                "2007",
+                '12" Vinyl',
+                "Hyperdub",
+                "GB",
+                "album",
+                "Dubstep",
+            ]
+        ),
+        sep.join(["b2", "X", "Untagged", "", "0", "", "", "", "", ""]),
+    ]
+
+    def fake_run(argv: list[str], **kwargs: Any) -> object:
+        class Result:
+            stdout = "\n".join(rows) + "\n"
+            stderr = ""
+
+        return Result()
+
+    monkeypatch.setattr(beets_mod.subprocess, "run", fake_run)
+    by_id = {a.beets_id: a for a in BeetsClient().all_albums()}
+
+    a = by_id["b1"]
+    assert (a.year, a.media, a.label, a.country) == (2007, '12" Vinyl', "Hyperdub", "GB")
+    assert (a.secondary_types, a.genre, a.mb_releasegroup_id) == ("album", "Dubstep", "rg-1")
+    b = by_id["b2"]  # empty facets and a `0` year all collapse to None
+    assert b.mb_releasegroup_id is None and b.year is None and b.media is None
+    assert b.label is None and b.country is None and b.secondary_types is None and b.genre is None
+
+
 def test_import_dir_skips_duplicates_uses_asis_and_traps_directory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

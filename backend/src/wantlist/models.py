@@ -239,6 +239,13 @@ class BeetsAlbumCache(Base):
     artist: Mapped[str]
     title: Mapped[str]
     mb_releasegroup_id: Mapped[str | None] = mapped_column(index=True, default=None)
+    # Curation facets (crates §1), cached from beets alongside the rest of the catalogue.
+    year: Mapped[int | None] = mapped_column(default=None)
+    media: Mapped[str | None] = mapped_column(default=None)
+    label: Mapped[str | None] = mapped_column(default=None)
+    country: Mapped[str | None] = mapped_column(default=None)
+    secondary_types: Mapped[str | None] = mapped_column(default=None)
+    genre: Mapped[str | None] = mapped_column(default=None)
 
 
 class NotificationState(Base):
