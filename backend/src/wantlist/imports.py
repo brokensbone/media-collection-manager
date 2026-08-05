@@ -5,7 +5,7 @@ import traceback
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol, overload
 
 from .adapters.album_repo import AlbumRepo, ImportRecord, ImportRow
 from .adapters.beets import BeetsAlbum
@@ -675,6 +675,18 @@ def _video_classification(
     )
 
 
+@overload
+def _tv_classification(
+    name: str, files: list[str], tv_root: str, auto: Literal[False] = False
+) -> Classification: ...
+
+
+@overload
+def _tv_classification(
+    name: str, files: list[str], tv_root: str, auto: Literal[True]
+) -> Classification | None: ...
+
+
 def _tv_classification(
     name: str, files: list[str], tv_root: str, auto: bool = False
 ) -> Classification | None:
@@ -709,7 +721,27 @@ def _tv_classification(
             destination_path=None,
             state=ImportState.detected,
         )
-    return None
+    if auto:
+        return None
+    return Classification(
+        media_kind=MediaKind.tv,
+        import_target=ImportTarget.review,
+        classification_detail="Manual override requested TV, but no episodes were detected.",
+        destination_path=None,
+        state=ImportState.detected,
+    )
+
+
+@overload
+def _film_classification(
+    name: str, files: list[str], film_root: str, auto: Literal[False] = False
+) -> Classification: ...
+
+
+@overload
+def _film_classification(
+    name: str, files: list[str], film_root: str, auto: Literal[True]
+) -> Classification | None: ...
 
 
 def _film_classification(
