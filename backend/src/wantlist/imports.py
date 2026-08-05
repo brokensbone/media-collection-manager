@@ -624,9 +624,13 @@ def _manual_classification(
     if target == ImportTarget.workspace:
         return _workspace_classification(name, workspace_root)
     if target == ImportTarget.tv:
-        return _tv_classification(name, files, tv_root)
+        classification = _tv_classification(name, files, tv_root)
+        assert classification is not None
+        return classification
     if target == ImportTarget.film:
-        return _film_classification(name, files, film_root)
+        classification = _film_classification(name, files, film_root)
+        assert classification is not None
+        return classification
     raise ValueError(f"unsupported manual target: {target}")
 
 
