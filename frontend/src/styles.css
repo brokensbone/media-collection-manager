@@ -244,6 +244,27 @@ button:disabled {
 button:disabled:hover {
   background: transparent;
 }
+.acquire-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.acquire-trackers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.acquire-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.acquire-actions button {
+  width: 100%;
+  margin-right: 0;
+}
 a {
   color: var(--accent);
 }
@@ -274,6 +295,17 @@ a {
 }
 .nowrap {
   white-space: nowrap;
+}
+@media (max-width: 1280px) {
+  col.acquire-artist-col {
+    width: 168px;
+  }
+  col.acquire-link-col {
+    width: 86px;
+  }
+  col.acquire-actions-col {
+    width: 124px;
+  }
 }
 .filter {
   width: 100%;

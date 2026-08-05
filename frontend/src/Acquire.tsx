@@ -117,10 +117,10 @@ export function Acquire({
       <table>
         <colgroup>
           <col className="c-cover" />
-          <col className="c-artist" />
+          <col className="c-artist acquire-artist-col" />
           <col />
-          <col className="c-link" />
-          <col className="c-actions1" />
+          <col className="c-link acquire-link-col" />
+          <col className="c-actions1 acquire-actions-col" />
         </colgroup>
         <tbody>
           {shown.map((it) => (
@@ -131,38 +131,43 @@ export function Acquire({
                 {it.title}
                 {it.possibly_owned && <div className="muted">possibly owned: {it.owned_hint}</div>}
               </td>
-              <td className="nowrap">
-                <a href={it.bandcamp_url} target="_blank" rel="noreferrer">
-                  Bandcamp
-                </a>
-                <br />
-                <a
-                  href={trackerSearch('https://redacted.sh/torrents.php', it.artist, it.title)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Red
-                </a>{' '}
-                <a
-                  href={trackerSearch(
-                    'https://orpheus.network/torrents.php',
-                    it.artist,
-                    it.title,
-                    ORPHEUS_PARAMS,
-                  )}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Ops
-                </a>
+              <td>
+                <div className="acquire-links">
+                  <a href={it.bandcamp_url} target="_blank" rel="noreferrer">
+                    Bandcamp
+                  </a>
+                  <div className="acquire-trackers">
+                    <a
+                      href={trackerSearch('https://redacted.sh/torrents.php', it.artist, it.title)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Red
+                    </a>
+                    <a
+                      href={trackerSearch(
+                        'https://orpheus.network/torrents.php',
+                        it.artist,
+                        it.title,
+                        ORPHEUS_PARAMS,
+                      )}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Ops
+                    </a>
+                  </div>
+                </div>
               </td>
-              <td className="nowrap">
-                <button type="button" onClick={() => returnToSaved(it.id)}>
-                  Back to saved
-                </button>{' '}
-                <button type="button" onClick={() => openOwn(it)}>
-                  Mark owned…
-                </button>
+              <td>
+                <div className="acquire-actions">
+                  <button type="button" onClick={() => returnToSaved(it.id)}>
+                    Back to saved
+                  </button>
+                  <button type="button" onClick={() => openOwn(it)}>
+                    Mark owned…
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
