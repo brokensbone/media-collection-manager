@@ -6,8 +6,8 @@ export type ImportItem = {
   id: number
   source: string
   name: string
-  media_kind: 'music' | 'tv' | 'film' | 'unknown'
-  import_target: 'beets' | 'tv' | 'film' | 'review'
+  media_kind: 'music' | 'tv' | 'film' | 'workspace' | 'unknown'
+  import_target: 'beets' | 'tv' | 'film' | 'workspace' | 'review'
   classification_detail: string | null
   destination_path: string | null
   state: ImportState
@@ -24,6 +24,7 @@ export function labelKind(kind: ImportItem['media_kind']): string {
   if (kind === 'tv') return 'TV'
   if (kind === 'film') return 'Film'
   if (kind === 'music') return 'Music'
+  if (kind === 'workspace') return 'Workspace'
   return 'Unknown'
 }
 

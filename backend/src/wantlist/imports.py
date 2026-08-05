@@ -5,7 +5,7 @@ import traceback
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol, overload
 
 from .adapters.album_repo import AlbumRepo, ImportRecord, ImportRow
 from .adapters.beets import BeetsAlbum
@@ -86,6 +86,7 @@ class ImportDetectionService:
         match_threshold: float,
         tv_root: str = "",
         film_root: str = "",
+        workspace_root: str = "",
         events: EventSink | None = None,
     ):
         self._transmission = transmission
@@ -93,6 +94,7 @@ class ImportDetectionService:
         self._threshold = match_threshold
         self._tv_root = tv_root
         self._film_root = film_root
+        self._workspace_root = workspace_root
         self._events = events or NullEventSink()
 
     def poll(self) -> DetectResult:
@@ -112,6 +114,7 @@ class ImportDetectionService:
                 t.files,
                 tv_root=self._tv_root,
                 film_root=self._film_root,
+                workspace_root=self._workspace_root,
                 matched_album_id=best_match(t.name, targets, self._threshold),
             )
             self._repo.add_pending_import(
@@ -312,7 +315,11 @@ class ImportRunner:
             if rec.import_target == ImportTarget.beets.value:
                 self._beets.import_dir(str(staging))
                 new = self._new_albums(before)
-            elif rec.import_target in (ImportTarget.tv.value, ImportTarget.film.value):
+            elif rec.import_target in (
+                ImportTarget.tv.value,
+                ImportTarget.film.value,
+                ImportTarget.workspace.value,
+            ):
                 if not rec.destination_path:
                     raise RuntimeError("video import missing destination path")
                 placed_video = self._video.import_dir(str(staging), rec.destination_path)
@@ -470,6 +477,40 @@ class ImportsService:
             return
         self._repo.queue_import(import_id)
 
+    def reclassify(
+        self,
+        import_id: int,
+        *,
+        target: ImportTarget,
+        tv_root: str,
+        film_root: str,
+        workspace_root: str,
+    ) -> None:
+        rec = self._repo.get_pending_import(import_id)
+        if rec is None or rec.state not in (
+            ImportState.detected.value,
+            ImportState.queued.value,
+            ImportState.failed.value,
+        ):
+            return
+        classified = _manual_classification(
+            rec.name,
+            rec.files,
+            target=target,
+            tv_root=tv_root,
+            film_root=film_root,
+            workspace_root=workspace_root,
+            matched_album_id=rec.matched_album_id,
+        )
+        self._repo.reclassify_import(
+            import_id,
+            media_kind=classified.media_kind,
+            import_target=classified.import_target,
+            classification_detail=classified.classification_detail,
+            destination_path=classified.destination_path,
+            state=ImportState.detected,
+        )
+
     def discard(self, import_id: int) -> None:
         rec = self._repo.get_pending_import(import_id)
         # A discarded watch-dir drop shouldn't linger in the folder. A transmission row's source
@@ -548,18 +589,69 @@ def _classify_torrent(
     *,
     tv_root: str,
     film_root: str,
+    workspace_root: str = "",
     matched_album_id: int | None,
 ) -> Classification:
     if _has_audio(files):
-        return Classification(
-            media_kind=MediaKind.music,
-            import_target=ImportTarget.beets,
-            classification_detail="Audio files detected.",
-            destination_path=None,
-            state=ImportState.detected,
+        return _music_classification(
             matched_album_id=matched_album_id,
+            detail="Audio files detected.",
         )
 
+    return _video_classification(
+        name,
+        files,
+        tv_root=tv_root,
+        film_root=film_root,
+    )
+
+
+def _manual_classification(
+    name: str,
+    files: list[str],
+    *,
+    target: ImportTarget,
+    tv_root: str,
+    film_root: str,
+    workspace_root: str,
+    matched_album_id: int | None,
+) -> Classification:
+    if target == ImportTarget.beets:
+        return _music_classification(
+            matched_album_id=matched_album_id,
+            detail="Manual override: music import.",
+        )
+    if target == ImportTarget.workspace:
+        return _workspace_classification(name, workspace_root)
+    if target == ImportTarget.tv:
+        classification = _tv_classification(name, files, tv_root)
+        assert classification is not None
+        return classification
+    if target == ImportTarget.film:
+        classification = _film_classification(name, files, film_root)
+        assert classification is not None
+        return classification
+    raise ValueError(f"unsupported manual target: {target}")
+
+
+def _music_classification(*, matched_album_id: int | None, detail: str) -> Classification:
+    return Classification(
+        media_kind=MediaKind.music,
+        import_target=ImportTarget.beets,
+        classification_detail=detail,
+        destination_path=None,
+        state=ImportState.detected,
+        matched_album_id=matched_album_id,
+    )
+
+
+def _video_classification(
+    name: str,
+    files: list[str],
+    *,
+    tv_root: str,
+    film_root: str,
+) -> Classification:
     video_files = _video_files(files)
     if not video_files:
         return Classification(
@@ -570,6 +662,39 @@ def _classify_torrent(
             state=ImportState.dismissed,
         )
 
+    tv = _tv_classification(name, files, tv_root, auto=True)
+    if tv is not None:
+        return tv
+
+    film = _film_classification(name, files, film_root, auto=True)
+    if film is not None:
+        return film
+
+    return Classification(
+        media_kind=MediaKind.unknown,
+        import_target=ImportTarget.review,
+        classification_detail="Video files found, but the title or type is ambiguous.",
+        destination_path=None,
+        state=ImportState.detected,
+    )
+
+
+@overload
+def _tv_classification(
+    name: str, files: list[str], tv_root: str, auto: Literal[False] = False
+) -> Classification: ...
+
+
+@overload
+def _tv_classification(
+    name: str, files: list[str], tv_root: str, auto: Literal[True]
+) -> Classification | None: ...
+
+
+def _tv_classification(
+    name: str, files: list[str], tv_root: str, auto: bool = False
+) -> Classification | None:
+    video_files = _video_files(files)
     episode_matches = [_episode_match(p) for p in [name, *video_files]]
     episodes = [m for m in episode_matches if m is not None]
     if episodes:
@@ -580,11 +705,19 @@ def _classify_torrent(
             return Classification(
                 media_kind=MediaKind.tv,
                 import_target=ImportTarget.tv,
-                classification_detail=f"Detected TV episode pack for season {season:02d}.",
+                classification_detail=(
+                    f"Detected TV episode pack for season {season:02d}."
+                    if auto
+                    else f"Manual override: TV season pack for season {season:02d}."
+                ),
                 destination_path=str(Path(tv_root) / show_title / f"Season {season:02d}"),
                 state=ImportState.detected,
             )
-        detail = "Detected TV episodes, but could not derive a single season destination."
+        detail = (
+            "Detected TV episodes, but could not derive a single season destination."
+            if auto
+            else "Manual override requested TV, but no single season destination could be derived."
+        )
         return Classification(
             media_kind=MediaKind.tv,
             import_target=ImportTarget.review,
@@ -592,26 +725,59 @@ def _classify_torrent(
             destination_path=None,
             state=ImportState.detected,
         )
+    if auto:
+        return None
+    return Classification(
+        media_kind=MediaKind.tv,
+        import_target=ImportTarget.review,
+        classification_detail="Manual override requested TV, but no episodes were detected.",
+        destination_path=None,
+        state=ImportState.detected,
+    )
 
+
+@overload
+def _film_classification(
+    name: str, files: list[str], film_root: str, auto: Literal[False] = False
+) -> Classification: ...
+
+
+@overload
+def _film_classification(
+    name: str, files: list[str], film_root: str, auto: Literal[True]
+) -> Classification | None: ...
+
+
+def _film_classification(
+    name: str, files: list[str], film_root: str, auto: bool = False
+) -> Classification | None:
+    video_files = _video_files(files)
+    if not video_files:
+        return None
     if not film_root:
         return Classification(
             media_kind=MediaKind.film,
             import_target=ImportTarget.review,
             classification_detail=(
                 "Detected a film-like video, but the film root is not configured."
+                if auto
+                else "Manual override requested film, but the film root is not configured."
             ),
             destination_path=None,
             state=ImportState.detected,
         )
-
     main_videos = [vf for vf in video_files if "sample" not in Path(vf).stem.lower()]
     if len(main_videos) == 1:
         title, year = _film_title_and_year(name, main_videos[0])
         if title:
             folder = f"{title} ({year})" if year is not None else title
-            detail = "Detected a single-feature film."
+            detail = "Detected a single-feature film." if auto else "Manual override: film import."
             if year is None:
-                detail = "Detected a film, but no year was found."
+                detail = (
+                    "Detected a film, but no year was found."
+                    if auto
+                    else "Manual override: film import (no year found)."
+                )
             return Classification(
                 media_kind=MediaKind.film,
                 import_target=ImportTarget.film,
@@ -619,12 +785,36 @@ def _classify_torrent(
                 destination_path=str(Path(film_root) / folder),
                 state=ImportState.detected,
             )
-
+    if auto:
+        return None
     return Classification(
-        media_kind=MediaKind.unknown,
+        media_kind=MediaKind.film,
         import_target=ImportTarget.review,
-        classification_detail="Video files found, but the title or type is ambiguous.",
+        classification_detail="Manual override requested film, but the title is ambiguous.",
         destination_path=None,
+        state=ImportState.detected,
+    )
+
+
+def _workspace_classification(
+    name: str, workspace_root: str, detail: str = "Manual override: workspace import."
+) -> Classification:
+    if not workspace_root:
+        return Classification(
+            media_kind=MediaKind.workspace,
+            import_target=ImportTarget.review,
+            classification_detail=(
+                "Manual override requested workspace, but the workspace root is not configured."
+            ),
+            destination_path=None,
+            state=ImportState.detected,
+        )
+    folder = _clean_title(name) or "Import"
+    return Classification(
+        media_kind=MediaKind.workspace,
+        import_target=ImportTarget.workspace,
+        classification_detail=detail,
+        destination_path=str(Path(workspace_root) / folder),
         state=ImportState.detected,
     )
 

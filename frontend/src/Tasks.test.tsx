@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Tasks } from './Tasks'
 
 function mockApi(items: unknown) {
-  const fetchMock = vi.fn((_url: string, opts?: { method?: string }) =>
+  const fetchMock = vi.fn((_url: string, opts?: { method?: string; body?: string }) =>
     opts?.method
       ? Promise.resolve({ ok: true })
       : Promise.resolve({ json: () => Promise.resolve(items) }),
@@ -81,6 +81,19 @@ describe('Tasks', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     const posted = fetchMock.mock.calls.find((c) => c[1]?.method === 'POST')
     expect(posted?.[0]).toBe('/imports/5/import')
+  })
+
+  it('lets a queued task be reclassified', async () => {
+    const fetchMock = mockApi([item({ id: 6, name: 'Pack', state: 'queued' })])
+    render(<Tasks />)
+    await screen.findByText('Pack')
+    fireEvent.change(screen.getByRole('combobox', { name: 'Classify Pack' }), {
+      target: { value: 'workspace' },
+    })
+
+    const posted = fetchMock.mock.calls.find((c) => c[0] === '/imports/6/classify')
+    expect(posted?.[1]?.method).toBe('POST')
+    expect(posted?.[1]?.body).toBe(JSON.stringify({ kind: 'workspace' }))
   })
 
   it('mirrors an opened failure log into the URL for sharing', async () => {

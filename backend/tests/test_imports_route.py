@@ -5,7 +5,7 @@ from wantlist.adapters.album_repo import AlbumRepo
 from wantlist.app import create_app
 from wantlist.config import Settings
 from wantlist.imports import ImportsService
-from wantlist.models import ImportSource
+from wantlist.models import ImportSource, ImportTarget, MediaKind
 
 
 def test_import_click_enqueues_and_row_persists_with_status(
@@ -63,3 +63,31 @@ def test_scan_imports_forces_watchdir_detection(clean_album_tables: sessionmaker
     assert resp.status_code == 200
     assert resp.json() == {"detected": 1}
     assert watchdir.forced is True
+
+
+def test_classify_import_updates_its_target(clean_album_tables: sessionmaker[Session]) -> None:
+    sf = clean_album_tables
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.watchdir,
+        source_key="k1",
+        name="Mystery Pack",
+        media_kind=MediaKind.unknown,
+        import_target=ImportTarget.review,
+        archive_path="/w/Mystery Pack",
+        files=["disc1.mkv"],
+        matched_album_id=None,
+    )
+
+    app = create_app(Settings(workspace_root="/workspace"))
+    app.state.imports_service = ImportsService(repo=repo)
+    client = TestClient(app)
+    import_id = client.get("/imports").json()[0]["id"]
+
+    resp = client.post(f"/imports/{import_id}/classify", json={"kind": "workspace"})
+
+    assert resp.status_code == 204
+    row = repo.get_pending_import(import_id)
+    assert row is not None
+    assert row.import_target == ImportTarget.workspace.value
+    assert row.destination_path == "/workspace/Mystery Pack"

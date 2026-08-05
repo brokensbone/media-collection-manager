@@ -873,6 +873,37 @@ class AlbumRepo:
             )
             session.commit()
 
+    def reclassify_import(
+        self,
+        import_id: int,
+        *,
+        media_kind: MediaKind,
+        import_target: ImportTarget,
+        classification_detail: str | None,
+        destination_path: str | None,
+        state: ImportState,
+    ) -> None:
+        with self._sf() as session:
+            session.execute(
+                update(PendingImport)
+                .where(
+                    PendingImport.id == import_id,
+                    PendingImport.state.in_(
+                        (ImportState.detected, ImportState.queued, ImportState.failed)
+                    ),
+                )
+                .values(
+                    media_kind=media_kind,
+                    import_target=import_target,
+                    classification_detail=classification_detail,
+                    destination_path=destination_path,
+                    state=state,
+                    error_detail=None,
+                    updated_at=func.now(),
+                )
+            )
+            session.commit()
+
     def set_import_match(self, import_id: int, album_id: int) -> None:
         """Point an import row at the album it produced — used after a reverse-match creates an
         owned album, so the row shows that album instead of a stale 'no match'."""

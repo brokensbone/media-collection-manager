@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Imports } from './Imports'
 
 function mockApi(items: unknown) {
-  const fetchMock = vi.fn((_url: string, opts?: { method?: string }) =>
+  const fetchMock = vi.fn((_url: string, opts?: { method?: string; body?: string }) =>
     opts?.method
       ? Promise.resolve({ ok: true })
       : Promise.resolve({ json: () => Promise.resolve(items) }),
@@ -94,6 +94,19 @@ describe('Imports', () => {
     expect(await screen.findByText('needs review')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Import' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Discard' })).toBeTruthy()
+  })
+
+  it('reclassifies a row to workspace', async () => {
+    const fetchMock = mockApi([item({ id: 12, name: 'Mystery Pack', import_target: 'review' })])
+    render(<Imports />)
+    await screen.findByText('Mystery Pack')
+    fireEvent.change(screen.getByRole('combobox', { name: 'Classify Mystery Pack' }), {
+      target: { value: 'workspace' },
+    })
+
+    const posted = fetchMock.mock.calls.find((c) => c[0] === '/imports/12/classify')
+    expect(posted?.[1]?.method).toBe('POST')
+    expect(posted?.[1]?.body).toBe(JSON.stringify({ kind: 'workspace' }))
   })
 
   it('flags a match that is already owned', async () => {

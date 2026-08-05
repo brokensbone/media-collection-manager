@@ -3,8 +3,8 @@ import { useCallback, useEffect, useState } from 'react'
 type Torrent = {
   id: number
   name: string
-  media_kind: 'music' | 'tv' | 'film' | 'unknown'
-  import_target: 'beets' | 'tv' | 'film' | 'review'
+  media_kind: 'music' | 'tv' | 'film' | 'workspace' | 'unknown'
+  import_target: 'beets' | 'tv' | 'film' | 'workspace' | 'review'
   classification_detail: string | null
   destination_path: string | null
   state: string
@@ -109,6 +109,7 @@ function kind(torrent: Torrent): string {
   if (torrent.media_kind === 'music') return 'music'
   if (torrent.media_kind === 'tv') return 'tv'
   if (torrent.media_kind === 'film') return 'film'
+  if (torrent.media_kind === 'workspace') return 'workspace'
   return 'unknown'
 }
 

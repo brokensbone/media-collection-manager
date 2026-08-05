@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { matchesQuery } from './filter'
 import { type ImportItem, dayLabel, labelKind } from './importItem'
+import { ImportReclassify } from './importReclassify'
 
 // The type a row belongs to for the filter bar. Keyed off import_target so the buckets are
 // mutually exclusive and match where the file actually goes: a mixed-season TV pack routed to
 // review shows under Review (needs attention), not TV — so each list is a clean batch to work.
-type ItemType = 'music' | 'tv' | 'film' | 'review'
+type ItemType = 'music' | 'tv' | 'film' | 'workspace' | 'review'
 const TYPE_LABELS: [ItemType, string][] = [
   ['music', 'Music'],
   ['tv', 'TV'],
   ['film', 'Film'],
+  ['workspace', 'Workspace'],
   ['review', 'Review'],
 ]
 
 function itemType(it: ImportItem): ItemType {
   if (it.import_target === 'review') return 'review'
+  if (it.import_target === 'workspace') return 'workspace'
   if (it.import_target === 'tv') return 'tv'
   if (it.import_target === 'film') return 'film'
   return 'music' // beets
@@ -86,7 +89,13 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
   if (!items) return <p>Loading…</p>
 
   const queryFiltered = items.filter((it) => matchesQuery(`${it.name} ${it.matched ?? ''}`, query))
-  const counts: Record<ItemType, number> = { music: 0, tv: 0, film: 0, review: 0 }
+  const counts: Record<ItemType, number> = {
+    music: 0,
+    tv: 0,
+    film: 0,
+    workspace: 0,
+    review: 0,
+  }
   for (const it of queryFiltered) counts[itemType(it)]++
   const present = TYPE_LABELS.filter(([k]) => counts[k] > 0)
   const barTypes = TYPE_LABELS.filter(([k]) => counts[k] > 0 || typeFilter === k)
@@ -129,6 +138,7 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
               {it.matched_owned && <span className="badge">owned</span>}
             </td>
             <td className="nowrap">
+              <ImportReclassify item={it} onChange={refresh} disabled={it.missing} />{' '}
               {it.missing ? (
                 <>
                   <span className="muted">file no longer in watch folder</span>{' '}
