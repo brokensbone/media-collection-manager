@@ -1,8 +1,15 @@
 from fastapi import APIRouter, Request
+from pydantic import BaseModel
+
+from ..models import ImportTarget
 
 from ..imports import DetectResult, ImportItem, ImportsService, WatchdirDetectionService
 
 router = APIRouter(tags=["imports"])
+
+
+class ReclassifyBody(BaseModel):
+    kind: ImportTarget
 
 
 def _service(request: Request) -> ImportsService:
@@ -40,6 +47,18 @@ def scan_imports(request: Request) -> DetectResult:
 @router.post("/imports/{import_id}/import", status_code=204)
 def run_import(import_id: int, request: Request) -> None:
     _service(request).enqueue(import_id)  # queued; the worker imports it in the background
+
+
+@router.post("/imports/{import_id}/classify", status_code=204)
+def reclassify_import(import_id: int, body: ReclassifyBody, request: Request) -> None:
+    settings = request.app.state.settings
+    _service(request).reclassify(
+        import_id,
+        target=body.kind,
+        tv_root=settings.tv_root,
+        film_root=settings.film_root,
+        workspace_root=settings.workspace_root,
+    )
 
 
 @router.delete("/imports/{import_id}", status_code=204)

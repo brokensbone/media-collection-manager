@@ -167,6 +167,7 @@ def build_import_detection_service(
         match_threshold=settings.import_match_threshold,
         tv_root=settings.tv_root,
         film_root=settings.film_root,
+        workspace_root=settings.workspace_root,
         events=WorkerEventLog(session_factory),
     )
 

@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { ImportReclassify } from './importReclassify'
 import { type ImportItem, type ImportState, labelKind, whenLabel } from './importItem'
 
 const STATUS: Record<ImportState, string> = {
@@ -121,6 +122,11 @@ export function Tasks({
               </td>
               <td className="muted nowrap">{whenLabel(it.updated_at)}</td>
               <td className="nowrap">
+                {it.state !== 'imported' && it.state !== 'skipped' && it.state !== 'importing' && (
+                  <>
+                    <ImportReclassify item={it} onChange={refresh} />{' '}
+                  </>
+                )}
                 <span className="muted">{STATUS[it.state]}</span>
                 {it.state === 'failed' && (
                   <>

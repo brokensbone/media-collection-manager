@@ -625,6 +625,73 @@ def test_review_only_video_row_is_blocked_from_enqueue(
     assert repo.get_pending_import(item.id).state == ImportState.detected.value  # type: ignore[union-attr]
 
 
+def test_reclassify_detected_row_to_workspace(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    sf = clean_album_tables
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="Mystery Video Pack",
+        import_target=ImportTarget.review,
+        media_kind=MediaKind.unknown,
+        download_dir="/d",
+        files=["disc1.mkv", "disc2.mkv"],
+        matched_album_id=None,
+    )
+    item = ImportsService(repo=repo).pending()[0]
+
+    ImportsService(repo=repo).reclassify(
+        item.id,
+        target=ImportTarget.workspace,
+        tv_root="/tv",
+        film_root="/film",
+        workspace_root="/workspace",
+    )
+
+    row = repo.get_pending_import(item.id)
+    assert row is not None
+    assert row.media_kind == MediaKind.workspace.value
+    assert row.import_target == ImportTarget.workspace.value
+    assert row.destination_path == "/workspace/Mystery Video Pack"
+    assert row.state == ImportState.detected.value
+
+
+def test_reclassify_queued_row_returns_it_to_detected(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    sf = clean_album_tables
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="The.Matrix.1999.2160p",
+        import_target=ImportTarget.film,
+        media_kind=MediaKind.film,
+        destination_path="/film/The Matrix (1999)",
+        download_dir="/d",
+        files=["The.Matrix.1999.2160p.mkv"],
+        matched_album_id=None,
+    )
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
+
+    ImportsService(repo=repo).reclassify(
+        import_id,
+        target=ImportTarget.workspace,
+        tv_root="/tv",
+        film_root="/film",
+        workspace_root="/workspace",
+    )
+
+    row = repo.get_pending_import(import_id)
+    assert row is not None
+    assert row.state == ImportState.detected.value
+    assert row.import_target == ImportTarget.workspace.value
+    assert row.destination_path == "/workspace/The Matrix 1999"
+
+
 def test_video_import_moves_staged_files_into_destination(
     clean_album_tables: sessionmaker[Session], tmp_path: Path
 ) -> None:
@@ -660,6 +727,42 @@ def test_video_import_moves_staged_files_into_destination(
     target = film_root / "The Matrix (1999)"
     assert (target / "The.Matrix.1999.2160p.mkv").read_text() == "video"
     assert (target / "poster.jpg").read_text() == "art"
+    assert repo.get_pending_import(import_id).state == ImportState.imported.value  # type: ignore[union-attr]
+
+
+def test_workspace_import_moves_staged_files_into_destination(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    sf = clean_album_tables
+    download_dir = tmp_path / "downloads"
+    release_dir = download_dir / "Mystery.Video.Pack"
+    release_dir.mkdir(parents=True)
+    (release_dir / "disc1.mkv").write_text("video")
+    (release_dir / "notes.txt").write_text("note")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    workspace_root = tmp_path / "workspace"
+
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="Mystery Video Pack",
+        import_target=ImportTarget.workspace,
+        media_kind=MediaKind.workspace,
+        destination_path=str(workspace_root / "Mystery Video Pack"),
+        download_dir=str(download_dir),
+        files=["Mystery.Video.Pack/disc1.mkv", "Mystery.Video.Pack/notes.txt"],
+        matched_album_id=None,
+    )
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
+
+    _transmission_runner(repo, RecordingBeetsClient(), str(inbox)).run(import_id)
+
+    target = workspace_root / "Mystery Video Pack"
+    assert (target / "disc1.mkv").read_text() == "video"
+    assert (target / "notes.txt").read_text() == "note"
     assert repo.get_pending_import(import_id).state == ImportState.imported.value  # type: ignore[union-attr]
 
 

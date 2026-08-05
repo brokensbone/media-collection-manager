@@ -142,6 +142,7 @@ class MediaKind(StrEnum):
     music = "music"
     tv = "tv"
     film = "film"
+    workspace = "workspace"
     unknown = "unknown"
 
 
@@ -149,6 +150,7 @@ class ImportTarget(StrEnum):
     beets = "beets"
     tv = "tv"
     film = "film"
+    workspace = "workspace"
     review = "review"
 
 

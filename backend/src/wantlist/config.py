@@ -82,6 +82,7 @@ class Settings(BaseSettings):
     import_process_seconds: int = 30  # how often the worker imports queued acquisitions
     tv_root: str = ""
     film_root: str = ""
+    workspace_root: str = ""
 
     # Watch-dir import (§13, D15). Empty path = disabled. Bandcamp zips / dropped folders are
     # scanned, matched by embedded tags, and one-click imported; the drop is ours, so it's
