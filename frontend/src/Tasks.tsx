@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
-import { ImportReclassify } from './importReclassify'
 import { type ImportItem, type ImportState, labelKind, whenLabel } from './importItem'
+import { ImportReclassify } from './importReclassify'
 
 const STATUS: Record<ImportState, string> = {
   detected: '',

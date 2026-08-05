@@ -767,7 +767,9 @@ def _workspace_classification(
         return Classification(
             media_kind=MediaKind.workspace,
             import_target=ImportTarget.review,
-            classification_detail="Manual override requested workspace, but the workspace root is not configured.",
+            classification_detail=(
+                "Manual override requested workspace, but the workspace root is not configured."
+            ),
             destination_path=None,
             state=ImportState.detected,
         )

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { matchesQuery } from './filter'
-import { ImportReclassify } from './importReclassify'
 import { type ImportItem, dayLabel, labelKind } from './importItem'
+import { ImportReclassify } from './importReclassify'
 
 // The type a row belongs to for the filter bar. Keyed off import_target so the buckets are
 // mutually exclusive and match where the file actually goes: a mixed-season TV pack routed to

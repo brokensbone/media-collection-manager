@@ -1,4 +1,4 @@
-import { type ImportItem } from './importItem'
+import type { ImportItem } from './importItem'
 
 export type ManualImportKind = 'music' | 'tv' | 'film' | 'workspace'
 

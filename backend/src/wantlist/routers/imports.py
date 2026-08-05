@@ -1,9 +1,8 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from ..models import ImportTarget
-
 from ..imports import DetectResult, ImportItem, ImportsService, WatchdirDetectionService
+from ..models import ImportTarget
 
 router = APIRouter(tags=["imports"])
 
