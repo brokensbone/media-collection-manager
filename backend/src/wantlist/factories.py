@@ -137,7 +137,6 @@ def build_decide_service(
     return DecideService(
         repo=AlbumRepo(session_factory),
         clock=SystemClock(),
-        forgotten_days=settings.verdict_forgotten_days,
         snooze_days=settings.verdict_snooze_days,
         listened_tracks=settings.verdict_listened_tracks,
         listened_days=settings.verdict_listened_days,

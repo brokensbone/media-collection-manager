@@ -42,8 +42,7 @@ class Settings(BaseSettings):
     # a hard gate. Tunable.
     crate_soft_cap: int = 50
 
-    # Verdict / Decide (§6a): the "forgotten" (time) and "listened" (play-history) triggers.
-    verdict_forgotten_days: int = 21
+    # Verdict / Decide (§6a): snooze duration, plus the "listened" (play-history) hint thresholds.
     verdict_snooze_days: int = 14
     verdict_listened_tracks: int = 4
     verdict_listened_days: int = 3

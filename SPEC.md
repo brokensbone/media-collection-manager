@@ -122,7 +122,7 @@ via the §6a verdict). Could be one table with a state field, or two — see ope
   - (`acquiring` chosen as a state, not a flag: a single linear field is fewer things to
     look at, and reversibility doesn't distinguish the two.)
 - **Verdict timing fields:** saved-at, verdict-at (null = still awaiting judgement).
-  Drives the 6a "surface saves older than N days with no verdict" query.
+  Drives the 6a "saves with no verdict" queue (every un-snoozed save, oldest first).
 - **Ownership link:** the owned beets album (else null), with a **source**:
   - `auto` — derived by reconcile from a release-group match; recomputed every pass (§5).
   - `manual` — a link I made by hand to a specific beets album; **sticky** — reconcile
@@ -316,26 +316,21 @@ saved album and ask for a verdict: **keep → becomes a want-to-own** / **drop �
 dismissed, don't resurface**. This is the curation gate that turns the firehose into an
 intentional want-list.
 
-Crucially, **don't prompt right after saving** — I haven't heard it yet. Two
-complementary triggers fire the prompt (both powered by the §4a play-history store):
+**REVISED (was two triggers, now drop-in):** every saved album that isn't snoozed shows
+in Decide straight away — new saves just drop in. The original "forgotten" (time-based)
+and "listened" (play-history) *triggers* that gated what surfaced are gone: waiting T
+days before a save appeared meant new stuff got lost, which was the opposite of the
+intent. **Snooze** is the only way to defer a row (push it out N days); otherwise it sits
+in the queue until you give it a verdict.
 
-- **"You've listened" trigger** — the album has accrued enough plays (e.g. ≥N distinct
-  tracks played, or plays spread over ≥M days). Now I can give a real verdict. This is
-  the primary, higher-quality signal.
-- **"You forgot about it" trigger (safety net)** — saved > T days ago with little/no
-  plays. These are the ones that get lost in the stream of new saves. Surface them as
-  *"you saved this and never really played it — give it a spin, or drop it?"* so nothing
-  quietly rots in the backlog.
+The **"listened" signal survives as a non-gating hint**, not a gate: a row shows a small
+*"N plays"* / *"played over Nd"* tag when it has accrued enough plays (≥N distinct tracks,
+or plays spread over ≥M days) so the easy keeps are obvious. It never decides whether the
+row appears.
 
-**DECIDED defaults:** *listened enough* = ≥4 distinct tracks played **or** plays
-spanning ≥3 days; *forgotten* = saved ≥21 days ago with <2 tracks ever played. All
-tunable in config.
-
-**Cold-start note (consequence of polling-only history, §4a):** for the first few weeks
-the "you've listened" trigger has little data, so 6a will fire mostly via the
-time-based "forgotten" trigger. That's fine — the safety net works from day one; the
-smarter listened-based prompting simply switches on as history accumulates. v1 is
-usable throughout.
+**DECIDED defaults:** *listened hint* = ≥4 distinct tracks played **or** plays spanning
+≥3 days; *snooze* = 14 days. All tunable in config. (The old `verdict_forgotten_days`
+tunable is removed.)
 
 ### 6b. "Something new by this artist" — the release watch  *(old `artistwatch.py`, re-keyed)*
 Spotify is genuinely bad at telling me about new releases. Watch artists I care about
@@ -507,12 +502,11 @@ releases → decide → acquire → import.
    flow · **Want** → `wanted` (*also saves*, skips the verdict) · **Dismiss** →
    `dismissed`, don't resurface. (Save/Want are the app's first Spotify *writes* —
    `user-library-modify` scope, §6b.) **Post-v1** — arrives with the §6b increment.
-2. **Decide** — the §6a verdict queue. Albums in `saved` where a 6a trigger has *fired*
-   (listened-enough or forgotten) with no verdict yet. **Shows only what's ready to
-   judge** — the wider saved backlog that hasn't tripped a trigger stays out, by design
-   (don't nag prematurely). Item: artwork, artist/album, *why it surfaced* ("played 5
-   tracks" / "saved 24 days ago, never played"), an open-in-Spotify link. Actions:
-   **Keep** → `wanted` · **Drop** → `dismissed` · **Snooze** (not heard it yet).
+2. **Decide** — the §6a verdict queue. Every album in `saved` with no verdict yet that
+   isn't currently snoozed — new saves drop straight in (no trigger gate), oldest first.
+   Item: artwork, artist/album, an optional *listened* hint ("4 plays" / "played over
+   4d") flagging the easy keeps, and an open-in-Spotify link. Actions:
+   **Keep** → `wanted` · **Drop** → `dismissed` · **Snooze** (defer N days — not heard it yet).
 3. **Acquire** — albums in `wanted`. Item: artwork, artist/album, **Buy on Bandcamp**
    (§7) + fallback links + paste-a-URL; a **Mark as ordered** action that moves it to
    `acquiring` (§4) — dropping it out until reconcile flips it `owned` (cancel-order
@@ -595,7 +589,7 @@ keep/drop/snooze.
 | Identity | MusicBrainz release-group as the spine; 3-tier resolution (barcode → ISRC-cluster → fuzzy). Resolve once at ingest, store the id; reconcile is a deterministic join thereafter (§5). |
 | LLM matching | **Not building it** — the D0 spike showed the unresolved tail is MB-absent, not fuzzy-matchable, so an LLM can't help. Tail handled by manual-match + re-resolve instead (§5, §5a, ROADMAP D17). |
 | Play history | Poll `recently-played` from install; **no** GDPR backfill (accept cold-start, §4a/§6a). |
-| 6a thresholds | listened = ≥4 tracks or ≥3 days; forgotten = ≥21 days & <2 plays. Config-tunable. |
+| 6a behaviour | every un-snoozed save surfaces (no trigger gate); listened *hint* = ≥4 tracks or ≥3 days; snooze = 14 days. Config-tunable. |
 | 6b seed set | Union of kept-album artists **and** followed artists. (Not in v1.) |
 | Spotify auth | Authorization Code (+ client secret). Refresh tokens now expire at **6 months** → web re-auth flow + proactive warning are **v1-critical**; store `spotify_authorized_at` (§8c). |
 | Redirect URI | Config-driven public HTTPS callback, registered per-deployment in the Spotify dashboard; loopback `127.0.0.1` (not `localhost`) for local dev (§8c). |
@@ -614,9 +608,9 @@ keep/drop/snooze.
 Spotify OAuth **with a working re-auth flow** (§8c) → saves ingest → reconcile against
 beets → web list of *saved-but-not-owned*, each with a Buy-on-Bandcamp link **and a
 manual "link to library / mark owned"** (so edition-mismatch and MB-absent albums can
-always reach `owned`, §5) → the **6a verdict prompt** (leaning on the time-based
-"forgotten" trigger early, per the cold-start note). Play-history polling ships in v1
-because 6a's "listened" trigger depends on it, even though it starts quiet.
+always reach `owned`, §5) → the **6a verdict prompt** (every un-snoozed save surfaces).
+Play-history polling ships in v1 because 6a's "listened" hint depends on it, even though
+it starts quiet.
 
 **Explicitly deferred to v2+:** 6b new-release watch, 6c catalogue backfill,
 notifications, GDPR history backfill, any Bandcamp scraping beyond the search URL.
@@ -904,7 +898,7 @@ load-bearing, not optional.
 
 ### Unit tests (the bulk) — pure logic, table-driven
 - state-machine transitions incl. skip/reverse/`dismissed` edges;
-- 6a triggers (listened/forgotten) over fabricated play-history + injected clock + thresholds;
+- 6a queue: every un-snoozed save surfaces; listened hint over fabricated play-history + thresholds;
 - reconcile matching: ISRC clustering, release-group selection, owned-set diff (over fixtures);
 - dedupe (release-group / Spotify id), 6b new-vs-seen diff;
 - Bandcamp URL builder, art-source selection;
@@ -1057,7 +1051,7 @@ app is self-explanatory without re-reading the spec. Built in ROADMAP **D19**.
 - **Covers the whole loop, worklist by worklist:**
   - The funnel in one picture/paragraph: `saved → decide → wanted → acquire → owned`, plus
     where **suggested** (artist-watch) and **dismissed** fit.
-  - **Decide** — what "forgotten" and "listened" triggers mean, and Keep / Drop / Snooze.
+  - **Decide** — every un-snoozed save surfaces; the "listened" hint; Keep / Drop / Snooze.
   - **Acquire** — the Bandcamp buy-assist, Mark ordered, and the manual "mark owned" link
     for edition mismatches / MB-absent albums (why the loop is always closable).
   - **Releases** — new-from-same-artist, Save vs. straight-to-Want.

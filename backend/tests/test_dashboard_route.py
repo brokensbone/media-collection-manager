@@ -44,7 +44,6 @@ def test_dashboard_counts(clean_album_tables: sessionmaker[Session]) -> None:
     app.state.decide_service = DecideService(
         repo=AlbumRepo(sf),
         clock=FrozenClock(NOW),
-        forgotten_days=21,
         snooze_days=14,
         listened_tracks=4,
         listened_days=3,

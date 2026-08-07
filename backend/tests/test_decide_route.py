@@ -31,7 +31,6 @@ def _client(sf: sessionmaker[Session]) -> tuple[TestClient, AlbumRepo]:
     app.state.decide_service = DecideService(
         repo=AlbumRepo(sf),
         clock=FrozenClock(NOW),
-        forgotten_days=21,
         snooze_days=14,
         listened_tracks=4,
         listened_days=3,
@@ -43,7 +42,7 @@ def test_decide_lists_then_keep_clears(clean_album_tables: sessionmaker[Session]
     client, repo = _client(clean_album_tables)
     queue = client.get("/decide").json()
     assert len(queue) == 1
-    assert queue[0]["reason"] == "30d"
+    assert queue[0]["reason"] == ""  # surfaced on save; no plays, so no listened hint
 
     resp = client.post(f"/albums/{queue[0]['id']}/keep")
     assert resp.status_code == 204
