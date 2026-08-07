@@ -15,6 +15,7 @@ class DecideItem:
     reason: str
     has_art: bool
     spotify_id: str | None
+    album_type: str | None
 
 
 class DecideService:
@@ -56,7 +57,13 @@ class DecideService:
             if reason:
                 items.append(
                     DecideItem(
-                        cand.id, cand.artist, cand.title, reason, cand.has_art, cand.spotify_id
+                        cand.id,
+                        cand.artist,
+                        cand.title,
+                        reason,
+                        cand.has_art,
+                        cand.spotify_id,
+                        cand.album_type,
                     )
                 )
         return items

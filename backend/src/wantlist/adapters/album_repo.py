@@ -66,6 +66,7 @@ class SavedCandidate:
     title: str
     saved_at: datetime | None
     has_art: bool
+    album_type: str | None
 
 
 @dataclass
@@ -75,6 +76,7 @@ class AcquireRow:
     title: str
     has_art: bool
     spotify_id: str | None
+    album_type: str | None
 
 
 @dataclass
@@ -84,6 +86,7 @@ class SuggestedRow:
     title: str
     has_art: bool
     spotify_id: str | None
+    album_type: str | None
 
 
 @dataclass
@@ -168,6 +171,7 @@ class AlbumRepo:
         upc: str | None,
         added_at: datetime | None,
         art_url: str | None,
+        album_type: str | None = None,
     ) -> None:
         with self._sf() as session:
             session.add(
@@ -178,6 +182,7 @@ class AlbumRepo:
                     title=title,
                     upc=upc,
                     art_url=art_url,
+                    album_type=album_type,
                     saved_at=added_at,
                     state=AlbumState.saved,
                     provenance=Provenance.spotify_save,
@@ -193,6 +198,7 @@ class AlbumRepo:
         artist_id: str | None,
         title: str,
         art_url: str | None,
+        album_type: str | None = None,
     ) -> None:
         with self._sf() as session:
             session.add(
@@ -202,6 +208,7 @@ class AlbumRepo:
                     artist_id=artist_id,
                     title=title,
                     art_url=art_url,
+                    album_type=album_type,
                     state=AlbumState.suggested,
                     provenance=Provenance.artist_watch,
                 )
@@ -364,7 +371,13 @@ class AlbumRepo:
             has_art = exists().where(AlbumArt.album_id == Album.id)
             rows = session.execute(
                 select(
-                    Album.id, Album.spotify_id, Album.artist, Album.title, Album.saved_at, has_art
+                    Album.id,
+                    Album.spotify_id,
+                    Album.artist,
+                    Album.title,
+                    Album.saved_at,
+                    has_art,
+                    Album.album_type,
                 )
                 .where(
                     Album.state == AlbumState.saved,
@@ -372,7 +385,7 @@ class AlbumRepo:
                 )
                 .order_by(Album.saved_at)
             )
-            return [SavedCandidate(r[0], r[1], r[2], r[3], r[4], r[5]) for r in rows]
+            return [SavedCandidate(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]
 
     def play_stats_by_album(self) -> dict[str, PlayStat]:
         """Per-Spotify-album play stats from the accumulated play history (§4a)."""
@@ -443,11 +456,18 @@ class AlbumRepo:
         with self._sf() as session:
             has_art = exists().where(AlbumArt.album_id == Album.id)
             rows = session.execute(
-                select(Album.id, Album.artist, Album.title, has_art, Album.spotify_id)
+                select(
+                    Album.id,
+                    Album.artist,
+                    Album.title,
+                    has_art,
+                    Album.spotify_id,
+                    Album.album_type,
+                )
                 .where(Album.state == AlbumState.wanted)
                 .order_by(Album.artist, Album.title)
             )
-            return [AcquireRow(r[0], r[1], r[2], r[3], r[4]) for r in rows]
+            return [AcquireRow(r[0], r[1], r[2], r[3], r[4], r[5]) for r in rows]
 
     def mark_owned_manual(self, album_id: int, beets_id: str | None) -> None:
         """A sticky manual ownership link (§4/§5) — reconcile never clobbers it. Closes the
@@ -525,11 +545,18 @@ class AlbumRepo:
         with self._sf() as session:
             has_art = exists().where(AlbumArt.album_id == Album.id)
             rows = session.execute(
-                select(Album.id, Album.artist, Album.title, has_art, Album.spotify_id)
+                select(
+                    Album.id,
+                    Album.artist,
+                    Album.title,
+                    has_art,
+                    Album.spotify_id,
+                    Album.album_type,
+                )
                 .where(Album.state == AlbumState.suggested)
                 .order_by(Album.artist, Album.title)
             )
-            return [SuggestedRow(r[0], r[1], r[2], r[3], r[4]) for r in rows]
+            return [SuggestedRow(r[0], r[1], r[2], r[3], r[4], r[5]) for r in rows]
 
     def seen_album_ids(self) -> set[str]:
         with self._sf() as session:
