@@ -365,8 +365,9 @@ class AlbumRepo:
     # --- verdict / Decide (§6a) ------------------------------------------------------
 
     def saved_pending(self, now: datetime) -> list[SavedCandidate]:
-        """Saved albums awaiting a verdict and not currently snoozed. Trigger evaluation
-        (forgotten/listened) happens in the service against play stats. Oldest first."""
+        """Saved albums awaiting a verdict and not currently snoozed — the full Decide queue.
+        The service tags each with a play-history 'listened' hint but surfaces them all.
+        Oldest first."""
         with self._sf() as session:
             has_art = exists().where(AlbumArt.album_id == Album.id)
             rows = session.execute(

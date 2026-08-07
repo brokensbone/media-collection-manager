@@ -26,7 +26,7 @@ from wantlist.jobs import ingest_once, reconcile_once
 from wantlist.models import Base
 
 OWNED_RGID = "rg-owned-e2e"
-LONG_AGO = "2020-01-01T00:00:00Z"  # so saves are "forgotten" straight away
+LONG_AGO = "2020-01-01T00:00:00Z"  # a fixed save time; Decide surfaces saves regardless of age
 
 
 class _Control:
@@ -174,7 +174,7 @@ def test_full_loop(settings: Settings, stub: tuple[str, _Control]) -> None:
     assert albums["Owned One"]["owned"] is True  # resolved via barcode -> in beets
     assert albums["Want One"]["owned"] is False  # unresolved -> stays
 
-    # 4. verdict: the un-owned save surfaces in Decide (forgotten), keep -> wanted
+    # 4. verdict: the un-owned save surfaces in Decide, keep -> wanted
     decide = client.get("/decide").json()
     assert [d["title"] for d in decide] == ["Want One"]
     want_id = decide[0]["id"]

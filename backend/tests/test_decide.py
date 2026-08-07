@@ -52,7 +52,6 @@ def _svc(sf: sessionmaker[Session]) -> DecideService:
     return DecideService(
         repo=AlbumRepo(sf),
         clock=FrozenClock(NOW),
-        forgotten_days=21,
         snooze_days=14,
         listened_tracks=4,
         listened_days=3,
@@ -63,20 +62,21 @@ def _id(sf: sessionmaker[Session], title: str) -> int:
     return next(a.id for a in AlbumRepo(sf).list_albums() if a.title == title)
 
 
-def test_forgotten_trigger_surfaces_old_saves(clean_album_tables: sessionmaker[Session]) -> None:
+def test_all_saves_surface_oldest_first(clean_album_tables: sessionmaker[Session]) -> None:
     sf = clean_album_tables
     _add(sf, title="old", saved_days_ago=30)
-    _add(sf, title="recent", saved_days_ago=5)  # not old, not played
+    _add(sf, title="recent", saved_days_ago=5)
     queue = _svc(sf).queue()
-    assert [i.title for i in queue] == ["old"]
-    assert queue[0].reason == "30d"
+    # New saves drop straight in — no forgotten wait — oldest first for triage.
+    assert [i.title for i in queue] == ["old", "recent"]
+    assert [i.reason for i in queue] == ["", ""]  # neither has been played
 
 
-def test_listened_trigger_surfaces_recent_but_played(
+def test_listened_hint_flags_played_saves(
     clean_album_tables: sessionmaker[Session],
 ) -> None:
     sf = clean_album_tables
-    _add(sf, title="fresh-but-played", saved_days_ago=5)  # too new for the forgotten trigger
+    _add(sf, title="fresh-but-played", saved_days_ago=5)
     for i in range(4):  # 4 distinct tracks >= listened_tracks
         _play(sf, "fresh-but-played", f"t{i}", days_ago=2)
     queue = _svc(sf).queue()
@@ -84,13 +84,15 @@ def test_listened_trigger_surfaces_recent_but_played(
     assert queue[0].reason == "4 plays"
 
 
-def test_not_surfaced_when_neither_trigger_fires(
+def test_quiet_save_still_surfaces_without_hint(
     clean_album_tables: sessionmaker[Session],
 ) -> None:
     sf = clean_album_tables
     _add(sf, title="quiet", saved_days_ago=5)
-    _play(sf, "quiet", "t0", days_ago=1)  # only 1 track, 1 day
-    assert _svc(sf).queue() == []
+    _play(sf, "quiet", "t0", days_ago=1)  # only 1 track, 1 day — no listened hint
+    queue = _svc(sf).queue()
+    assert [i.title for i in queue] == ["quiet"]
+    assert queue[0].reason == ""
 
 
 def test_snoozed_is_excluded(clean_album_tables: sessionmaker[Session]) -> None:
