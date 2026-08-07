@@ -124,6 +124,7 @@ class HttpxSpotifyApiClient:
             upc=album.get("external_ids", {}).get("upc"),
             added_at=added_at,
             art_url=self._best_image(album.get("images", [])),
+            album_type=album.get("album_type"),
         )
 
     def _best_image(self, images: list[dict[str, Any]]) -> str | None:

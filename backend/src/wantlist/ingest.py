@@ -57,6 +57,7 @@ class IngestService:
                 upc=album.upc,
                 added_at=album.added_at,
                 art_url=album.art_url,
+                album_type=album.album_type,
             )
             existing.add(album.spotify_id)
             added += 1

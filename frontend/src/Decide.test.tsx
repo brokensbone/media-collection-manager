@@ -25,6 +25,15 @@ describe('Decide', () => {
     expect(screen.getByText('30d')).toBeTruthy()
   })
 
+  it('shows the album_type as a badge', async () => {
+    mockApi([
+      { id: 1, artist: 'A', title: 'T1', reason: '30d', has_art: false, album_type: 'compilation' },
+    ])
+    render(<Decide />)
+    await screen.findByText('T1')
+    expect(screen.getByText('compilation')).toBeTruthy()
+  })
+
   it('keeps an item: POSTs and removes it from the queue', async () => {
     const fetchMock = mockApi([{ id: 7, artist: 'A', title: 'Only', reason: 'r', has_art: false }])
     render(<Decide />)

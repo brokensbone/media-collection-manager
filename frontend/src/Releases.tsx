@@ -8,6 +8,7 @@ type Item = {
   title: string
   has_art: boolean
   spotify_id: string | null
+  album_type: string | null
 }
 type Action = 'save' | 'want' | 'dismiss'
 
@@ -50,7 +51,10 @@ export function Releases({ onChange, query = '' }: { onChange?: () => void; quer
           <tr key={it.id}>
             <Cover id={it.id} hasArt={it.has_art} spotifyId={it.spotify_id} />
             <td>{it.artist}</td>
-            <td>{it.title}</td>
+            <td>
+              {it.title}
+              {it.album_type && <span className="badge">{it.album_type}</span>}
+            </td>
             <td className="nowrap">
               <button type="button" onClick={() => act(it.id, 'save')}>
                 Save

@@ -33,6 +33,17 @@ describe('Releases', () => {
     expect(link.target).toBe('_blank')
   })
 
+  it('shows the album_type as a badge, and nothing when null', async () => {
+    mockApi([
+      { id: 1, artist: 'A', title: 'Single One', has_art: false, album_type: 'single' },
+      { id: 2, artist: 'B', title: 'No Type', has_art: false, album_type: null },
+    ])
+    render(<Releases />)
+    await screen.findByText('Single One')
+    expect(screen.getByText('single')).toBeTruthy()
+    expect(screen.queryByText('album')).toBeNull()
+  })
+
   it('want: POSTs and removes the row', async () => {
     const fetchMock = mockApi([{ id: 5, artist: 'B', title: 'Only', has_art: false }])
     render(<Releases />)

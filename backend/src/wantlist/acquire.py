@@ -15,6 +15,7 @@ class AcquireItem:
     possibly_owned: bool  # a same-artist/similar-title edition already sits in beets (§7)
     owned_hint: str | None
     spotify_id: str | None
+    album_type: str | None
 
 
 class AcquireService:
@@ -39,6 +40,7 @@ class AcquireService:
                 possibly_owned=row.id in hints,
                 owned_hint=hints[row.id].owned_hint if row.id in hints else None,
                 spotify_id=row.spotify_id,
+                album_type=row.album_type,
             )
             for row in rows
         ]

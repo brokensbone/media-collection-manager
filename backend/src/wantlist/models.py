@@ -53,6 +53,8 @@ class Album(Base):
     title: Mapped[str]
     upc: Mapped[str | None] = mapped_column(default=None)
     art_url: Mapped[str | None] = mapped_column(default=None)  # source URL; blob in album_art
+    # Spotify's album_type: album / single / compilation
+    album_type: Mapped[str | None] = mapped_column(default=None)
 
     # Failed resolution attempts (§5). Resolution runs least-tried-first, so the MB-absent tail
     # sinks below fresh albums instead of clogging the front of the queue and starving them.
