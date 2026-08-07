@@ -9,6 +9,7 @@ type Item = {
   reason: string
   has_art: boolean
   spotify_id: string | null
+  album_type: string | null
 }
 type Action = 'keep' | 'drop' | 'snooze'
 
@@ -94,7 +95,10 @@ export function Decide({ onChange, query = '' }: { onChange?: () => void; query?
           >
             <Cover id={it.id} hasArt={it.has_art} spotifyId={it.spotify_id} />
             <td>{it.artist}</td>
-            <td>{it.title}</td>
+            <td>
+              {it.title}
+              {it.album_type && <span className="badge">{it.album_type}</span>}
+            </td>
             <td className="nowrap">{it.reason}</td>
             <td className="nowrap">
               <button type="button" onClick={() => act(it.id, 'keep')}>

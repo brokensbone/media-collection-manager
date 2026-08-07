@@ -70,6 +70,13 @@ describe('Acquire', () => {
     expect(screen.queryByText('Untrue')).toBeNull()
   })
 
+  it('shows the album_type as a badge', async () => {
+    mockApi([item({ album_type: 'album' })])
+    render(<Acquire />)
+    await screen.findByText('T1')
+    expect(screen.getByText('album')).toBeTruthy()
+  })
+
   it('flags a possibly-owned want with its hint', async () => {
     mockApi([item({ possibly_owned: true, owned_hint: 'A — T1 (Deluxe)' })])
     render(<Acquire />)

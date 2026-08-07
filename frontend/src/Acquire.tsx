@@ -12,6 +12,7 @@ type Item = {
   possibly_owned: boolean
   owned_hint: string | null
   spotify_id: string | null
+  album_type: string | null
 }
 
 type Candidate = {
@@ -129,6 +130,7 @@ export function Acquire({
               <td>{it.artist}</td>
               <td>
                 {it.title}
+                {it.album_type && <span className="badge">{it.album_type}</span>}
                 {it.possibly_owned && <div className="muted">possibly owned: {it.owned_hint}</div>}
               </td>
               <td>
