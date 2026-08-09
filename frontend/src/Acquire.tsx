@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Cover } from './Cover'
-import { Modal } from './Modal'
 import { matchesQuery } from './filter'
+import { Modal } from './Modal'
 
 type Item = {
   id: number
@@ -44,13 +44,7 @@ const ORPHEUS_PARAMS = {
   searchsubmit: '1',
 }
 
-export function Acquire({
-  onChange,
-  query = '',
-}: {
-  onChange?: () => void
-  query?: string
-}) {
+export function Acquire({ onChange, query = '' }: { onChange?: () => void; query?: string }) {
   const [items, setItems] = useState<Item[] | null>(null)
   const [owning, setOwning] = useState<Item | null>(null) // the album being marked owned
   const [q, setQ] = useState('')

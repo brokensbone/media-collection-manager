@@ -5,7 +5,11 @@ export function Modal({
   title,
   onClose,
   children,
-}: { title: string; onClose: () => void; children: ReactNode }) {
+}: {
+  title: string
+  onClose: () => void
+  children: ReactNode
+}) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()

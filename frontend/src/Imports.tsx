@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { matchesQuery } from './filter'
-import { type ImportItem, dayLabel, labelKind } from './importItem'
+import { dayLabel, type ImportItem, labelKind } from './importItem'
 import { ImportReclassify } from './importReclassify'
 
 // The type a row belongs to for the filter bar. Keyed off import_target so the buckets are

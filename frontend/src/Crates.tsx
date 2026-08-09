@@ -76,7 +76,6 @@ export function Crates() {
       .catch(() => setView(null))
   }, [boxId])
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: load already closes over boxId
   useEffect(load, [load])
 
   // Post a mutation, surface any rejection (e.g. a blocked delete), then reload the view.

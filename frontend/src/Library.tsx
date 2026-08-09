@@ -16,7 +16,11 @@ export function Library({
   state,
   refreshKey = 0,
   query = '',
-}: { state?: string; refreshKey?: number; query?: string }) {
+}: {
+  state?: string
+  refreshKey?: number
+  query?: string
+}) {
   const [albums, setAlbums] = useState<Album[] | null>(null)
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey is a manual refetch trigger

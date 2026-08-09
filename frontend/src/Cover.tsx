@@ -5,7 +5,11 @@ export function Cover({
   id,
   hasArt,
   spotifyId,
-}: { id: number; hasArt: boolean; spotifyId?: string | null }) {
+}: {
+  id: number
+  hasArt: boolean
+  spotifyId?: string | null
+}) {
   const img = hasArt ? (
     <img className="cover" src={`/art/${id}`} alt="" loading="lazy" />
   ) : (

@@ -108,8 +108,11 @@ describe('Acquire', () => {
     await screen.findByText(/Nothing to acquire/)
 
     const posted = fetchMock.mock.calls.find((c) => c[1]?.method === 'POST')
+    expect(posted).toBeDefined()
     expect(posted?.[0]).toBe('/albums/9/mark-owned')
-    expect(JSON.parse((posted?.[1] as { body: string }).body)).toEqual({
+    const postedBody = posted?.[1]
+    expect(postedBody).toBeDefined()
+    expect(JSON.parse((postedBody as { body: string }).body)).toEqual({
       beets_id: 'b7',
     })
   })
@@ -126,8 +129,11 @@ describe('Acquire', () => {
     await screen.findByText(/Nothing to acquire/)
 
     const posted = fetchMock.mock.calls.find((c) => c[1]?.method === 'POST')
+    expect(posted).toBeDefined()
     expect(posted?.[0]).toBe('/albums/9/mark-owned')
-    expect(JSON.parse((posted?.[1] as { body: string }).body)).toEqual({
+    const postedBody = posted?.[1]
+    expect(postedBody).toBeDefined()
+    expect(JSON.parse((postedBody as { body: string }).body)).toEqual({
       beets_id: null,
     })
   })
