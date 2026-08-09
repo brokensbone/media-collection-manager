@@ -11,7 +11,7 @@ dependencies = [
     "alembic>=1.19.1",
     "psycopg[binary]>=3.2",
     "apscheduler>=3.10",
-    "beets>=2.12",
+    "beets>=2.13",
     "httpx>=0.27",  # runtime: art fetch + Spotify/MusicBrainz/Transmission adapters
 ]
 
