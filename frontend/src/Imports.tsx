@@ -137,32 +137,38 @@ export function Imports({ onChange, query = '' }: { onChange?: () => void; query
               {it.matched ?? <span className="muted">no match</span>}
               {it.matched_owned && <span className="badge">owned</span>}
             </td>
-            <td className="nowrap">
-              <ImportReclassify item={it} onChange={refresh} disabled={it.missing} />{' '}
-              {it.missing ? (
-                <>
-                  <span className="muted">file no longer in watch folder</span>{' '}
-                  <button type="button" onClick={() => act(it.id, 'DELETE')}>
-                    Discard
-                  </button>
-                </>
-              ) : it.import_target === 'review' ? (
-                <>
-                  <span className="muted">needs review</span>{' '}
-                  <button type="button" onClick={() => act(it.id, 'DELETE')}>
-                    Discard
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button type="button" onClick={() => act(it.id, 'POST')}>
-                    Import
-                  </button>{' '}
-                  <button type="button" onClick={() => act(it.id, 'DELETE')}>
-                    Discard
-                  </button>
-                </>
-              )}
+            <td>
+              <div className="import-actions">
+                <ImportReclassify item={it} onChange={refresh} disabled={it.missing} />
+                {it.missing ? (
+                  <>
+                    <div className="import-status muted">file no longer in watch folder</div>
+                    <div className="import-action-buttons">
+                      <button type="button" onClick={() => act(it.id, 'DELETE')}>
+                        Discard
+                      </button>
+                    </div>
+                  </>
+                ) : it.import_target === 'review' ? (
+                  <>
+                    <div className="import-status muted">needs review</div>
+                    <div className="import-action-buttons">
+                      <button type="button" onClick={() => act(it.id, 'DELETE')}>
+                        Discard
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="import-action-buttons">
+                    <button type="button" onClick={() => act(it.id, 'POST')}>
+                      Import
+                    </button>
+                    <button type="button" onClick={() => act(it.id, 'DELETE')}>
+                      Discard
+                    </button>
+                  </div>
+                )}
+              </div>
             </td>
           </tr>
         ))}

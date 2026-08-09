@@ -265,6 +265,28 @@ button:disabled:hover {
   width: 100%;
   margin-right: 0;
 }
+.import-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.import-actions select {
+  width: 100%;
+  min-width: 0;
+}
+.import-status {
+  line-height: 1.35;
+  white-space: normal;
+}
+.import-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.import-action-buttons button {
+  margin-right: 0;
+}
 a {
   color: var(--accent);
 }
