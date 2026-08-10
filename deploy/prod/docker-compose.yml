@@ -20,6 +20,9 @@ x-app: &app
   environment:
     WANTLIST_STATIC_DIR: /app/frontend-dist  # api serves the SPA; worker ignores it
     BEETSDIR: ${WANTLIST_BEETS_DIR}  # beets reads config.yaml + library from here
+  # Local to blink (not in the repo compose): keep worker/init off Traefik; only api is proxied.
+  labels:
+    traefik.enable: "false"
   restart: unless-stopped
   volumes:
     # Beets library, mounted at the SAME absolute path host<->container so library.db paths
@@ -31,7 +34,14 @@ x-app: &app
     - ${WANTLIST_WATCHDIR_PATH}:${WANTLIST_WATCHDIR_PATH}
     # Transmission auto-land (§12): give rsync the seedbox SSH key. Uncomment and set
     # WANTLIST_TRANSMISSION_SSH_KEY=/keys/id in .env once you wire up Transmission.
-    # - ${WANTLIST_SSH_KEY}:/keys/id:ro
+    - ${WANTLIST_SSH_KEY}:/keys/id:ro
+    # TV/film import destinations (Jellyfin's libraries on /mnt/redhdd). Mounted rw at the SAME
+    # absolute path host<->container so the classifier's destination_path (built from tv_root/
+    # film_root) is valid both inside the worker and on disk. The worker runs as root, so it can
+    # write regardless of the media dirs' ownership.
+    - ${WANTLIST_TV_ROOT}:${WANTLIST_TV_ROOT}
+    - ${WANTLIST_FILM_ROOT}:${WANTLIST_FILM_ROOT}
+    - ${WANTLIST_WORKSPACE_ROOT}:${WANTLIST_WORKSPACE_ROOT}
 
 services:
   # One-shot: apply migrations against the partridge database before api/worker start. The real
@@ -43,10 +53,16 @@ services:
 
   api:
     <<: *app
-    # Bound to localhost; blink's reverse proxy terminates TLS and forwards to it. Change the
-    # bind address if the proxy reaches it another way.
-    ports:
-      - "127.0.0.1:8000:8000"
+    # blink local: Traefik discovers Docker labels and proxies over its own Docker network,
+    # terminating TLS for wantlist.b.alcachofa.faith. (Repo compose binds 127.0.0.1:8000 instead.)
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: docker_default
+      traefik.http.routers.wantlist.rule: Host(`wantlist.b.alcachofa.faith`)
+      traefik.http.services.wantlist.loadbalancer.server.port: "8000"
+    networks:
+      - default
+      - traefik
     depends_on:
       init:
         condition: service_completed_successfully
@@ -57,3 +73,8 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
+
+networks:
+  traefik:
+    external: true
+    name: docker_default
