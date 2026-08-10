@@ -7,12 +7,14 @@ HOST=blink
 KEY="${ONWARD_SSH_KEY:?dispatcher must set ONWARD_SSH_KEY}"
 
 rc=0
-echo "==> rebuilding wantlist on ${h}"
+echo "==> rebuilding wantlist on ${HOST}"
+# Quote the whole remote command so git/docker run on blink, not here on fourth.
 if ssh -i "${KEY}" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
-     "edward@${h}.int.alcachofa.faith" cd ~/deploy/untitled-musical-project/deploy/prod && git pull && docker compose up --build; then
-  echo "    ${h} ok"
+     "edward@${HOST}.int.alcachofa.faith" \
+     "cd develop/untitled-music-project/deploy/prod && git pull --ff-only && docker compose build worker api && docker compose up -d"; then
+  echo "    ${HOST} ok"
 else
-  echo "    ${h} FAILED" >&2
+  echo "    ${HOST} FAILED" >&2
   rc=1
 fi
 exit "${rc}"
