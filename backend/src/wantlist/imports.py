@@ -1,4 +1,6 @@
+import errno
 import logging
+import os
 import re
 import shutil
 import traceback
@@ -954,7 +956,24 @@ def _move_into(source: Path, dest: Path) -> int:
             pass
         return moved
     if dest.exists():
-        return 0  # already in the library — skip, don't overwrite
+        if source.stat().st_size == dest.stat().st_size:
+            return 0  # already in the library — skip, don't overwrite
+        raise FileExistsError(
+            f"destination exists with a different size: {dest} "
+            f"(source={source.stat().st_size}, destination={dest.stat().st_size})"
+        )
     dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(source), str(dest))
+    try:
+        os.rename(source, dest)
+    except OSError as exc:
+        if exc.errno != errno.EXDEV:
+            raise
+        tmp = dest.with_name(f".{dest.name}.tmp-{os.getpid()}")
+        try:
+            shutil.copy2(source, tmp)
+            os.replace(tmp, dest)
+            source.unlink()
+        except Exception:
+            tmp.unlink(missing_ok=True)
+            raise
     return 1

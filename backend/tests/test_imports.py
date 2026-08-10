@@ -1,3 +1,6 @@
+import errno
+import os
+import shutil
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -15,6 +18,7 @@ from wantlist.imports import (
     VideoLibraryImporter,
     WatchdirStager,
     _classify_torrent,
+    _move_into,
 )
 from wantlist.models import (
     Album,
@@ -852,6 +856,75 @@ def test_video_reimport_skips_when_all_files_already_present(
 
     assert (target / "The.Matrix.1999.2160p.mkv").read_text() == "already here"  # not overwritten
     assert repo.get_pending_import(import_id).state == ImportState.skipped.value  # type: ignore[union-attr]
+
+
+def test_video_reimport_fails_when_destination_file_size_differs(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    sf = clean_album_tables
+    download_dir = tmp_path / "downloads"
+    release_dir = download_dir / "Supervixens.1975"
+    release_dir.mkdir(parents=True)
+    (release_dir / "Supervixens.1975.mkv").write_text("complete source")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    target = tmp_path / "workspace" / "Supervixens 1975"
+    target.mkdir(parents=True)
+    (target / "Supervixens.1975.mkv").write_text("partial")
+
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="Supervixens 1975",
+        import_target=ImportTarget.workspace,
+        media_kind=MediaKind.workspace,
+        destination_path=str(target),
+        download_dir=str(download_dir),
+        files=["Supervixens.1975/Supervixens.1975.mkv"],
+        matched_album_id=None,
+    )
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
+
+    ImportRunner(
+        repo=repo,
+        stagers={ImportSource.transmission: TransmissionStager(FakeFileTransfer())},
+        beets=RecordingBeetsClient(),
+        video=VideoLibraryImporter(),
+        inbox=str(inbox),
+    ).run_queued()
+
+    row = repo.get_pending_import(import_id)
+    assert row is not None
+    assert row.state == ImportState.failed.value
+    assert "different size" in (row.error_detail or "")
+    assert (target / "Supervixens.1975.mkv").read_text() == "partial"
+
+
+def test_video_cross_device_copy_failure_does_not_publish_partial_destination(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.mkv"
+    source.write_text("complete source")
+    dest = tmp_path / "dest" / "source.mkv"
+
+    def fake_rename(src: os.PathLike[str], dst: os.PathLike[str]) -> None:
+        raise OSError(errno.EXDEV, "Invalid cross-device link", src, dst)
+
+    def fake_copy2(src: os.PathLike[str], dst: os.PathLike[str]) -> None:
+        Path(dst).write_text("partial")
+        raise OSError(errno.EIO, "Input/output error", src, dst)
+
+    monkeypatch.setattr(os, "rename", fake_rename)
+    monkeypatch.setattr(shutil, "copy2", fake_copy2)
+
+    with pytest.raises(OSError, match="Input/output error"):
+        _move_into(source, dest)
+
+    assert not dest.exists()
+    assert not list(dest.parent.glob(".*.tmp-*"))
+    assert source.read_text() == "complete source"
 
 
 def test_import_views_split_into_pending_tasks_and_archive(
