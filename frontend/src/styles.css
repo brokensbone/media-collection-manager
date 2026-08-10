@@ -136,6 +136,9 @@ col.c-source {
 col.c-matched {
 	width: 260px;
 }
+col.c-task-actions {
+	width: 340px;
+}
 col.c-link {
 	width: 100px;
 }
@@ -449,6 +452,49 @@ a {
 	font-weight: 500;
 	margin: 16px 0 4px;
 	color: var(--text);
+}
+.tasks-table td {
+	min-width: 0;
+}
+.tasks-table td:nth-child(2) {
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+.task-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 4px 6px;
+	min-width: 0;
+}
+.task-actions select {
+	max-width: 100%;
+}
+.task-actions button,
+.task-actions select {
+	flex: 0 1 auto;
+}
+.task-actions .muted {
+	white-space: nowrap;
+}
+@media (max-width: 780px) {
+	col.c-task-actions {
+		width: 150px;
+	}
+	.tasks-table col.c-source {
+		width: 76px;
+	}
+	.tasks-table col.c-when {
+		width: 72px;
+	}
+	.task-actions {
+		justify-content: flex-start;
+	}
+	.task-actions button,
+	.task-actions select {
+		width: 100%;
+	}
 }
 
 /* Expanded failure log under a failed import row (click "Log"). */

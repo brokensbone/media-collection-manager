@@ -115,12 +115,12 @@ export function Tasks({
 		: items;
 
 	const rows = (list: ImportItem[]) => (
-		<table className="mobile-card-table">
+		<table className="mobile-card-table tasks-table">
 			<colgroup>
 				<col className="c-source" />
 				<col />
 				<col className="c-when" />
-				<col className="c-actions3" />
+				<col className="c-task-actions" />
 			</colgroup>
 			<tbody>
 				{list.map((it) => (
@@ -138,31 +138,33 @@ export function Tasks({
 								)}
 							</td>
 							<td className="muted nowrap">{whenLabel(it.updated_at)}</td>
-							<td className="nowrap row-actions">
-								{it.state !== "imported" &&
-									it.state !== "skipped" &&
-									it.state !== "importing" && (
+							<td className="row-actions">
+								<div className="task-actions">
+									{it.state !== "imported" &&
+										it.state !== "skipped" &&
+										it.state !== "importing" && (
+											<ImportReclassify item={it} onChange={refresh} />
+										)}
+									<span className="muted">{STATUS[it.state]}</span>
+									{it.state === "failed" && (
 										<>
-											<ImportReclassify item={it} onChange={refresh} />{" "}
+											{it.error_detail && (
+												<button type="button" onClick={() => toggleLog(it.id)}>
+													{openLog === it.id ? "Hide log" : "Log"}
+												</button>
+											)}
+											<button type="button" onClick={() => act(it.id, "POST")}>
+												Retry
+											</button>
+											<button
+												type="button"
+												onClick={() => act(it.id, "DELETE")}
+											>
+												Discard
+											</button>
 										</>
 									)}
-								<span className="muted">{STATUS[it.state]}</span>
-								{it.state === "failed" && (
-									<>
-										{" "}
-										{it.error_detail && (
-											<button type="button" onClick={() => toggleLog(it.id)}>
-												{openLog === it.id ? "Hide log" : "Log"}
-											</button>
-										)}{" "}
-										<button type="button" onClick={() => act(it.id, "POST")}>
-											Retry
-										</button>{" "}
-										<button type="button" onClick={() => act(it.id, "DELETE")}>
-											Discard
-										</button>
-									</>
-								)}
+								</div>
 							</td>
 						</tr>
 						{openLog === it.id && it.error_detail && (

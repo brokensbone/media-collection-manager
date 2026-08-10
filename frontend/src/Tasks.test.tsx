@@ -88,6 +88,29 @@ describe("Tasks", () => {
 		expect(posted?.[0]).toBe("/imports/5/import");
 	});
 
+	it("keeps task controls in a wrapping action cell", async () => {
+		mockApi([
+			item({
+				id: 5,
+				name: "Supervixens.1975.1080p.BluRay.FLAC.2.0.x264-DON.mkv",
+				state: "failed",
+				destination_path: "/mnt/redhdd/workspace/Supervixens 1975",
+				error_detail:
+					"OSError: /mnt/ssd4tb/partial/record-library/stage/2334/Supervixens.1975.1080p.BluRay.FLAC.2.0.x264-DON.mkv",
+			}),
+		]);
+		const { container } = render(<Tasks />);
+		await screen.findByText("failed");
+
+		expect(container.querySelector("table.tasks-table")).toBeTruthy();
+		expect(container.querySelector("col.c-task-actions")).toBeTruthy();
+		expect(
+			screen
+				.getByRole("button", { name: "Retry" })
+				.parentElement?.classList.contains("task-actions"),
+		).toBe(true);
+	});
+
 	it("lets a queued task be reclassified", async () => {
 		const fetchMock = mockApi([item({ id: 6, name: "Pack", state: "queued" })]);
 		render(<Tasks />);
