@@ -1,0 +1,39 @@
+name: deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-lab
+  cancel-in-progress: false
+
+jobs:
+  blink-relaunch:
+    name: blink-relaunch
+    runs-on: ubuntu-latest
+    steps:
+      - name: tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          ping: fourth.ts.alcachofa.faith
+
+      - name: install ssh key
+        run: |
+          install -d -m 0700 ~/.ssh
+          printf '%s\n' "${{ secrets.FOURTH_DEPLOY_SSH_KEY }}" > ~/.ssh/deploy
+          chmod 0600 ~/.ssh/deploy
+
+      - name: trigger blink-relaunch on the orchestrator
+        run: |
+          ssh \
+            -i ~/.ssh/deploy \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=accept-new \
+            deploy@fourth.ts.alcachofa.faith \
+            blink-relaunch
