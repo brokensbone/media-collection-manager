@@ -87,7 +87,7 @@ export function Decide({
 	const cur = Math.min(sel, shown.length - 1);
 
 	return (
-		<table>
+		<table className="mobile-card-table">
 			<colgroup>
 				<col className="c-cover" />
 				<col className="c-artist" />
@@ -118,7 +118,7 @@ export function Decide({
 							{it.album_type && <span className="badge">{it.album_type}</span>}
 						</td>
 						<td className="nowrap">{it.reason}</td>
-						<td className="nowrap">
+						<td className="nowrap row-actions">
 							<button type="button" onClick={() => act(it.id, "keep")}>
 								Keep
 							</button>

@@ -119,7 +119,7 @@ export function Acquire({
 
 	return (
 		<>
-			<table>
+			<table className="mobile-card-table">
 				<colgroup>
 					<col className="c-cover" />
 					<col className="c-artist acquire-artist-col" />
