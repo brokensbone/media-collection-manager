@@ -49,7 +49,7 @@ export function Releases({
 	);
 
 	return (
-		<table>
+		<table className="mobile-card-table">
 			<colgroup>
 				<col className="c-cover" />
 				<col className="c-artist" />
@@ -65,7 +65,7 @@ export function Releases({
 							{it.title}
 							{it.album_type && <span className="badge">{it.album_type}</span>}
 						</td>
-						<td className="nowrap">
+						<td className="nowrap row-actions">
 							<button type="button" onClick={() => act(it.id, "save")}>
 								Save
 							</button>

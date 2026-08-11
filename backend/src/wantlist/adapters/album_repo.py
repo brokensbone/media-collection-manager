@@ -141,6 +141,7 @@ class ImportRecord:
     archive_path: str | None
     destination_path: str | None
     matched_album_id: int | None
+    error_detail: str | None
     state: str
 
 
@@ -877,6 +878,7 @@ class AlbumRepo:
                 archive_path=row.archive_path,
                 destination_path=row.destination_path,
                 matched_album_id=row.matched_album_id,
+                error_detail=row.error_detail,
                 state=row.state.value,
             )
 

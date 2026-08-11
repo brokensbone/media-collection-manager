@@ -85,7 +85,7 @@ export function Owned({
 	);
 
 	return (
-		<table>
+		<table className="mobile-card-table">
 			<colgroup>
 				<col className="c-cover" />
 				<col className="c-artist" />

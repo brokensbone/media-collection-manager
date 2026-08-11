@@ -115,7 +115,7 @@ export function Tasks({
 		: items;
 
 	const rows = (list: ImportItem[]) => (
-		<table>
+		<table className="mobile-card-table">
 			<colgroup>
 				<col className="c-source" />
 				<col />
@@ -138,7 +138,7 @@ export function Tasks({
 								)}
 							</td>
 							<td className="muted nowrap">{whenLabel(it.updated_at)}</td>
-							<td className="nowrap">
+							<td className="nowrap row-actions">
 								{it.state !== "imported" &&
 									it.state !== "skipped" &&
 									it.state !== "importing" && (

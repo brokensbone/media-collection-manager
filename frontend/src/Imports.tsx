@@ -135,7 +135,7 @@ export function Imports({
 	}
 
 	const table = (rows: ImportItem[]) => (
-		<table>
+		<table className="mobile-card-table">
 			<colgroup>
 				<col className="c-source" />
 				<col />

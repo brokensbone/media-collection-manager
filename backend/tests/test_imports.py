@@ -828,7 +828,7 @@ def test_video_reimport_skips_when_all_files_already_present(
     inbox.mkdir()
     target = tmp_path / "film" / "The Matrix (1999)"
     target.mkdir(parents=True)
-    (target / "The.Matrix.1999.2160p.mkv").write_text("already here")  # pre-existing
+    (target / "The.Matrix.1999.2160p.mkv").write_text("old copy")  # same size: already imported
 
     repo = AlbumRepo(sf)
     repo.add_pending_import(
@@ -854,7 +854,7 @@ def test_video_reimport_skips_when_all_files_already_present(
         catalog=beets,
     ).run(import_id)
 
-    assert (target / "The.Matrix.1999.2160p.mkv").read_text() == "already here"  # not overwritten
+    assert (target / "The.Matrix.1999.2160p.mkv").read_text() == "old copy"  # not overwritten
     assert repo.get_pending_import(import_id).state == ImportState.skipped.value  # type: ignore[union-attr]
 
 
