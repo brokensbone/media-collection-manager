@@ -14,6 +14,7 @@ from .factories import (
     build_decide_service,
     build_library_assist_service,
     build_releases_service,
+    build_torrent_submission_service,
     build_transmission_service,
     build_watchdir_detection_service,
 )
@@ -53,6 +54,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings, session_factory
     )
     app.state.transmission_service = build_transmission_service(settings, session_factory)
+    app.state.torrent_submission_service = build_torrent_submission_service(settings)
     app.state.metrics_service = MetricsService(
         repo=AlbumRepo(session_factory),
         auth=build_auth_service(settings, session_factory),

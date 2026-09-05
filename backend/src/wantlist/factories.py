@@ -38,6 +38,7 @@ from .reconcile import OwnershipReconciler
 from .releases import ReleasesService
 from .resolution import ResolutionService
 from .reverse_match import ReverseMatcher
+from .torrent_submission_service import TorrentSubmissionService
 from .transmission_service import TransmissionService
 
 
@@ -190,6 +191,17 @@ def build_transmission_service(
         ),
         api_configured=bool(settings.transmission_rpc_url),
         ssh_configured=bool(settings.transmission_ssh_host),
+    )
+
+
+def build_torrent_submission_service(settings: Settings) -> TorrentSubmissionService:
+    return TorrentSubmissionService(
+        uploader=HttpxTransmissionClient(
+            rpc_url=settings.transmission_rpc_url,
+            user=settings.transmission_user,
+            password=settings.transmission_password,
+        ),
+        api_configured=bool(settings.transmission_rpc_url),
     )
 
 

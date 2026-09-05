@@ -3,7 +3,10 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from .adapters.album_repo import AlbumRepo, TransmissionRow
-from .ports.transmission import TransmissionClient
+
+
+class _Pingable(Protocol):
+    def ping(self) -> None: ...
 
 
 class _Testable(Protocol):
@@ -31,7 +34,7 @@ class TransmissionService:
         self,
         *,
         repo: AlbumRepo,
-        client: TransmissionClient,
+        client: _Pingable,
         transfer: _Testable,
         api_configured: bool,
         ssh_configured: bool,
@@ -44,11 +47,6 @@ class TransmissionService:
 
     def torrents(self) -> list[TransmissionRow]:
         return self._repo.transmission_ledger()
-
-    def add_torrent(self, metainfo: bytes) -> None:
-        if not self._api_configured:
-            raise RuntimeError("Transmission RPC is not configured.")
-        self._client.add_torrent(metainfo)
 
     def test(self) -> ConnectionReport:
         return ConnectionReport(api=self._test_api(), ssh=self._test_ssh())

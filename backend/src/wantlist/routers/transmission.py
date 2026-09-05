@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from ..adapters.album_repo import TransmissionRow
+from ..torrent_submission_service import TorrentSubmissionService
 from ..transmission_service import ConnectionReport, TransmissionService
 
 router = APIRouter(prefix="/transmission", tags=["transmission"])
@@ -11,6 +12,10 @@ router = APIRouter(prefix="/transmission", tags=["transmission"])
 
 def _service(request: Request) -> TransmissionService:
     return request.app.state.transmission_service  # type: ignore[no-any-return]
+
+
+def _submission_service(request: Request) -> TorrentSubmissionService:
+    return request.app.state.torrent_submission_service  # type: ignore[no-any-return]
 
 
 @router.get("/torrents")
@@ -36,7 +41,7 @@ async def add_torrent(
 
     try:
         for metainfo in metainfos:
-            _service(request).add_torrent(metainfo)
+            _submission_service(request).submit(metainfo)
     except Exception as e:
         raise HTTPException(
             status_code=502, detail=f"Transmission rejected the torrent: {e}"

@@ -4,18 +4,18 @@ from wantlist.app import create_app
 from wantlist.config import Settings
 
 
-class _TransmissionService:
+class _TorrentSubmissionService:
     def __init__(self) -> None:
         self.added: list[bytes] = []
 
-    def add_torrent(self, metainfo: bytes) -> None:
+    def submit(self, metainfo: bytes) -> None:
         self.added.append(metainfo)
 
 
-def _client() -> tuple[TestClient, _TransmissionService]:
+def _client() -> tuple[TestClient, _TorrentSubmissionService]:
     app = create_app(Settings())
-    service = _TransmissionService()
-    app.state.transmission_service = service
+    service = _TorrentSubmissionService()
+    app.state.torrent_submission_service = service
     return TestClient(app), service
 
 
