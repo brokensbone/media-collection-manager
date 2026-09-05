@@ -13,6 +13,7 @@ dependencies = [
     "apscheduler>=3.10",
     "beets>=2.13",
     "httpx>=0.27",  # runtime: art fetch + Spotify/MusicBrainz/Transmission adapters
+    "python-multipart>=0.0.20",  # multipart parsing for torrent-file uploads
 ]
 
 [dependency-groups]

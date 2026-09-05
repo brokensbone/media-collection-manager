@@ -19,6 +19,9 @@ export function Transmission() {
 	const [torrents, setTorrents] = useState<Torrent[] | null>(null);
 	const [report, setReport] = useState<TestReport | null>(null);
 	const [testing, setTesting] = useState(false);
+	const [torrentFiles, setTorrentFiles] = useState<File[]>([]);
+	const [uploading, setUploading] = useState(false);
+	const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
 	useEffect(() => {
 		fetch("/transmission/torrents")
@@ -37,6 +40,30 @@ export function Transmission() {
 			.finally(() => setTesting(false));
 	}, []);
 
+	const uploadTorrent = useCallback(async () => {
+		if (torrentFiles.length === 0) return;
+		setUploading(true);
+		setUploadStatus(null);
+		const form = new FormData();
+		for (const torrentFile of torrentFiles) form.append("files", torrentFile);
+		try {
+			const response = await fetch("/transmission/torrents", {
+				method: "POST",
+				body: form,
+			});
+			const body = (await response.json()) as { detail?: string };
+			if (!response.ok) throw new Error(body.detail ?? "Upload failed.");
+			setUploadStatus(body.detail ?? "Torrents added to Transmission.");
+			setTorrentFiles([]);
+		} catch (error) {
+			setUploadStatus(
+				error instanceof Error ? error.message : "Upload failed.",
+			);
+		} finally {
+			setUploading(false);
+		}
+	}, [torrentFiles]);
+
 	return (
 		<>
 			<section>
@@ -53,6 +80,33 @@ export function Transmission() {
 						<CheckLine label="SSH" check={report.ssh} />
 					</div>
 				)}
+			</section>
+
+			<section>
+				<h2>Add torrent</h2>
+				<p className="muted">
+					Upload one or more .torrent files to start their downloads in
+					Transmission.
+				</p>
+				<div className="torrent-upload">
+					<input
+						aria-label="Upload a .torrent file"
+						type="file"
+						accept=".torrent,application/x-bittorrent"
+						multiple
+						onChange={(event) =>
+							setTorrentFiles(Array.from(event.target.files ?? []))
+						}
+					/>
+					<button
+						type="button"
+						onClick={uploadTorrent}
+						disabled={torrentFiles.length === 0 || uploading}
+					>
+						{uploading ? "Adding…" : "Start download"}
+					</button>
+				</div>
+				{uploadStatus && <p className="upload-status">{uploadStatus}</p>}
 			</section>
 
 			<section>
