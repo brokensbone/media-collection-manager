@@ -3,12 +3,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from .adapters.album_repo import AlbumRepo, TransmissionRow
-
-
-class _Pingable(Protocol):
-    def ping(self) -> None: ...
-
-    def add_torrent(self, metainfo: bytes) -> None: ...
+from .ports.transmission import TransmissionClient
 
 
 class _Testable(Protocol):
@@ -36,7 +31,7 @@ class TransmissionService:
         self,
         *,
         repo: AlbumRepo,
-        client: _Pingable,
+        client: TransmissionClient,
         transfer: _Testable,
         api_configured: bool,
         ssh_configured: bool,
