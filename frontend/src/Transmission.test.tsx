@@ -75,4 +75,30 @@ describe("Transmission", () => {
 		);
 		expect(screen.getByText(/Permission denied/)).toBeTruthy();
 	});
+
+	it("uploads a torrent file to start a download", async () => {
+		const fetchMock = vi.fn((url: string, opts?: RequestInit) => {
+			if (url === "/transmission/torrents" && opts?.method === "POST") {
+				return Promise.resolve({
+					ok: true,
+					json: () =>
+						Promise.resolve({ detail: "Torrent added to Transmission." }),
+				});
+			}
+			return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		render(<Transmission />);
+
+		const input = screen.getByLabelText(/upload a .torrent file/i);
+		fireEvent.change(input, {
+			target: { files: [new File(["torrent"], "album.torrent")] },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Start download" }));
+
+		await screen.findByText("Torrent added to Transmission.");
+		const posted = fetchMock.mock.calls.find((c) => c[1]?.method === "POST");
+		expect(posted?.[0]).toBe("/transmission/torrents");
+		expect(posted?.[1]?.body).toBeInstanceOf(FormData);
+	});
 });

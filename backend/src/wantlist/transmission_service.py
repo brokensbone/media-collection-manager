@@ -8,6 +8,8 @@ from .adapters.album_repo import AlbumRepo, TransmissionRow
 class _Pingable(Protocol):
     def ping(self) -> None: ...
 
+    def add_torrent(self, metainfo: bytes) -> None: ...
+
 
 class _Testable(Protocol):
     def test(self) -> None: ...
@@ -47,6 +49,11 @@ class TransmissionService:
 
     def torrents(self) -> list[TransmissionRow]:
         return self._repo.transmission_ledger()
+
+    def add_torrent(self, metainfo: bytes) -> None:
+        if not self._api_configured:
+            raise RuntimeError("Transmission RPC is not configured.")
+        self._client.add_torrent(metainfo)
 
     def test(self) -> ConnectionReport:
         return ConnectionReport(api=self._test_api(), ssh=self._test_ssh())

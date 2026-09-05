@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import respx
 
@@ -71,3 +73,13 @@ def test_filters_incomplete_torrents() -> None:
     )
     torrents = _client().completed_torrents()
     assert [t.hash for t in torrents] == ["done"]
+
+
+@respx.mock
+def test_add_torrent_base64_encodes_metainfo() -> None:
+    route = respx.post(RPC).mock(return_value=httpx.Response(200, json={"result": "success"}))
+    _client().add_torrent(b"d4:infodee")
+    assert json.loads(route.calls[0].request.content) == {
+        "method": "torrent-add",
+        "arguments": {"metainfo": "ZDQ6aW5mb2RlZQ=="},
+    }

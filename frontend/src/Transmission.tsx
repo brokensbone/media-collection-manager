@@ -19,6 +19,9 @@ export function Transmission() {
 	const [torrents, setTorrents] = useState<Torrent[] | null>(null);
 	const [report, setReport] = useState<TestReport | null>(null);
 	const [testing, setTesting] = useState(false);
+	const [torrentFile, setTorrentFile] = useState<File | null>(null);
+	const [uploading, setUploading] = useState(false);
+	const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
 	useEffect(() => {
 		fetch("/transmission/torrents")
@@ -37,6 +40,30 @@ export function Transmission() {
 			.finally(() => setTesting(false));
 	}, []);
 
+	const uploadTorrent = useCallback(async () => {
+		if (!torrentFile) return;
+		setUploading(true);
+		setUploadStatus(null);
+		const form = new FormData();
+		form.append("file", torrentFile);
+		try {
+			const response = await fetch("/transmission/torrents", {
+				method: "POST",
+				body: form,
+			});
+			const body = (await response.json()) as { detail?: string };
+			if (!response.ok) throw new Error(body.detail ?? "Upload failed.");
+			setUploadStatus(body.detail ?? "Torrent added to Transmission.");
+			setTorrentFile(null);
+		} catch (error) {
+			setUploadStatus(
+				error instanceof Error ? error.message : "Upload failed.",
+			);
+		} finally {
+			setUploading(false);
+		}
+	}, [torrentFile]);
+
 	return (
 		<>
 			<section>
@@ -53,6 +80,31 @@ export function Transmission() {
 						<CheckLine label="SSH" check={report.ssh} />
 					</div>
 				)}
+			</section>
+
+			<section>
+				<h2>Add torrent</h2>
+				<p className="muted">
+					Upload a .torrent file to start its download in Transmission.
+				</p>
+				<div className="torrent-upload">
+					<input
+						aria-label="Upload a .torrent file"
+						type="file"
+						accept=".torrent,application/x-bittorrent"
+						onChange={(event) =>
+							setTorrentFile(event.target.files?.[0] ?? null)
+						}
+					/>
+					<button
+						type="button"
+						onClick={uploadTorrent}
+						disabled={!torrentFile || uploading}
+					>
+						{uploading ? "Adding…" : "Start download"}
+					</button>
+				</div>
+				{uploadStatus && <p className="upload-status">{uploadStatus}</p>}
 			</section>
 
 			<section>

@@ -1,3 +1,4 @@
+import base64
 from typing import Any
 
 import httpx
@@ -34,6 +35,15 @@ class HttpxTransmissionClient:
             for t in torrents
             if t.get("percentDone") == 1
         ]
+
+    def add_torrent(self, metainfo: bytes) -> None:
+        """Hand a .torrent file to Transmission without retaining a local copy."""
+        self._rpc(
+            {
+                "method": "torrent-add",
+                "arguments": {"metainfo": base64.b64encode(metainfo).decode("ascii")},
+            }
+        )
 
     def _rpc(self, body: dict[str, Any]) -> dict[str, Any]:
         for attempt in range(2):

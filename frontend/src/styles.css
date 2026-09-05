@@ -309,6 +309,17 @@ a {
 	margin-top: 8px;
 	line-height: 1.6;
 }
+.torrent-upload {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.torrent-upload button {
+	margin-right: 0;
+}
+.upload-status {
+	margin: 8px 0 0;
+}
 .resolving {
 	margin: 4px 0 8px;
 	font-size: 0.9em;

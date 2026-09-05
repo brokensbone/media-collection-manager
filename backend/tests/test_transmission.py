@@ -1,5 +1,6 @@
 import subprocess
 
+import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
 from wantlist.adapters.album_repo import AlbumRepo
@@ -8,12 +9,21 @@ from wantlist.transmission_service import TransmissionService
 
 
 class _OkClient:
+    def __init__(self) -> None:
+        self.added: list[bytes] = []
+
     def ping(self) -> None:
         return None
+
+    def add_torrent(self, metainfo: bytes) -> None:
+        self.added.append(metainfo)
 
 
 class _BoomClient:
     def ping(self) -> None:
+        raise ConnectionError("connection refused")
+
+    def add_torrent(self, metainfo: bytes) -> None:
         raise ConnectionError("connection refused")
 
 
@@ -98,3 +108,16 @@ def test_torrents_lists_all_seen_including_non_music(
     assert rows["An Album"].has_audio is True
     assert rows["A Movie"].has_audio is False  # skipped as non-music, still listed
     assert rows["A Movie"].state == "dismissed"
+
+
+def test_add_torrent_hands_the_file_to_transmission(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    client = _OkClient()
+    _svc(clean_album_tables, client=client).add_torrent(b"d4:infodee")
+    assert client.added == [b"d4:infodee"]
+
+
+def test_add_torrent_requires_configured_rpc(clean_album_tables: sessionmaker[Session]) -> None:
+    with pytest.raises(RuntimeError, match="not configured"):
+        _svc(clean_album_tables, api=False).add_torrent(b"d4:infodee")
