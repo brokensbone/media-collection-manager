@@ -76,13 +76,13 @@ describe("Transmission", () => {
 		expect(screen.getByText(/Permission denied/)).toBeTruthy();
 	});
 
-	it("uploads a torrent file to start a download", async () => {
+	it("uploads selected torrent files to start downloads", async () => {
 		const fetchMock = vi.fn((url: string, opts?: RequestInit) => {
 			if (url === "/transmission/torrents" && opts?.method === "POST") {
 				return Promise.resolve({
 					ok: true,
 					json: () =>
-						Promise.resolve({ detail: "Torrent added to Transmission." }),
+						Promise.resolve({ detail: "2 torrents added to Transmission." }),
 				});
 			}
 			return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
@@ -92,13 +92,21 @@ describe("Transmission", () => {
 
 		const input = screen.getByLabelText(/upload a .torrent file/i);
 		fireEvent.change(input, {
-			target: { files: [new File(["torrent"], "album.torrent")] },
+			target: {
+				files: [
+					new File(["first"], "first.torrent"),
+					new File(["second"], "second.torrent"),
+				],
+			},
 		});
 		fireEvent.click(screen.getByRole("button", { name: "Start download" }));
 
-		await screen.findByText("Torrent added to Transmission.");
+		await screen.findByText("2 torrents added to Transmission.");
 		const posted = fetchMock.mock.calls.find((c) => c[1]?.method === "POST");
-		expect(posted?.[0]).toBe("/transmission/torrents");
-		expect(posted?.[1]?.body).toBeInstanceOf(FormData);
+		expect(posted).toBeDefined();
+		const [url, options] = posted as [string, RequestInit];
+		expect(url).toBe("/transmission/torrents");
+		expect(options.body).toBeInstanceOf(FormData);
+		expect((options.body as FormData).getAll("files")).toHaveLength(2);
 	});
 });

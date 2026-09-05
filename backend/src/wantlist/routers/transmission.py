@@ -19,23 +19,30 @@ def torrents(request: Request) -> list[TransmissionRow]:
 
 
 @router.post("/torrents")
-async def add_torrent(request: Request, file: Annotated[UploadFile, File()]) -> dict[str, str]:
-    if not file.filename or not file.filename.lower().endswith(".torrent"):
-        raise HTTPException(status_code=400, detail="Choose a .torrent file.")
+async def add_torrent(
+    request: Request, files: Annotated[list[UploadFile], File()]
+) -> dict[str, str]:
+    metainfos: list[bytes] = []
+    for file in files:
+        if not file.filename or not file.filename.lower().endswith(".torrent"):
+            raise HTTPException(status_code=400, detail="Choose .torrent files only.")
 
-    metainfo = await file.read()
-    if not metainfo:
-        raise HTTPException(status_code=400, detail="The torrent file is empty.")
-    if len(metainfo) > 2 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="Torrent files must be 2 MiB or smaller.")
+        metainfo = await file.read()
+        if not metainfo:
+            raise HTTPException(status_code=400, detail="Torrent files cannot be empty.")
+        if len(metainfo) > 2 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="Torrent files must be 2 MiB or smaller.")
+        metainfos.append(metainfo)
 
     try:
-        _service(request).add_torrent(metainfo)
+        for metainfo in metainfos:
+            _service(request).add_torrent(metainfo)
     except Exception as e:
         raise HTTPException(
             status_code=502, detail=f"Transmission rejected the torrent: {e}"
         ) from e
-    return {"detail": "Torrent added to Transmission."}
+    count = len(metainfos)
+    return {"detail": f"{count} torrent{'s' if count != 1 else ''} added to Transmission."}
 
 
 @router.post("/test")

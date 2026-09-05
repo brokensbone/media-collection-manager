@@ -19,7 +19,7 @@ export function Transmission() {
 	const [torrents, setTorrents] = useState<Torrent[] | null>(null);
 	const [report, setReport] = useState<TestReport | null>(null);
 	const [testing, setTesting] = useState(false);
-	const [torrentFile, setTorrentFile] = useState<File | null>(null);
+	const [torrentFiles, setTorrentFiles] = useState<File[]>([]);
 	const [uploading, setUploading] = useState(false);
 	const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
@@ -41,11 +41,11 @@ export function Transmission() {
 	}, []);
 
 	const uploadTorrent = useCallback(async () => {
-		if (!torrentFile) return;
+		if (torrentFiles.length === 0) return;
 		setUploading(true);
 		setUploadStatus(null);
 		const form = new FormData();
-		form.append("file", torrentFile);
+		for (const torrentFile of torrentFiles) form.append("files", torrentFile);
 		try {
 			const response = await fetch("/transmission/torrents", {
 				method: "POST",
@@ -53,8 +53,8 @@ export function Transmission() {
 			});
 			const body = (await response.json()) as { detail?: string };
 			if (!response.ok) throw new Error(body.detail ?? "Upload failed.");
-			setUploadStatus(body.detail ?? "Torrent added to Transmission.");
-			setTorrentFile(null);
+			setUploadStatus(body.detail ?? "Torrents added to Transmission.");
+			setTorrentFiles([]);
 		} catch (error) {
 			setUploadStatus(
 				error instanceof Error ? error.message : "Upload failed.",
@@ -62,7 +62,7 @@ export function Transmission() {
 		} finally {
 			setUploading(false);
 		}
-	}, [torrentFile]);
+	}, [torrentFiles]);
 
 	return (
 		<>
@@ -85,21 +85,23 @@ export function Transmission() {
 			<section>
 				<h2>Add torrent</h2>
 				<p className="muted">
-					Upload a .torrent file to start its download in Transmission.
+					Upload one or more .torrent files to start their downloads in
+					Transmission.
 				</p>
 				<div className="torrent-upload">
 					<input
 						aria-label="Upload a .torrent file"
 						type="file"
 						accept=".torrent,application/x-bittorrent"
+						multiple
 						onChange={(event) =>
-							setTorrentFile(event.target.files?.[0] ?? null)
+							setTorrentFiles(Array.from(event.target.files ?? []))
 						}
 					/>
 					<button
 						type="button"
 						onClick={uploadTorrent}
-						disabled={!torrentFile || uploading}
+						disabled={torrentFiles.length === 0 || uploading}
 					>
 						{uploading ? "Adding…" : "Start download"}
 					</button>
