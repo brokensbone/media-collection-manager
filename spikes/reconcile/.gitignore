@@ -1,0 +1,4 @@
+.spike/
+owned_rgids.txt
+*.local.*
+__pycache__/

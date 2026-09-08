@@ -1,0 +1,62 @@
+# Production example: the app (API+SPA on one origin) + the poller worker. Postgres is external.
+# The existing beets library is bind-mounted at its own absolute path so the paths beets records
+# stay valid (see the "host-consistent paths" note in deploy/README.md).
+#
+# Run from this directory (deploy/prod):
+#   cp .env.example .env      # then fill in the placeholders
+#   docker compose up -d --build
+#
+# Tear down (data lives in the external database and the host bind mounts, so nothing is lost):
+#   docker compose down
+
+x-app: &app
+  build:
+    context: ../..
+    dockerfile: deploy/Dockerfile
+  image: wantlist:latest
+  env_file: .env
+  environment:
+    WANTLIST_STATIC_DIR: /app/frontend-dist  # api serves the SPA; worker ignores it
+    BEETSDIR: ${WANTLIST_BEETS_DIR}  # beets reads config.yaml + library from here
+  restart: unless-stopped
+  volumes:
+    # Beets library, mounted at the SAME absolute path host<->container so library.db paths
+    # resolve everywhere (see deploy/README.md). ${WANTLIST_BEETS_DIR} is BEETSDIR (holds
+    # config.yaml + library.db); ${WANTLIST_MUSIC_DIR} is where the music lives (beets `directory:`).
+    - ${WANTLIST_MUSIC_DIR}:${WANTLIST_MUSIC_DIR}
+    - ${WANTLIST_BEETS_DIR}:${WANTLIST_BEETS_DIR}
+    # Watch-dir import (§13): drop albums/zips here on the host.
+    - ${WANTLIST_WATCHDIR_PATH}:${WANTLIST_WATCHDIR_PATH}
+    # Transmission auto-land (§12): give rsync the seedbox SSH key. Uncomment and set
+    # WANTLIST_TRANSMISSION_SSH_KEY=/keys/id in .env once you wire up Transmission.
+    - ${WANTLIST_SSH_KEY}:/keys/id:ro
+    # TV/film import destinations (Jellyfin's libraries on /mnt/redhdd). Mounted rw at the SAME
+    # absolute path host<->container so the classifier's destination_path (built from tv_root/
+    # film_root) is valid both inside the worker and on disk. The worker runs as root, so it can
+    # write regardless of the media dirs' ownership.
+    - ${WANTLIST_TV_ROOT}:${WANTLIST_TV_ROOT}
+    - ${WANTLIST_FILM_ROOT}:${WANTLIST_FILM_ROOT}
+    - ${WANTLIST_WORKSPACE_ROOT}:${WANTLIST_WORKSPACE_ROOT}
+
+services:
+  # One-shot: apply migrations against the external database before api/worker start. The real
+  # beets library already exists, so (unlike the local deploy) this creates nothing.
+  init:
+    <<: *app
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+
+  api:
+    <<: *app
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "wantlist.worker"]
+    depends_on:
+      init:
+        condition: service_completed_successfully
