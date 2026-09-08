@@ -15,6 +15,36 @@
           lib = pkgs.lib;
           python = pkgs.python312;
           pythonPackages = python.pkgs;
+          # These releases are pinned by backend/uv.lock but landed after the
+          # current nixos-unstable package set. Keep their Nix definitions
+          # explicit until nixpkgs catches up, so the package respects the
+          # backend's declared runtime minimum versions.
+          alembic = pythonPackages.alembic.overridePythonAttrs (_: {
+            version = "1.19.1";
+            doCheck = false;
+            src = pkgs.fetchPypi {
+              pname = "alembic";
+              version = "1.19.1";
+              hash = "sha256-4PygUYEYx4rMST4xvLVALxkAV6r234tblc6UxHic9kg=";
+            };
+          });
+          pydantic-settings = pythonPackages."pydantic-settings".overridePythonAttrs (old: {
+            version = "2.15.0";
+            src = pkgs.fetchPypi {
+              pname = "pydantic_settings";
+              version = "2.15.0";
+              hash = "sha256-aUt5PoT3Zrp2qQ6978AdCpoEXasDgr7nA5Pak3Eq0Rc=";
+            };
+            dependencies = old.dependencies ++ [ pythonPackages.typing-inspection ];
+          });
+          uvicorn = pythonPackages.uvicorn.overridePythonAttrs (_: {
+            version = "0.52.1";
+            src = pkgs.fetchPypi {
+              pname = "uvicorn";
+              version = "0.52.1";
+              hash = "sha256-ES7GYYFBiay8zT97hkYBR8wGX8ksCCGvp4kYeA5DVN0=";
+            };
+          });
           fastapi = pythonPackages.fastapi.overridePythonAttrs (_: { doCheck = false; });
           # APScheduler 3.11.2's upstream process-pool tests are flaky under the current
           # sandboxed Python build. Wantlist's own tests cover its scheduler integration.
@@ -52,7 +82,9 @@
           };
 
           backend = pythonPackages.buildPythonPackage {
-            pname = "wantlist-backend";
+            # This must match the Python distribution name in pyproject.toml;
+            # the service-side name remains wantlist-backend at the Nix API.
+            pname = "wantlist";
             version = "0.1.0";
             src = ./backend;
             pyproject = true;
