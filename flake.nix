@@ -137,7 +137,7 @@
             pname = "wantlist-frontend";
             version = "0.1.0";
             src = ./frontend;
-            npmDepsHash = "sha256-nQwHvZAByd5Eg7Fe/p8nujBL2AcJnGtYserYw7k3MaE=";
+            npmDepsHash = "sha256-Y6w4LExQkCWgmJfl5mfF+HnPlBpSVd/NLPE1HZXtMNE=";
             npmBuildScript = "build";
             installPhase = ''
               runHook preInstall
