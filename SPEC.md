@@ -1,4 +1,4 @@
-# Project Spec — (working title: "wantlist")
+# Media Collection Manager — Project Spec
 
 > Status: **MVP built** (ROADMAP D0–D9 complete). This spec is the design of record;
 > where implementation refined a decision, the relevant section notes "as built". Remaining
@@ -34,8 +34,7 @@ Design principles:
 - **Deployment-agnostic.** The app knows only two things about its environment, both
   from config: it needs a **PostgreSQL backend** (host/port/db/user/password) and a way
   to **run the beets CLI** (a configurable command/path). It has no knowledge of *where*
-  it runs. My own hosting (blink + partridge) is a *reference deployment* (§8b), not a
-  requirement — anyone with a Postgres and a beets install can run it.
+  it runs. Anyone with Postgres and a beets install can run it.
 
 ## 3. The loop this closes
 
@@ -296,8 +295,7 @@ that doesn't exist. So the LLM Tier-3 is **dropped** (ROADMAP D16 → D17); the 
 handled by manual-match + re-resolve (§5) instead. Reconsider only if edition-mismatch
 false positives later emerge as a distinct problem.
 
-**If built:** run it as a *batch* over unresolved albums (a scheduled job / skill — fits
-the existing `blink` scheduler and skills setup), never inline on the continuous
+**If built:** run it as a *batch* over unresolved albums (a scheduled job), never inline on the continuous
 reconcile. It writes a resolved release-group id (with a confidence + provenance flag)
 back to the album, after which reconcile treats it like any other exact match. This keeps
 the "resolve once, reconcile forever" split intact: the LLM only ever touches
@@ -424,19 +422,11 @@ to the code.
 If those are satisfied, the app doesn't care whether it's in Docker, a VM, bare metal,
 one host or three.
 
-### 8b. Reference deployment (my setup — illustrative, not required)
+### 8b. Example deployment
 
-How *I* intend to satisfy the §8a contract. None of this is baked into the app.
-- App runs as a container in the **`blink`** docker-compose stack, behind Traefik/TLS.
-  Traefik also gives the app its public HTTPS domain — which is what the Spotify redirect
-  URI needs (§8c).
-- Postgres is the existing instance on **`partridge`**; I create a dedicated DB + writer
-  role there (following the `lab` repo `scheduler-db.nix` pattern) and point the app's
-  `DATABASE_URL` at it. blink↔partridge share the **LAN (`10.4.1.0/24`)**, so a `pg_hba`
-  rule for that CIDR (as `postgres-readonly.nix` already does) is the connection path;
-  Tailscale is an optional fallback.
-- Beets: the container carries `beet` + read access to the beets library (mount vs
-  sidecar TBD — the §5 open item), so the beets command is plain `beet`.
+The app can run as a container behind an authenticated reverse proxy, with a dedicated
+Postgres database and read access to a beets library. The Spotify callback URL must be
+registered for that deployment. None of these details are baked into the app.
 
 ### 8c. Spotify auth & the 6-month re-authorization requirement
 
@@ -599,7 +589,7 @@ keep/drop/snooze.
 | State machine | `suggested → saved → wanted → acquiring → owned` (+ `dismissed`). Entry state by provenance: Spotify saves enter at `saved`, 6b/6c discoveries at `suggested`. `owned` derived by reconcile from `wanted`/`acquiring`; `dismissed` reachable from `suggested` (rejected suggestion) or `saved`/`wanted` (verdict drop), disambiguated by provenance (§4). |
 | Storage | **PostgreSQL**, connection from config (host/port/db/user/pass). No local SQLite of its own. |
 | Cover art | **Owned/retained blobs in Postgres**, in a dedicated `album_art` table (splittable to its own schema/DB later). Self-served (`/art/<album-id>`) with ETag/immutable caching; a front cache only if slow. Not hotlinked. Sourced from Spotify / Cover Art Archive / beets (§4b). |
-| Deployment | **Agnostic** — app only requires a Postgres backend + a beets command, both from config (§8a). My blink+partridge hosting is a reference deployment (§8b), not a requirement. |
+| Deployment | **Agnostic** — app only requires a Postgres backend + a beets command, both from config (§8a). |
 | Acquisition | Manual; assisted by one-click Bandcamp search-URL per want (§7). Links, never buys. |
 | Testing | Ports-and-adapters + pure core + injectable clock + configurable base URLs → unit-test the bulk; real-Postgres integration (testcontainers); Docker E2E (app+postgres, fake-Spotify stub) for the full flow (§14). |
 | Observability | `GET /metrics` (Prometheus), DB-sourced so it's correct across the API/worker split; alerts for reauth-due and stalled pollers via Grafana (§16, ROADMAP D18). |
@@ -672,8 +662,7 @@ modes on real data** before the architecture commits to this chain. It also **ga
 §5a LLM decision** (how big is the fuzzy tail, really?).
 
 **Standalone & decoupled:** read-only Spotify + MusicBrainz API calls + a read-only
-`beet list`. No Postgres, no blink, no compose — can run anytime, including before the
-blink→nix conversion.
+`beet list`. No Postgres or Compose stack is required, so it can run independently.
 
 **Design:**
 - **Input:** a deliberately *mixed* sample of ~50–100 saved albums — old/new,
@@ -973,8 +962,8 @@ without touching the core.
 | Packaging | **uv** + lockfile | |
 | Quality | **Ruff** (lint+format) + **mypy** | |
 
-**Why Python, not Go (considered).** Go was weighed — it would consolidate with `blink`
-and nix-package more cleanly as a single static binary. But the two reasons Python was
+**Why Python, not Go (considered).** Go was weighed as a possible single static binary.
+But the two reasons Python was
 *originally* obvious have gone (we use the beets **CLI** not its library, §5; the
 clustering/data-science work is dead), so this was decided on merits, not inertia: the
 tool orbits beets (which must be in the runtime regardless — Python lets app + beets share
@@ -997,16 +986,15 @@ ports (§14), so this isn't a one-way door.
 ### Packaging & deploy
 - **Single multi-stage Docker image**: Node stage builds the SPA → Python runtime serves
   the JSON API *and* the built static assets; **beets is a bundled dependency** in the
-  image, and the beets **library is mounted** in (resolved in §5). Behind Traefik on the
-  `blink` stack (§8b).
+  image, and the beets **library is mounted** in (resolved in §5).
 - **Monorepo**: `backend/` + `frontend/` in this repo; one image out.
 
 ## 16. Observability & metrics
 
 The app runs unattended on a schedule, so its main operational risk is **silent failure**:
 a poller dies or the Spotify refresh token expires and nothing tells me until I next look
-and find the library hasn't grown. Prometheus metrics + Grafana alerts close that gap
-(Grafana/Prometheus already run on partridge, §8b). Built in ROADMAP **D18**.
+and find the library hasn't grown. Prometheus metrics + Grafana alerts close that gap.
+Built in ROADMAP **D18**.
 
 - **`GET /metrics`** in Prometheus text format, served by the API.
 - **Sourced from the DB, not in-process counters.** The API and the poller `worker` are

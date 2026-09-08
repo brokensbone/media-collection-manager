@@ -1,7 +1,8 @@
-# wantlist
+# Media Collection Manager
 
-wantlist is a self-hosted music want-list: it tracks albums you save, compares them with a
-beets library, and provides queues for deciding, acquiring, and importing records.
+Media Collection Manager is a self-hosted music want-list: it tracks albums you save,
+compares them with a beets library, and provides queues for deciding, acquiring, and
+importing records.
 
 The application is intended for a private, single-user deployment. It has no built-in
 authentication or authorisation; put it behind an appropriate access-control layer before

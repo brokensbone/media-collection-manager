@@ -89,9 +89,9 @@ Everything that makes it a coherent app, and the end-to-end proof.
 ## P2 — Live
 
 ### D10 · Deploy  *(§8b)*
-Make it real. (Independent of dev — can land as soon as the blink→nix conversion is ready; nothing above is blocked on it.)
+Make it real. (Independent of dev; nothing above is blocked on it.)
 - **D10a · Local disposable deploy — ✅ done (pending CI).** A `deploy/` stack: multi-stage image (Node builds the SPA → Python image serves it + the API on one origin), `docker compose` with Postgres + `init` (migrate + create an empty beets library) + `api` + `worker`, all on local volumes. Proves the config surface (`deploy/.env.example`) and that it runs end-to-end against an empty beets db. Flushed out one real bug: `httpx` was a runtime dep miscategorised as dev (only surfaced under `--no-dev`). See [`deploy/README.md`](deploy/README.md).
-- **D10b · Real deploy — pending blink.** Compose service on blink behind Traefik/TLS; dedicated DB + writer role on partridge; register the Spotify redirect URI; point `WANTLIST_BEETS_CONFIG` at the **existing** beets library/config. Reuses the D10a image + compose.
+- **D10b · Real deploy.** Run the Compose service behind authenticated HTTPS, provision a dedicated DB + writer role, register the Spotify redirect URI, and point the app at the beets library/config. Reuses the D10a image + compose.
 - **Done when:** the app is reachable at its real URL, connected to real Spotify + real beets, and the first real wants are flowing through the worklists. *("running for real")*
 
 ---
@@ -147,7 +147,7 @@ assistance on top.)
 ### D18 · Metrics endpoint (Prometheus) + alerting hooks  *(§16, post-MVP)*  — ✅ done (pending CI)
 The app runs unattended, so without metrics it can **silently stop working** — a poller
 dies, or the Spotify refresh token expires — and I won't notice until I look. Expose
-Prometheus metrics so Grafana (already on partridge) can alert.
+Prometheus metrics so Grafana can alert.
 - **`GET /metrics`** (Prometheus text) on the API, sourced from the **DB** so it's correct
   across processes (the API and the poller worker are separate — in-process counters in
   the worker are invisible to the API). Exposes:
@@ -212,7 +212,6 @@ An import that matched no want used to land only in beets — invisible in the a
   (D5 depends on D4; D6 on D5; D7 on D6; D8 enriches D6). D0 is done (GO): it dropped D16
   and added D17 (manual-match + re-resolve) as the tail's handling.
 - Dev + CI run entirely on local + testcontainers, so **D10 (deploy) is not on the
-  critical path** — pull it forward the moment blink is nix-ready if you'd rather deploy a
-  walking skeleton early.
+  critical path** — pull it forward whenever you'd rather deploy a walking skeleton early.
 - Every deliverable lands with its tests (§14) — "done" always includes green tests, not
   just working code.

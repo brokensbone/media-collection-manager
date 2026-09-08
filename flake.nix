@@ -1,5 +1,5 @@
 {
-  description = "wantlist: a self-hosted music want-list";
+  description = "Media Collection Manager: a self-hosted music want-list";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
