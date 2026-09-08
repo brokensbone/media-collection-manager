@@ -5,8 +5,8 @@ directory (they share the [`Dockerfile`](Dockerfile)):
 
 - [`local/`](local) — a disposable local run: Postgres in a container, an empty beets library
   it creates itself. For seeing it work and what config a real deploy needs.
-- [`prod/`](prod) — the real deploy: app + worker only, Postgres on partridge over the LAN,
-  your real existing beets library.
+- [`prod/`](prod) — an example production-shaped deployment: app + worker with an external
+  Postgres database and a bind-mounted beets library.
 
 ## Local (disposable)
 
@@ -47,12 +47,11 @@ cp .env.example .env        # fill in the placeholders
 docker compose up -d --build
 ```
 
-App + worker only — Postgres lives on partridge and is reached over the LAN (provisioned by
-`nixos/hosts/partridge/wantlist-db.nix` in the lab repo), and your real, existing beets library
-is bind-mounted. Fill [`prod/.env.example`](prod/.env.example): point `WANTLIST_DATABASE_URL`
-at partridge's LAN address, set `WANTLIST_BEETS_DIR` to your beets directory (the app runs beets
-with `BEETSDIR` set to it, so beets finds its own config + library there), and set the music dir
-to its real absolute path (see below).
+App + worker only — use an external Postgres database and bind-mount your existing beets library.
+Fill [`prod/.env.example`](prod/.env.example): point `WANTLIST_DATABASE_URL` at the database,
+set `WANTLIST_BEETS_DIR` to your beets directory (the app runs beets with `BEETSDIR` set to it,
+so beets finds its own config + library there), and set the music dir to its real absolute path
+(see below).
 
 ### Beets paths must be host-consistent
 
