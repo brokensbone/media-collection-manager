@@ -1,0 +1,106 @@
+name: Open Lab Deploy PR
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      media_collection_manager_sha:
+        description: Optional Media Collection Manager commit SHA to deploy. Defaults to the triggering SHA.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# A new successful main build supersedes any queued request to update the same
+# Lab PR. Deployment remains explicitly gated by merging that Lab PR.
+concurrency:
+  group: open-lab-deploy-pr
+  cancel-in-progress: true
+
+jobs:
+  open-pr:
+    name: Update Lab flake.lock
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main'
+      )
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve target SHA
+        id: target
+        env:
+          MANUAL_TARGET_SHA: ${{ inputs.media_collection_manager_sha }}
+          WORKFLOW_RUN_TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          target_sha="$MANUAL_TARGET_SHA"
+          if [ -z "$target_sha" ]; then
+            target_sha="$WORKFLOW_RUN_TARGET_SHA"
+          fi
+          if [ -z "$target_sha" ]; then
+            target_sha="${GITHUB_SHA}"
+          fi
+
+          case "$target_sha" in
+            [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f])
+              ;;
+            *)
+              echo "unexpected target SHA: $target_sha" >&2
+              exit 64
+              ;;
+          esac
+
+          echo "sha=$target_sha" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${target_sha%${target_sha#????????}}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Lab
+        uses: actions/checkout@v7
+        with:
+          repository: EdwardSalkeld/lab
+          token: ${{ secrets.LAB_REPO_TOKEN }}
+          path: lab
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v19
+
+      - name: Update Media Collection Manager lock entry
+        working-directory: lab
+        run: |
+          nix flake lock \
+            --override-input media-collection-manager github:brokensbone/media-collection-manager/${{ steps.target.outputs.sha }} \
+            --update-input media-collection-manager
+
+      - name: Compose PR body
+        working-directory: lab
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          cat > /tmp/lab-pr-body.md <<EOF
+          ## Summary
+          - bump the Media Collection Manager flake input to ${TARGET_SHA}
+          - deploy the merged Media Collection Manager main commit through Lab's reviewed rollout
+
+          ## Testing
+          - not run (automation-only flake.lock update)
+          EOF
+
+      - name: Create or update Lab PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.LAB_REPO_TOKEN }}
+          path: lab
+          commit-message: Deploy Media Collection Manager ${{ steps.target.outputs.short_sha }}
+          branch: edward/auto-deploy-media-collection-manager
+          base: main
+          delete-branch: true
+          title: Deploy Media Collection Manager ${{ steps.target.outputs.short_sha }}
+          body-path: /tmp/lab-pr-body.md
