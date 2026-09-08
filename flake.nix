@@ -56,9 +56,8 @@
             pname = "pyrate-limiter";
             version = "4.4.0";
             format = "wheel";
-            src = pkgs.fetchPypi {
-              pname = "pyrate_limiter";
-              inherit version format;
+            src = pkgs.fetchurl {
+              url = "https://files.pythonhosted.org/packages/2b/77/2b5ea2e5e343fd7f74ba9c50a282d7cb66d1be3d12bd647510338d78fcf1/pyrate_limiter-4.4.0-py3-none-any.whl";
               hash = "sha256-9zjfo8esEiKl6j0x4Az9MbVZKxOt5Ad6/p6KxikzgfU=";
             };
             doCheck = false;
