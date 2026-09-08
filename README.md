@@ -1,8 +1,28 @@
 # wantlist
 
-A smart want-list over Spotify + beets — captures what you want to own, tells you whether
-you already own it, and nudges you to curate and acquire. See [SPEC.md](SPEC.md) for the
-design and [ROADMAP.md](ROADMAP.md) for the sequential deliverables.
+wantlist is a self-hosted music want-list: it tracks albums you save, compares them with a
+beets library, and provides queues for deciding, acquiring, and importing records.
+
+The application is intended for a private, single-user deployment. It has no built-in
+authentication or authorisation; put it behind an appropriate access-control layer before
+making an instance reachable by anyone else.
+
+## Nix
+
+The flake is the supported upstream packaging interface. It exposes these packages:
+
+- `wantlist-api` — serves the API and bundled SPA. It listens on 127.0.0.1:8000 by default;
+  set `WANTLIST_HOST` and `WANTLIST_PORT` to override that.
+- `wantlist-worker` — runs scheduled polling and import work.
+- `wantlist-migrate` — runs Alembic, e.g. `wantlist-migrate upgrade head`.
+- `frontend` and `backend` — separately consumable build outputs.
+- `image` — an OCI image whose default command is `wantlist-api`.
+
+`wantlist-api` supplies the packaged SPA through `WANTLIST_STATIC_DIR` unless the deployment
+sets that variable itself. Runtime configuration remains environment-based; see
+[`deploy/local/.env.example`](deploy/local/.env.example) for the available settings. A host
+integration should run migrations before the API and worker, and manage all credentials outside
+the Nix store.
 
 ## Layout
 

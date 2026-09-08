@@ -1,14 +1,12 @@
-# Real deploy: the app (API+SPA on one origin) + the poller worker, in Docker on blink.
-# Postgres is NOT here — it lives on partridge and is reached over the LAN (provisioned by
-# nixos/hosts/partridge/wantlist-db.nix in the lab repo). The beets library is the real,
-# existing one, bind-mounted at its own absolute path so the paths beets records stay valid
-# (see the "host-consistent paths" note in deploy/README.md).
+# Production example: the app (API+SPA on one origin) + the poller worker. Postgres is external.
+# The existing beets library is bind-mounted at its own absolute path so the paths beets records
+# stay valid (see the "host-consistent paths" note in deploy/README.md).
 #
 # Run from this directory (deploy/prod):
 #   cp .env.example .env      # then fill in the placeholders
 #   docker compose up -d --build
 #
-# Tear down (data lives on partridge + the host bind mounts, so nothing is lost):
+# Tear down (data lives in the external database and the host bind mounts, so nothing is lost):
 #   docker compose down
 
 x-app: &app
@@ -20,9 +18,6 @@ x-app: &app
   environment:
     WANTLIST_STATIC_DIR: /app/frontend-dist  # api serves the SPA; worker ignores it
     BEETSDIR: ${WANTLIST_BEETS_DIR}  # beets reads config.yaml + library from here
-  # Local to blink (not in the repo compose): keep worker/init off Traefik; only api is proxied.
-  labels:
-    traefik.enable: "false"
   restart: unless-stopped
   volumes:
     # Beets library, mounted at the SAME absolute path host<->container so library.db paths
@@ -44,7 +39,7 @@ x-app: &app
     - ${WANTLIST_WORKSPACE_ROOT}:${WANTLIST_WORKSPACE_ROOT}
 
 services:
-  # One-shot: apply migrations against the partridge database before api/worker start. The real
+  # One-shot: apply migrations against the external database before api/worker start. The real
   # beets library already exists, so (unlike the local deploy) this creates nothing.
   init:
     <<: *app
@@ -53,16 +48,8 @@ services:
 
   api:
     <<: *app
-    # blink local: Traefik discovers Docker labels and proxies over its own Docker network,
-    # terminating TLS for wantlist.b.alcachofa.faith. (Repo compose binds 127.0.0.1:8000 instead.)
-    labels:
-      traefik.enable: "true"
-      traefik.docker.network: docker_default
-      traefik.http.routers.wantlist.rule: Host(`wantlist.b.alcachofa.faith`)
-      traefik.http.services.wantlist.loadbalancer.server.port: "8000"
-    networks:
-      - default
-      - traefik
+    ports:
+      - "127.0.0.1:8000:8000"
     depends_on:
       init:
         condition: service_completed_successfully
@@ -73,8 +60,3 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
-
-networks:
-  traefik:
-    external: true
-    name: docker_default
