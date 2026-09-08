@@ -49,7 +49,35 @@
           # APScheduler 3.11.2's upstream process-pool tests are flaky under the current
           # sandboxed Python build. Wantlist's own tests cover its scheduler integration.
           apscheduler = pythonPackages.apscheduler.overridePythonAttrs (_: { doCheck = false; });
-          requests-ratelimiter = pythonPackages.requests-ratelimiter;
+          # nixpkgs currently packages requests-ratelimiter 0.7.0, which is
+          # incompatible with its pyrate-limiter 3.x package. Keep this pair
+          # aligned with backend/uv.lock until nixpkgs catches up.
+          pyrate-limiter = pythonPackages.buildPythonPackage rec {
+            pname = "pyrate-limiter";
+            version = "4.4.0";
+            format = "wheel";
+            src = pkgs.fetchurl {
+              url = "https://files.pythonhosted.org/packages/2b/77/2b5ea2e5e343fd7f74ba9c50a282d7cb66d1be3d12bd647510338d78fcf1/pyrate_limiter-4.4.0-py3-none-any.whl";
+              hash = "sha256-9zjfo8esEiKl6j0x4Az9MbVZKxOt5Ad6/p6KxikzgfU=";
+            };
+            doCheck = false;
+          };
+          requests-ratelimiter = pythonPackages.buildPythonPackage rec {
+            pname = "requests-ratelimiter";
+            version = "0.10.0";
+            src = pkgs.fetchPypi {
+              pname = "requests_ratelimiter";
+              inherit version;
+              hash = "sha256-nBp412RsqlzPIRpsNBq9FtMpviyMNQRKQYqp2nwOejM=";
+            };
+            pyproject = true;
+            build-system = [ pythonPackages.hatchling ];
+            dependencies = [
+              pyrate-limiter
+              pythonPackages.requests
+            ];
+            doCheck = false;
+          };
           # Wantlist invokes beets' core commands directly. Build that core rather than the
           # nixpkgs convenience package, which bundles optional plugins and GStreamer support
           # into a multi-gigabyte desktop/media runtime closure.
