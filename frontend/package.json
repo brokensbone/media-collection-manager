@@ -15,14 +15,14 @@
 		"react-dom": "^19.2.8"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.7",
-		"@testing-library/react": "^16.0.1",
+		"@biomejs/biome": "^2.5.12",
+		"@testing-library/react": "^16.3.3",
 		"@types/react": "^19.2.18",
 		"@types/react-dom": "^19.2.7",
 		"@vitejs/plugin-react": "^6.0.5",
 		"jsdom": "^30.0.1",
 		"typescript": "^7.0.2",
-		"vite": "^8.2.1",
-		"vitest": "^4.1.10"
+		"vite": "^8.2.2",
+		"vitest": "^5.0.0"
 	}
 }
