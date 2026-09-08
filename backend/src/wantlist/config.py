@@ -94,7 +94,9 @@ class Settings(BaseSettings):
 
     # MusicBrainz resolution (§5, §11). Base URL overridable for tests/E2E (§14).
     musicbrainz_url: str = "https://musicbrainz.org/ws/2"
-    musicbrainz_user_agent: str = "wantlist/0.1 ( https://github.com/EdwardSalkeld )"
+    musicbrainz_user_agent: str = (
+        "media-collection-manager/0.1 ( https://github.com/brokensbone/media-collection-manager )"
+    )
     musicbrainz_min_interval: float = 2.0  # MB asks for <= 1 req/sec; stay well under it (~0.5/s)
     musicbrainz_text_min_score: int = 90  # Tier-3 fuzzy accept threshold
     resolution_max_per_run: int = 100  # cap MB lookups per reconcile (cold-start politeness)

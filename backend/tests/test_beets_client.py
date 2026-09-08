@@ -129,11 +129,11 @@ def test_trap_flags_default_directory_and_passes_the_configured_one(
     good = (
         "data directory: /mnt/ssd4tb/record-library\n"
         "library database: /mnt/ssd4tb/record-library/beets.db\n"
-        "library directory: /home/edward/.config/beets/library\n"
+        "library directory: /home/example/.config/beets/library\n"
     )
     with caplog.at_level("INFO", logger="wantlist.adapters.beets"):
         client._trap_import_directory("/drop", good)
-    assert "directory ok" in caplog.text and "/home/edward" in caplog.text
+    assert "directory ok" in caplog.text and "/home/example" in caplog.text
 
     caplog.clear()
     bad = "library directory: /root/Music\n"  # beets fell back to its default → the bug
