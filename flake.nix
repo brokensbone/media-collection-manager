@@ -166,7 +166,10 @@
 
           worker = pkgs.writeShellApplication {
             name = "wantlist-worker";
-            runtimeInputs = [ pkgs.openssh pkgs.rsync ];
+            # Beets is a Python dependency of the backend, but Python's runtime closure
+            # does not expose its console scripts on PATH.  The worker invokes `beet`
+            # directly for imports and catalogue refreshes.
+            runtimeInputs = [ pkgs.openssh pkgs.rsync beets ];
             text = ''
               exec ${pythonEnv}/bin/python -m wantlist.worker "$@"
             '';
