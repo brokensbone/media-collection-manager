@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     # Imports run one at a time, so a very large transfer does hold up the queue behind it.
     transmission_transfer_timeout_seconds: int = 21600  # 6 hours
     import_inbox_path: str = "/inbox"
+    # An optional deploy-owned override for beets' media destination. This is kept separate from
+    # BEETSDIR (which owns config.yaml and library.db) because a migrated config can retain an
+    # obsolete absolute `directory:` path.
+    beets_directory: str = ""
     # The Tasks view shows completed imports (imported/skipped) from this many days back; older
     # completed imports live in the archive (reached from Tasks), not the default task list.
     import_completed_window_days: int = 3

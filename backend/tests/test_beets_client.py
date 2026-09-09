@@ -1,3 +1,4 @@
+import json
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -118,7 +119,29 @@ def test_import_dir_skips_duplicates_uses_asis_and_traps_directory(
     # `-vv` (diagnostic trap) then `--config <overlay>` are global opts before the subcommand.
     assert argv[0] == "beet" and argv[1] == "-vv" and argv[2] == "--config"
     assert argv[4:] == ["import", "-q", "--quiet-fallback=asis", "/drop"]
-    assert "duplicate_action: skip" in captured["override"]
+    assert json.loads(captured["override"]) == {"import": {"duplicate_action": "skip"}}
+
+
+def test_import_dir_overrides_migrated_directory_when_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_run(argv: list[str], **kwargs: Any) -> object:
+        captured["override"] = Path(argv[argv.index("--config") + 1]).read_text()
+
+        class Result:
+            stdout = ""
+            stderr = ""
+
+        return Result()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    BeetsClient(import_directory="/data/library").import_dir("/drop")
+    assert json.loads(captured["override"]) == {
+        "import": {"duplicate_action": "skip"},
+        "directory": "/data/library",
+    }
 
 
 def test_trap_flags_default_directory_and_passes_the_configured_one(
