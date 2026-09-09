@@ -259,6 +259,46 @@ def test_run_marks_failed_and_can_be_retried(
     assert repo.get_pending_import(import_id).state == ImportState.imported.value  # type: ignore[union-attr]
 
 
+def test_run_marks_failed_when_catalogue_snapshot_fails(
+    clean_album_tables: sessionmaker[Session], tmp_path: Path
+) -> None:
+    """An unavailable beet CLI must not leave a row permanently `importing`."""
+    sf = clean_album_tables
+    download_dir = tmp_path / "d"
+    download_dir.mkdir()
+    (download_dir / "x.flac").write_text("x")
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+
+    repo = AlbumRepo(sf)
+    repo.add_pending_import(
+        source=ImportSource.transmission,
+        source_key="h1",
+        name="d",
+        download_dir=str(download_dir),
+        files=["x.flac"],
+        matched_album_id=None,
+    )
+    import_id = repo.list_imports()[0].id
+    repo.queue_import(import_id)
+
+    class BrokenCatalog:
+        def all_albums(self) -> list[BeetsAlbum]:
+            raise FileNotFoundError("beet")
+
+    runner = ImportRunner(
+        repo=repo,
+        stagers={ImportSource.transmission: TransmissionStager(FakeFileTransfer())},
+        beets=RecordingBeetsClient(),
+        video=VideoLibraryImporter(),
+        inbox=str(inbox),
+        catalog=BrokenCatalog(),  # type: ignore[arg-type]
+    )
+    runner.run_queued()
+
+    assert repo.get_pending_import(import_id).state == ImportState.failed.value  # type: ignore[union-attr]
+
+
 def test_failed_import_captures_error_detail_and_clears_it_on_retry(
     clean_album_tables: sessionmaker[Session], tmp_path: Path
 ) -> None:

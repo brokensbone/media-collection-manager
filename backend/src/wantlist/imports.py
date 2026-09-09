@@ -308,11 +308,11 @@ class ImportRunner:
             album_id=rec.matched_album_id,
         )
 
-        before = self._album_ids()  # snapshot to identify what this import adds (D21)
         new: list[BeetsAlbum] = []
         placed_video = 0
         staging = Path(self._inbox) / str(rec.id)  # unique per import; no name-collisions
         try:
+            before = self._album_ids()  # snapshot to identify what this import adds (D21)
             stager.stage(rec, str(staging))
             if rec.import_target == ImportTarget.beets.value:
                 self._beets.import_dir(str(staging))
