@@ -37,13 +37,9 @@ describe("App", () => {
 		stubFetch();
 		render(<App />);
 		fireEvent.click(screen.getByRole("button", { name: "Guide" }));
-		expect(
-			screen.getByRole("heading", { name: "How mcm works" }),
-		).toBeTruthy();
+		expect(screen.getByRole("heading", { name: "How mcm works" })).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "Dashboard" }));
-		expect(
-			screen.queryByRole("heading", { name: "How mcm works" }),
-		).toBeNull();
+		expect(screen.queryByRole("heading", { name: "How mcm works" })).toBeNull();
 	});
 
 	it("filters the visible tables as you type", async () => {
