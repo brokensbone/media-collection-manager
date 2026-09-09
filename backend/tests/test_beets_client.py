@@ -121,6 +121,25 @@ def test_import_dir_skips_duplicates_uses_asis_and_traps_directory(
     assert "duplicate_action: skip" in captured["override"]
 
 
+def test_import_dir_overrides_migrated_directory_when_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_run(argv: list[str], **kwargs: Any) -> object:
+        captured["override"] = Path(argv[argv.index("--config") + 1]).read_text()
+
+        class Result:
+            stdout = ""
+            stderr = ""
+
+        return Result()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    BeetsClient(import_directory="/data/library").import_dir("/drop")
+    assert '"directory": "/data/library"' in captured["override"]
+
+
 def test_trap_flags_default_directory_and_passes_the_configured_one(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:

@@ -235,7 +235,7 @@ def build_import_runner(settings: Settings, session_factory: sessionmaker[Sessio
         disposition=settings.watchdir_disposition,
         archive_subdir=settings.watchdir_archive_subdir,
     )
-    beets = BeetsClient()
+    beets = BeetsClient(import_directory=settings.beets_directory)
     reverse_matcher = ReverseMatcher(
         repo=AlbumRepo(session_factory),
         api=HttpxSpotifyApiClient(

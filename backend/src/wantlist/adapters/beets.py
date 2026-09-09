@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import subprocess
@@ -50,6 +51,9 @@ class BeetsClient:
     directory) to find its config.yaml and, via that config, the library.db + music. Never raw
     SQLite. Relative library/directory paths in the config resolve against BEETSDIR, so pointing
     BEETSDIR at the mounted library dir is all that's needed."""
+
+    def __init__(self, *, import_directory: str = "") -> None:
+        self._import_directory = import_directory
 
     def owned_release_group_ids(self) -> set[str]:
         out = self._run("list", "-a", "-f", "$mb_releasegroupid", timeout=120)
@@ -107,7 +111,12 @@ class BeetsClient:
         `-vv` is a diagnostic trap (see `_trap_import_directory`): it makes beets log the config
         and library paths it actually resolved for THIS invocation, which we then record."""
         with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as ov:
-            ov.write("import:\n    duplicate_action: skip\n")
+            # JSON is also valid YAML, avoiding unsafe interpolation for paths with spaces or
+            # punctuation. This overlay has higher priority than the migrated config.yaml.
+            override: dict[str, object] = {"import": {"duplicate_action": "skip"}}
+            if self._import_directory:
+                override["directory"] = self._import_directory
+            ov.write(json.dumps(override))
             overrides = ov.name
         try:
             result = self._run_result(
