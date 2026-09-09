@@ -1,6 +1,6 @@
 import pytest
 
-from wantlist.torrent_submission_service import TorrentSubmissionService
+from mcm.torrent_submission_service import TorrentSubmissionService
 
 
 class _Uploader:

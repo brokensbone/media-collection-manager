@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.models import Album, AlbumState, LinkSource, Provenance
-from wantlist.reconcile import OwnershipReconciler
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.models import Album, AlbumState, LinkSource, Provenance
+from mcm.reconcile import OwnershipReconciler
 
 from .fakes import RecordingEventSink, StubOwnedReleaseGroups
 

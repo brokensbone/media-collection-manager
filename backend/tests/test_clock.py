@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
-from wantlist.adapters.clock import SystemClock
-from wantlist.ports.clock import Clock
+from mcm.adapters.clock import SystemClock
+from mcm.ports.clock import Clock
 
 
 class FrozenClock:

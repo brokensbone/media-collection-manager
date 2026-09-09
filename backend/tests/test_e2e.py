@@ -19,11 +19,11 @@ from beets.library import Item, Library
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 
-from wantlist.app import create_app
-from wantlist.config import Settings
-from wantlist.db import make_engine, make_session_factory
-from wantlist.jobs import ingest_once, reconcile_once
-from wantlist.models import Base
+from mcm.app import create_app
+from mcm.config import Settings
+from mcm.db import make_engine, make_session_factory
+from mcm.jobs import ingest_once, reconcile_once
+from mcm.models import Base
 
 OWNED_RGID = "rg-owned-e2e"
 LONG_AGO = "2020-01-01T00:00:00Z"  # a fixed save time; Decide surfaces saves regardless of age

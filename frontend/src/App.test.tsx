@@ -30,20 +30,16 @@ describe("App", () => {
 	it("renders the app name", () => {
 		stubFetch();
 		render(<App />);
-		expect(screen.getByText("wantlist")).toBeTruthy();
+		expect(screen.getByText("mcm")).toBeTruthy();
 	});
 
 	it("toggles to the guide from the top bar and back", () => {
 		stubFetch();
 		render(<App />);
 		fireEvent.click(screen.getByRole("button", { name: "Guide" }));
-		expect(
-			screen.getByRole("heading", { name: "How wantlist works" }),
-		).toBeTruthy();
+		expect(screen.getByRole("heading", { name: "How mcm works" })).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "Dashboard" }));
-		expect(
-			screen.queryByRole("heading", { name: "How wantlist works" }),
-		).toBeNull();
+		expect(screen.queryByRole("heading", { name: "How mcm works" })).toBeNull();
 	});
 
 	it("filters the visible tables as you type", async () => {

@@ -1,7 +1,7 @@
 import subprocess
 from typing import Any
 
-from wantlist.adapters.rsync import RsyncTransfer
+from mcm.adapters.rsync import RsyncTransfer
 
 
 def _capture(monkeypatch: Any) -> dict[str, Any]:

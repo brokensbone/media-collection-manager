@@ -10,8 +10,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
 from testcontainers.postgres import PostgresContainer
 
-from wantlist.app import create_app
-from wantlist.config import Settings
+from mcm.app import create_app
+from mcm.config import Settings
 
 EXPECTED_TABLES = {
     "album",
@@ -29,7 +29,7 @@ def pg_url() -> Iterator[str]:
     with PostgresContainer("postgres:16", driver="psycopg") as pg:
         url = pg.get_connection_url()
         monkey = pytest.MonkeyPatch()
-        monkey.setenv("WANTLIST_DATABASE_URL", url)  # env.py builds its url from Settings
+        monkey.setenv("MCM_DATABASE_URL", url)  # env.py builds its url from Settings
         command.upgrade(Config("alembic.ini"), "head")
         monkey.undo()
         yield url

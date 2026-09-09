@@ -48,8 +48,8 @@ docker compose up -d --build
 ```
 
 App + worker only — use an external Postgres database and bind-mount your existing beets library.
-Fill [`prod/.env.example`](prod/.env.example): point `WANTLIST_DATABASE_URL` at the database,
-set `WANTLIST_BEETS_DIR` to your beets directory (the app runs beets with `BEETSDIR` set to it,
+Fill [`prod/.env.example`](prod/.env.example): point `MCM_DATABASE_URL` at the database,
+set `MCM_BEETS_DIR` to your beets directory (the app runs beets with `BEETSDIR` set to it,
 so beets finds its own config + library there), and set the music dir to its real absolute path
 (see below).
 

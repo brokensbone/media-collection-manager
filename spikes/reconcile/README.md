@@ -32,7 +32,7 @@ Standalone: read-only Spotify + MusicBrainz + a beets dump. No app, no Postgres.
 ```
 SPOTIFY_CLIENT_ID=xxx \
 SPOTIFY_CLIENT_SECRET=yyy \
-MB_USER_AGENT="wantlist-spike/0.1 ( you@example.com )" \
+MB_USER_AGENT="mcm-spike/0.1 ( you@example.com )" \
 uv run reconcile_spike.py --owned-file owned_rgids.txt --sample 80
 ```
 

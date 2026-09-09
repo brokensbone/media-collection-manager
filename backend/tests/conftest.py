@@ -6,8 +6,8 @@ from sqlalchemy import create_engine, delete
 from sqlalchemy.orm import Session, sessionmaker
 from testcontainers.postgres import PostgresContainer
 
-from wantlist.db import make_session_factory
-from wantlist.models import (
+from mcm.db import make_session_factory
+from mcm.models import (
     Album,
     AlbumArt,
     Base,

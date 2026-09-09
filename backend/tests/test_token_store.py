@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.token_store import TokenStore
+from mcm.adapters.token_store import TokenStore
 
 NOW = datetime(2026, 7, 16, tzinfo=UTC)
 

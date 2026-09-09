@@ -3,14 +3,14 @@ from datetime import UTC, datetime, timedelta
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.acquire import AcquireService
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.adapters.beets import BeetsAlbum
-from wantlist.app import create_app
-from wantlist.config import Settings
-from wantlist.decide import DecideService
-from wantlist.library_assist import LibraryAssistService
-from wantlist.models import Album, AlbumState, Provenance
+from mcm.acquire import AcquireService
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.adapters.beets import BeetsAlbum
+from mcm.app import create_app
+from mcm.config import Settings
+from mcm.decide import DecideService
+from mcm.library_assist import LibraryAssistService
+from mcm.models import Album, AlbumState, Provenance
 
 from .fakes import FrozenClock, StubLibraryCatalog
 

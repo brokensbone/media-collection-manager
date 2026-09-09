@@ -2,9 +2,9 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.decide import DecideService
-from wantlist.models import Album, AlbumState, PlayHistory, Provenance
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.decide import DecideService
+from mcm.models import Album, AlbumState, PlayHistory, Provenance
 
 from .fakes import FrozenClock
 

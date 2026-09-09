@@ -3,7 +3,7 @@ import urllib.parse
 import httpx
 import respx
 
-from wantlist.adapters.mb_resolver import HttpxMusicBrainzResolver
+from mcm.adapters.mb_resolver import HttpxMusicBrainzResolver
 
 MB = "https://mb.test/ws/2"
 

@@ -2,9 +2,9 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.play_history import PlayHistoryService
-from wantlist.ports.spotify_api import Play
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.play_history import PlayHistoryService
+from mcm.ports.spotify_api import Play
 
 from .fakes import StubSpotifyApiClient, StubTokens
 

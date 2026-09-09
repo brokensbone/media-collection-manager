@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.ingest import IngestService
-from wantlist.models import Album, AlbumState, Provenance
-from wantlist.ports.spotify_api import SavedAlbum
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.ingest import IngestService
+from mcm.models import Album, AlbumState, Provenance
+from mcm.ports.spotify_api import SavedAlbum
 
 from .fakes import StubSpotifyApiClient, StubTokens, fake_fetch_image
 

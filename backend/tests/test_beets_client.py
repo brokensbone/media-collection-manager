@@ -6,8 +6,8 @@ from typing import Any
 import pytest
 from beets.library import Item, Library
 
-import wantlist.adapters.beets as beets_mod
-from wantlist.adapters.beets import BeetsClient
+import mcm.adapters.beets as beets_mod
+from mcm.adapters.beets import BeetsClient
 
 
 def _make_beets_dir(tmp_path: Path) -> Path:
@@ -154,13 +154,13 @@ def test_trap_flags_default_directory_and_passes_the_configured_one(
         "library database: /mnt/ssd4tb/record-library/beets.db\n"
         "library directory: /home/example/.config/beets/library\n"
     )
-    with caplog.at_level("INFO", logger="wantlist.adapters.beets"):
+    with caplog.at_level("INFO", logger="mcm.adapters.beets"):
         client._trap_import_directory("/drop", good)
     assert "directory ok" in caplog.text and "/home/example" in caplog.text
 
     caplog.clear()
     bad = "library directory: /root/Music\n"  # beets fell back to its default → the bug
-    with caplog.at_level("INFO", logger="wantlist.adapters.beets"):
+    with caplog.at_level("INFO", logger="mcm.adapters.beets"):
         client._trap_import_directory("/drop", bad)
     assert "DEFAULT (wrong) library directory" in caplog.text
 

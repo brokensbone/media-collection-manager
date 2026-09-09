@@ -1,9 +1,9 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.event_log import WorkerEventLog
-from wantlist.app import create_app
-from wantlist.config import Settings
+from mcm.adapters.event_log import WorkerEventLog
+from mcm.app import create_app
+from mcm.config import Settings
 
 
 def _client(sf: sessionmaker[Session]) -> TestClient:

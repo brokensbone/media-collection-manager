@@ -118,7 +118,7 @@ export default function App() {
 	return (
 		<div className="app">
 			<header className="topbar">
-				<span className="brand">wantlist</span>
+				<span className="brand">mcm</span>
 				<div className="topbar-right">
 					<button
 						type="button"

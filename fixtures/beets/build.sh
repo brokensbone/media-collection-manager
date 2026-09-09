@@ -3,8 +3,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 mkdir -p out
-docker build -t wantlist-beets-fixture .
-docker run --rm -v "$PWD/out:/out" wantlist-beets-fixture
+docker build -t mcm-beets-fixture .
+docker run --rm -v "$PWD/out:/out" mcm-beets-fixture
 echo
 echo "Fixture ready:"
 echo "  library.db      -> $PWD/out/library.db   (seed for D2/D5/§14 tests)"

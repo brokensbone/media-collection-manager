@@ -23,7 +23,7 @@ class MetricsService:
         status = self._auth.status()
         _gauge(
             lines,
-            "wantlist_spotify_connected",
+            "mcm_spotify_connected",
             "Spotify refresh token present (1) or reconnect needed (0).",
             [("", 1 if status.connected else 0)],
         )
@@ -31,7 +31,7 @@ class MetricsService:
         days = status.reauth_in_days if status.reauth_in_days is not None else 0
         _gauge(
             lines,
-            "wantlist_spotify_reauth_days_remaining",
+            "mcm_spotify_reauth_days_remaining",
             "Days until the Spotify refresh token expires; 0 = reconnect now.",
             [("", max(days, 0))],
         )
@@ -39,20 +39,20 @@ class MetricsService:
         counts = self._repo.count_by_state()
         _gauge(
             lines,
-            "wantlist_albums",
+            "mcm_albums",
             "Albums in each funnel state.",
             [(f'state="{s.value}"', counts.get(s.value, 0)) for s in AlbumState],
         )
         _gauge(
             lines,
-            "wantlist_albums_missing_art",
+            "mcm_albums_missing_art",
             "Albums with a source art URL but no stored cover blob yet.",
             [("", self._repo.count_missing_art())],
         )
         resolved, unresolved = self._repo.resolution_counts()
         _gauge(
             lines,
-            "wantlist_albums_resolution",
+            "mcm_albums_resolution",
             "Albums by MusicBrainz release-group resolution state (cold-start progress).",
             [('state="resolved"', resolved), ('state="unresolved"', unresolved)],
         )
@@ -60,7 +60,7 @@ class MetricsService:
         runs = self._repo.job_runs()
         _gauge(
             lines,
-            "wantlist_job_last_success_timestamp",
+            "mcm_job_last_success_timestamp",
             "Unix time of each poller's last successful run; 0 = never. Alert on staleness.",
             [
                 (f'job="{r.job}"', int(r.last_success_at.timestamp()) if r.last_success_at else 0)
@@ -69,13 +69,13 @@ class MetricsService:
         )
         _counter(
             lines,
-            "wantlist_job_runs_total",
+            "mcm_job_runs_total",
             "Total successful runs per poller.",
             [(f'job="{r.job}"', r.runs) for r in runs],
         )
         _counter(
             lines,
-            "wantlist_job_errors_total",
+            "mcm_job_errors_total",
             "Total errored runs per poller.",
             [(f'job="{r.job}"', r.errors) for r in runs],
         )

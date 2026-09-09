@@ -39,7 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     engine = make_engine(settings.database_url)
     session_factory = make_session_factory(engine)
 
-    app = FastAPI(title="wantlist")
+    app = FastAPI(title="mcm")
     app.state.settings = settings
     app.state.engine = engine
     app.state.auth_service = build_auth_service(settings, session_factory)

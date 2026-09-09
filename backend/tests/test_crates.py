@@ -3,11 +3,11 @@ from collections.abc import Iterable
 import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.adapters.beets import BeetsAlbum
-from wantlist.adapters.box_repo import BoxRepo
-from wantlist.crates import BoxNotEmpty, CrateError, CrateService, SplitCandidate
-from wantlist.library_assist import LibraryAssistService
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.adapters.beets import BeetsAlbum
+from mcm.adapters.box_repo import BoxRepo
+from mcm.crates import BoxNotEmpty, CrateError, CrateService, SplitCandidate
+from mcm.library_assist import LibraryAssistService
 
 from .fakes import StubLibraryCatalog
 

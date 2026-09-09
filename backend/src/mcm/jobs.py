@@ -51,7 +51,7 @@ def _refresh_library_cache(session_factory: sessionmaker[Session]) -> None:
 
 
 def ingest_once(settings: Settings | None = None) -> None:
-    """One saves-ingest + art-fetch pass. CLI form: `python -m wantlist.jobs`."""
+    """One saves-ingest + art-fetch pass. CLI form: `python -m mcm.jobs`."""
     settings = settings or Settings()
     session_factory = _session_factory(settings)
     with heartbeat(session_factory, "ingest"):

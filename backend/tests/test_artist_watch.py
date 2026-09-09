@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.artist_watch import ArtistWatchService
-from wantlist.ports.spotify_api import SavedAlbum
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.artist_watch import ArtistWatchService
+from mcm.ports.spotify_api import SavedAlbum
 
 from .fakes import StubSpotifyApiClient, StubTokens
 

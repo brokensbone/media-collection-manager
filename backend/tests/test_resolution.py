@@ -3,9 +3,9 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.models import Album, AlbumState, Provenance
-from wantlist.resolution import ResolutionService
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.models import Album, AlbumState, Provenance
+from mcm.resolution import ResolutionService
 
 from .fakes import StubMusicBrainzResolver, StubSpotifyApiClient, StubTokens
 

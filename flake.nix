@@ -47,7 +47,7 @@
           });
           fastapi = pythonPackages.fastapi.overridePythonAttrs (_: { doCheck = false; });
           # APScheduler 3.11.2's upstream process-pool tests are flaky under the current
-          # sandboxed Python build. Wantlist's own tests cover its scheduler integration.
+          # sandboxed Python build. MCM's own tests cover its scheduler integration.
           apscheduler = pythonPackages.apscheduler.overridePythonAttrs (_: { doCheck = false; });
           # nixpkgs currently packages requests-ratelimiter 0.7.0, which is
           # incompatible with its pyrate-limiter 3.x package. Keep this pair
@@ -78,7 +78,7 @@
             ];
             doCheck = false;
           };
-          # Wantlist invokes beets' core commands directly. Build that core rather than the
+          # MCM invokes beets' core commands directly. Build that core rather than the
           # nixpkgs convenience package, which bundles optional plugins and GStreamer support
           # into a multi-gigabyte desktop/media runtime closure.
           beets = pythonPackages.buildPythonPackage rec {
@@ -111,8 +111,8 @@
 
           backend = pythonPackages.buildPythonPackage {
             # This must match the Python distribution name in pyproject.toml;
-            # the service-side name remains wantlist-backend at the Nix API.
-            pname = "wantlist";
+            # the service-side name remains mcm-backend at the Nix API.
+            pname = "mcm";
             version = "0.1.0";
             src = ./backend;
             pyproject = true;
@@ -134,10 +134,10 @@
 
           pythonEnv = python.withPackages (_: [ backend ]);
           frontend = pkgs.buildNpmPackage {
-            pname = "wantlist-frontend";
+            pname = "mcm-frontend";
             version = "0.1.0";
             src = ./frontend;
-            npmDepsHash = "sha256-mRQMaRZRt6BFTMRiq4Gm5MijOygm6tc/01zsqcBa+dY=";
+            npmDepsHash = "sha256-o82wjpP6LDkJpfKfDNldcV5E4SUqYUmD++xozF2Vv/w=";
             npmBuildScript = "build";
             installPhase = ''
               runHook preInstall
@@ -147,36 +147,36 @@
             '';
           };
 
-          backendSource = pkgs.runCommand "wantlist-backend-source" { src = ./backend; } ''
+          backendSource = pkgs.runCommand "mcm-backend-source" { src = ./backend; } ''
             cp -R "$src" "$out"
             chmod -R u+w "$out"
           '';
 
           api = pkgs.writeShellApplication {
-            name = "wantlist-api";
+            name = "mcm-api";
             runtimeInputs = [ pkgs.openssh pkgs.rsync ];
             text = ''
-              export WANTLIST_STATIC_DIR="''${WANTLIST_STATIC_DIR:-${frontend}}"
-              exec ${pythonEnv}/bin/python -m uvicorn wantlist.app:app \
-                --host "''${WANTLIST_HOST:-127.0.0.1}" \
-                --port "''${WANTLIST_PORT:-8000}" \
+              export MCM_STATIC_DIR="''${MCM_STATIC_DIR:-${frontend}}"
+              exec ${pythonEnv}/bin/python -m uvicorn mcm.app:app \
+                --host "''${MCM_HOST:-127.0.0.1}" \
+                --port "''${MCM_PORT:-8000}" \
                 "$@"
             '';
           };
 
           worker = pkgs.writeShellApplication {
-            name = "wantlist-worker";
+            name = "mcm-worker";
             # Beets is a Python dependency of the backend, but Python's runtime closure
             # does not expose its console scripts on PATH.  The worker invokes `beet`
             # directly for imports and catalogue refreshes.
             runtimeInputs = [ pkgs.openssh pkgs.rsync beets ];
             text = ''
-              exec ${pythonEnv}/bin/python -m wantlist.worker "$@"
+              exec ${pythonEnv}/bin/python -m mcm.worker "$@"
             '';
           };
 
           migrations = pkgs.writeShellApplication {
-            name = "wantlist-migrate";
+            name = "mcm-migrate";
             text = ''
               cd ${backendSource}
               exec ${pythonEnv}/bin/alembic "$@"
@@ -185,15 +185,15 @@
         in
         rec {
           inherit api backend frontend migrations worker;
-          wantlist-api = api;
-          wantlist-worker = worker;
-          wantlist-migrate = migrations;
+          mcm-api = api;
+          mcm-worker = worker;
+          mcm-migrate = migrations;
           image = pkgs.dockerTools.buildLayeredImage {
-            name = "wantlist";
+            name = "mcm";
             tag = "latest";
             contents = [ api worker migrations ];
             config = {
-              Cmd = [ "${api}/bin/wantlist-api" ];
+              Cmd = [ "${api}/bin/mcm-api" ];
               ExposedPorts = { "8000/tcp" = { }; };
             };
           };

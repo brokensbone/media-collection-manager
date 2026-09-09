@@ -1,4 +1,4 @@
-from wantlist.domain.match import MatchTarget, best_match
+from mcm.domain.match import MatchTarget, best_match
 
 TARGETS = [
     MatchTarget(id=1, artist="Patrick Wolf", title="Lupercalia"),

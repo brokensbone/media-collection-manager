@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from wantlist.domain.verdict import ZERO_PLAYS, PlayStat, listened_reason
+from mcm.domain.verdict import ZERO_PLAYS, PlayStat, listened_reason
 
 NOW = datetime(2026, 7, 16, tzinfo=UTC)
 

@@ -2,9 +2,9 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.models import Album, AlbumState, Provenance
-from wantlist.releases import ReleasesService
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.models import Album, AlbumState, Provenance
+from mcm.releases import ReleasesService
 
 from .fakes import FrozenClock, StubSpotifyApiClient, StubTokens
 

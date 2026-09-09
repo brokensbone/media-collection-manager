@@ -3,12 +3,12 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.acquire import AcquireService
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.adapters.beets import BeetsAlbum
-from wantlist.library_assist import LibraryAssistService
-from wantlist.models import Album, AlbumState, Provenance
-from wantlist.reconcile import OwnershipReconciler
+from mcm.acquire import AcquireService
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.adapters.beets import BeetsAlbum
+from mcm.library_assist import LibraryAssistService
+from mcm.models import Album, AlbumState, Provenance
+from mcm.reconcile import OwnershipReconciler
 
 from .fakes import StubLibraryCatalog, StubOwnedReleaseGroups
 

@@ -1,12 +1,12 @@
 export function Guide() {
 	return (
 		<div className="guide">
-			<h1>How wantlist works</h1>
+			<h1>How mcm works</h1>
 			<p>
-				wantlist is a smart want-list for music. It watches the albums you save
-				on Spotify, checks them against what you already own in your beets
-				library, and turns them into small, clearable to-do lists — so the album
-				you meant to buy doesn't quietly get forgotten. It is{" "}
+				mcm is a smart want-list for music. It watches the albums you save on
+				Spotify, checks them against what you already own in your beets library,
+				and turns them into small, clearable to-do lists — so the album you
+				meant to buy doesn't quietly get forgotten. It is{" "}
 				<strong>not a recommender</strong>: everything here started with you.
 			</p>
 
@@ -62,9 +62,9 @@ export function Guide() {
 				spots it in your library) — there's no separate "ordered" step to track.
 			</p>
 			<p>
-				When an album lands in your library wantlist normally notices by itself.
-				But editions differ — you might own the deluxe when Spotify had the
-				standard — so <strong>Mark owned…</strong> opens a box to{" "}
+				When an album lands in your library mcm normally notices by itself. But
+				editions differ — you might own the deluxe when Spotify had the standard
+				— so <strong>Mark owned…</strong> opens a box to{" "}
 				<strong>search your library</strong> and link the want to the exact
 				album (a sticky link reconcile won't undo), or mark it owned without a
 				link if it's not in beets. If a want looks like something you already
@@ -95,21 +95,21 @@ export function Guide() {
 
 			<h2>Staying connected to Spotify</h2>
 			<p>
-				The status in the top bar tells you whether wantlist is connected to
-				Spotify and roughly when you'll need to <strong>reconnect</strong>{" "}
-				(about every six months). This matters: if the connection lapses, every
-				worklist quietly stops filling — no new saves, plays, or releases come
-				in — so reconnect promptly when it asks.
+				The status in the top bar tells you whether mcm is connected to Spotify
+				and roughly when you'll need to <strong>reconnect</strong> (about every
+				six months). This matters: if the connection lapses, every worklist
+				quietly stops filling — no new saves, plays, or releases come in — so
+				reconnect promptly when it asks.
 			</p>
 
 			<h2>How it works behind the scenes</h2>
 			<p>
-				wantlist checks Spotify on a schedule for new saves, recent plays, and
-				new releases from your artists. Ownership isn't something you set — it's{" "}
-				<em>derived</em>: wantlist regularly compares your want-list against
-				your beets library and marks matches as owned (this is called
-				reconcile). Nothing here is a recommendation engine and nothing is
-				bought automatically — it only ever surfaces choices for you to make.
+				mcm checks Spotify on a schedule for new saves, recent plays, and new
+				releases from your artists. Ownership isn't something you set — it's{" "}
+				<em>derived</em>: mcm regularly compares your want-list against your
+				beets library and marks matches as owned (this is called reconcile).
+				Nothing here is a recommendation engine and nothing is bought
+				automatically — it only ever surfaces choices for you to make.
 			</p>
 		</div>
 	);

@@ -3,7 +3,7 @@ import json
 import httpx
 import respx
 
-from wantlist.adapters.transmission import HttpxTransmissionClient
+from mcm.adapters.transmission import HttpxTransmissionClient
 
 RPC = "http://transmission.test/transmission/rpc"
 
