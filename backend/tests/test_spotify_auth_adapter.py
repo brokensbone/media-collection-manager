@@ -2,8 +2,8 @@ import httpx
 import pytest
 import respx
 
-from wantlist.adapters.spotify_auth import HttpxSpotifyAuthClient
-from wantlist.ports.spotify import ReauthRequired
+from mcm.adapters.spotify_auth import HttpxSpotifyAuthClient
+from mcm.ports.spotify import ReauthRequired
 
 ACCOUNTS = "https://accounts.test"
 

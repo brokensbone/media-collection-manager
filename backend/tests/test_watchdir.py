@@ -4,15 +4,15 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.adapters.tags import MediaFileTagReader
-from wantlist.imports import (
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.adapters.tags import MediaFileTagReader
+from mcm.imports import (
     ImportRunner,
     VideoLibraryImporter,
     WatchdirDetectionService,
     WatchdirStager,
 )
-from wantlist.models import Album, AlbumState, ImportSource, ImportState, Provenance
+from mcm.models import Album, AlbumState, ImportSource, ImportState, Provenance
 
 from .fakes import FrozenClock, RecordingBeetsClient
 

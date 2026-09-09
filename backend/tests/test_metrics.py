@@ -4,13 +4,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.app import create_app
-from wantlist.config import Settings
-from wantlist.domain.auth import AuthStatus
-from wantlist.jobs import heartbeat
-from wantlist.metrics import MetricsService
-from wantlist.models import Album, AlbumState, Provenance
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.app import create_app
+from mcm.config import Settings
+from mcm.domain.auth import AuthStatus
+from mcm.jobs import heartbeat
+from mcm.metrics import MetricsService
+from mcm.models import Album, AlbumState, Provenance
 
 T1 = datetime(2026, 7, 17, 12, 0, tzinfo=UTC)
 
@@ -85,15 +85,15 @@ def test_render_exposes_the_key_series(clean_album_tables: sessionmaker[Session]
 
     text = MetricsService(repo=repo, auth=_connected(42)).render()  # type: ignore[arg-type]
 
-    assert "wantlist_spotify_connected 1" in text
-    assert "wantlist_spotify_reauth_days_remaining 42" in text
-    assert 'wantlist_albums{state="wanted"} 2' in text
-    assert 'wantlist_albums{state="owned"} 1' in text
-    assert 'wantlist_albums{state="saved"} 0' in text  # absent states still emitted
-    assert "wantlist_albums_missing_art 0" in text
-    assert f'wantlist_job_last_success_timestamp{{job="ingest"}} {int(T1.timestamp())}' in text
-    assert 'wantlist_job_runs_total{job="ingest"} 1' in text
-    assert "# TYPE wantlist_job_runs_total counter" in text
+    assert "mcm_spotify_connected 1" in text
+    assert "mcm_spotify_reauth_days_remaining 42" in text
+    assert 'mcm_albums{state="wanted"} 2' in text
+    assert 'mcm_albums{state="owned"} 1' in text
+    assert 'mcm_albums{state="saved"} 0' in text  # absent states still emitted
+    assert "mcm_albums_missing_art 0" in text
+    assert f'mcm_job_last_success_timestamp{{job="ingest"}} {int(T1.timestamp())}' in text
+    assert 'mcm_job_runs_total{job="ingest"} 1' in text
+    assert "# TYPE mcm_job_runs_total counter" in text
 
 
 def test_render_disconnected_flags_reconnect_now(
@@ -103,8 +103,8 @@ def test_render_disconnected_flags_reconnect_now(
         AuthStatus(connected=False, authorized_at=None, reauth_in_days=None, reauth_due=True)
     )
     text = MetricsService(repo=AlbumRepo(clean_album_tables), auth=auth).render()  # type: ignore[arg-type]
-    assert "wantlist_spotify_connected 0" in text
-    assert "wantlist_spotify_reauth_days_remaining 0" in text  # 0 = reconnect now
+    assert "mcm_spotify_connected 0" in text
+    assert "mcm_spotify_reauth_days_remaining 0" in text  # 0 = reconnect now
 
 
 # --- route ----------------------------------------------------------------------------
@@ -122,4 +122,4 @@ def test_metrics_route_serves_prometheus_text(
 
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("text/plain; version=0.0.4")
-    assert "wantlist_spotify_connected 1" in resp.text
+    assert "mcm_spotify_connected 1" in resp.text

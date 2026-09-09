@@ -3,11 +3,11 @@ from datetime import UTC, datetime, timedelta
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.app import create_app
-from wantlist.config import Settings
-from wantlist.decide import DecideService
-from wantlist.models import Album, AlbumState, Provenance
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.app import create_app
+from mcm.config import Settings
+from mcm.decide import DecideService
+from mcm.models import Album, AlbumState, Provenance
 
 from .fakes import FrozenClock
 

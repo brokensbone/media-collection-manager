@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
-from wantlist.app import create_app
-from wantlist.config import Settings
+from mcm.app import create_app
+from mcm.config import Settings
 
 
 class _TorrentSubmissionService:

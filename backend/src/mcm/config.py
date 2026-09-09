@@ -2,12 +2,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """The environment contract (SPEC §8a). All from env (WANTLIST_*) or a .env file."""
+    """The environment contract (SPEC §8a). All from env (MCM_*) or a .env file."""
 
-    model_config = SettingsConfigDict(env_prefix="WANTLIST_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="MCM_", env_file=".env", extra="ignore")
 
     # Storage
-    database_url: str = "postgresql+psycopg://localhost:5432/wantlist"
+    database_url: str = "postgresql+psycopg://localhost:5432/mcm"
 
     # Optional: serve the built frontend (SPA) from this directory at `/`, so a single
     # container can serve both UI and API on one origin (D10). Empty = API only (dev uses Vite).

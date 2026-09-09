@@ -3,13 +3,13 @@ from collections.abc import Iterable
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.adapters.beets import BeetsAlbum
-from wantlist.adapters.box_repo import BoxRepo
-from wantlist.app import create_app
-from wantlist.config import Settings
-from wantlist.crates import CrateService
-from wantlist.library_assist import LibraryAssistService
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.adapters.beets import BeetsAlbum
+from mcm.adapters.box_repo import BoxRepo
+from mcm.app import create_app
+from mcm.config import Settings
+from mcm.crates import CrateService
+from mcm.library_assist import LibraryAssistService
 
 from .fakes import StubLibraryCatalog
 

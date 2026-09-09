@@ -1,4 +1,4 @@
-from wantlist.domain.bandcamp import bandcamp_search_url
+from mcm.domain.bandcamp import bandcamp_search_url
 
 
 def test_bandcamp_search_url_encodes_artist_and_title() -> None:

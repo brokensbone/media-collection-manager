@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from wantlist.domain.auth import compute_status
+from mcm.domain.auth import compute_status
 
 NOW = datetime(2026, 7, 16, tzinfo=UTC)
 

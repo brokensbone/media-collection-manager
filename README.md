@@ -12,14 +12,14 @@ making an instance reachable by anyone else.
 
 The flake is the supported upstream packaging interface. It exposes these packages:
 
-- `wantlist-api` — serves the API and bundled SPA. It listens on 127.0.0.1:8000 by default;
-  set `WANTLIST_HOST` and `WANTLIST_PORT` to override that.
-- `wantlist-worker` — runs scheduled polling and import work.
-- `wantlist-migrate` — runs Alembic, e.g. `wantlist-migrate upgrade head`.
+- `mcm-api` — serves the API and bundled SPA. It listens on 127.0.0.1:8000 by default;
+  set `MCM_HOST` and `MCM_PORT` to override that.
+- `mcm-worker` — runs scheduled polling and import work.
+- `mcm-migrate` — runs Alembic, e.g. `mcm-migrate upgrade head`.
 - `frontend` and `backend` — separately consumable build outputs.
-- `image` — an OCI image whose default command is `wantlist-api`.
+- `image` — an OCI image whose default command is `mcm-api`.
 
-`wantlist-api` supplies the packaged SPA through `WANTLIST_STATIC_DIR` unless the deployment
+`mcm-api` supplies the packaged SPA through `MCM_STATIC_DIR` unless the deployment
 sets that variable itself. Runtime configuration remains environment-based; see
 [`deploy/local/.env.example`](deploy/local/.env.example) for the available settings. A host
 integration should run migrations before the API and worker, and manage all credentials outside
@@ -41,7 +41,7 @@ uv run pytest        # tests
 uv run ruff check .  # lint
 uv run ruff format . # format
 uv run mypy          # types
-uv run uvicorn wantlist.app:app --reload   # run the API
+uv run uvicorn mcm.app:app --reload   # run the API
 ```
 
 Frontend (from `frontend/`):

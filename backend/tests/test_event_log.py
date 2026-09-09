@@ -1,8 +1,8 @@
 import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
-import wantlist.adapters.event_log as event_log
-from wantlist.adapters.event_log import WorkerEventLog
+import mcm.adapters.event_log as event_log
+from mcm.adapters.event_log import WorkerEventLog
 
 
 def test_emit_and_recent_are_ascending(clean_album_tables: sessionmaker[Session]) -> None:

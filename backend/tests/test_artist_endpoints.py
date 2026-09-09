@@ -1,7 +1,7 @@
 import httpx
 import respx
 
-from wantlist.adapters.spotify_api import HttpxSpotifyApiClient
+from mcm.adapters.spotify_api import HttpxSpotifyApiClient
 
 API = "https://api.test/v1"
 

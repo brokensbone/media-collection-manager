@@ -8,9 +8,9 @@ import pytest
 from sqlalchemy import update
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.adapters.beets import BeetsAlbum
-from wantlist.imports import (
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.adapters.beets import BeetsAlbum
+from mcm.imports import (
     ImportDetectionService,
     ImportRunner,
     ImportsService,
@@ -20,7 +20,7 @@ from wantlist.imports import (
     _classify_torrent,
     _move_into,
 )
-from wantlist.models import (
+from mcm.models import (
     Album,
     AlbumState,
     ImportSource,
@@ -30,9 +30,9 @@ from wantlist.models import (
     PendingImport,
     Provenance,
 )
-from wantlist.ports.spotify_api import SavedAlbum
-from wantlist.ports.transmission import Torrent
-from wantlist.reverse_match import ReverseMatcher
+from mcm.ports.spotify_api import SavedAlbum
+from mcm.ports.transmission import Torrent
+from mcm.reverse_match import ReverseMatcher
 
 from .fakes import (
     FakeBeetsLibrary,

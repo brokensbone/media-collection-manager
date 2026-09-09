@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.beets import BeetsAlbum
-from wantlist.adapters.beets_cache import BeetsCatalogCache
+from mcm.adapters.beets import BeetsAlbum
+from mcm.adapters.beets_cache import BeetsCatalogCache
 
 
 def test_replace_then_read_round_trips(clean_album_tables: sessionmaker[Session]) -> None:

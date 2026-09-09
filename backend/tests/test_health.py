@@ -1,9 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from wantlist import health
-from wantlist.app import create_app
-from wantlist.config import Settings
+from mcm import health
+from mcm.app import create_app
+from mcm.config import Settings
 
 
 def _client(monkeypatch: pytest.MonkeyPatch, *, postgres: bool) -> TestClient:

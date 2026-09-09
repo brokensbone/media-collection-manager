@@ -3,7 +3,7 @@ import json
 import httpx
 import respx
 
-from wantlist.adapters.notifier import WebhookNotifier
+from mcm.adapters.notifier import WebhookNotifier
 
 HOOK = "https://hooks.test/abc"
 

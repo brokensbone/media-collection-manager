@@ -2,8 +2,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from wantlist.auth_service import AuthService
-from wantlist.ports.spotify import ReauthRequired
+from mcm.auth_service import AuthService
+from mcm.ports.spotify import ReauthRequired
 
 from .fakes import FakeTokenStore, FrozenClock, StubSpotifyAuthClient
 

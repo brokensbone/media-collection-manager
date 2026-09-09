@@ -351,7 +351,7 @@ def main() -> None:
     ap.add_argument("--beets-config", default=os.environ.get("BEETS_CONFIG"))
     ap.add_argument("--owned-file", help="dump of `beet list -a -f '$mb_releasegroupid'`")
     ap.add_argument("--user-agent", default=os.environ.get(
-        "MB_USER_AGENT", "wantlist-reconcile-spike/0.1 (set MB_USER_AGENT with a contact)"))
+        "MB_USER_AGENT", "mcm-reconcile-spike/0.1 (set MB_USER_AGENT with a contact)"))
     ap.add_argument("--work-dir", default=".spike", help="token + http cache + output")
     args = ap.parse_args()
 

@@ -1,11 +1,11 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.adapters.beets import BeetsAlbum
-from wantlist.models import Album, AlbumState, LinkSource, Provenance
-from wantlist.ports.spotify_api import SavedAlbum
-from wantlist.reverse_match import ReverseMatcher
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.adapters.beets import BeetsAlbum
+from mcm.models import Album, AlbumState, LinkSource, Provenance
+from mcm.ports.spotify_api import SavedAlbum
+from mcm.reverse_match import ReverseMatcher
 
 from .fakes import StubSpotifyApiClient, StubTokens
 

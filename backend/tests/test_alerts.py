@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.alerts import AlertsService
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.alerts import AlertsService
 
 
 class RecordingNotifier:

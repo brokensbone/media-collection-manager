@@ -29,4 +29,4 @@ ENV PATH="/app/backend/.venv/bin:$PATH"
 COPY --from=frontend /fe/dist /app/frontend-dist
 
 EXPOSE 8000
-CMD ["uvicorn", "wantlist.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "mcm.app:app", "--host", "0.0.0.0", "--port", "8000"]

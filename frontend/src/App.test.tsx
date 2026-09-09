@@ -30,7 +30,7 @@ describe("App", () => {
 	it("renders the app name", () => {
 		stubFetch();
 		render(<App />);
-		expect(screen.getByText("wantlist")).toBeTruthy();
+		expect(screen.getByText("mcm")).toBeTruthy();
 	});
 
 	it("toggles to the guide from the top bar and back", () => {
@@ -38,11 +38,11 @@ describe("App", () => {
 		render(<App />);
 		fireEvent.click(screen.getByRole("button", { name: "Guide" }));
 		expect(
-			screen.getByRole("heading", { name: "How wantlist works" }),
+			screen.getByRole("heading", { name: "How mcm works" }),
 		).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "Dashboard" }));
 		expect(
-			screen.queryByRole("heading", { name: "How wantlist works" }),
+			screen.queryByRole("heading", { name: "How mcm works" }),
 		).toBeNull();
 	});
 

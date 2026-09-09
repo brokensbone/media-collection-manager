@@ -2,9 +2,9 @@ from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 
-from wantlist.app import create_app
-from wantlist.auth_service import AuthService
-from wantlist.config import Settings
+from mcm.app import create_app
+from mcm.auth_service import AuthService
+from mcm.config import Settings
 
 from .fakes import FakeTokenStore, FrozenClock, StubSpotifyAuthClient
 

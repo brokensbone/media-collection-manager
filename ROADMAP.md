@@ -151,10 +151,10 @@ Prometheus metrics so Grafana can alert.
 - **`GET /metrics`** (Prometheus text) on the API, sourced from the **DB** so it's correct
   across processes (the API and the poller worker are separate — in-process counters in
   the worker are invisible to the API). Exposes:
-  - `wantlist_spotify_connected` (0/1) and `wantlist_spotify_reauth_days_remaining` →
+  - `mcm_spotify_connected` (0/1) and `mcm_spotify_reauth_days_remaining` →
     alert *before* the 6-month token expiry (§8c);
-  - `wantlist_albums{state=…}` → Decide / Acquire backlog gauges; `wantlist_albums_missing_art`;
-  - `wantlist_job_last_success_timestamp{job=…}` + run/error counters → alert if a poller
+  - `mcm_albums{state=…}` → Decide / Acquire backlog gauges; `mcm_albums_missing_art`;
+  - `mcm_job_last_success_timestamp{job=…}` + run/error counters → alert if a poller
     stalls or errors (the "silently stopped" guard). Pollers write a heartbeat to a small
     `job_run` table on each pass; `/metrics` reads it.
 - **Done when:** `GET /metrics` returns valid Prometheus text with the above, and scraping

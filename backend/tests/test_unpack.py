@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from wantlist.adapters.unpack import dispose, unpack
+from mcm.adapters.unpack import dispose, unpack
 
 
 def test_unpack_zip_extracts_contents(tmp_path: Path) -> None:

@@ -1,11 +1,11 @@
 from collections.abc import Iterable
 from datetime import datetime
 
-from wantlist.adapters.beets import BeetsAlbum
-from wantlist.adapters.token_store import StoredAuth
-from wantlist.ports.spotify import ReauthRequired, SpotifyTokens
-from wantlist.ports.spotify_api import Play, SavedAlbum
-from wantlist.ports.transmission import Torrent
+from mcm.adapters.beets import BeetsAlbum
+from mcm.adapters.token_store import StoredAuth
+from mcm.ports.spotify import ReauthRequired, SpotifyTokens
+from mcm.ports.spotify_api import Play, SavedAlbum
+from mcm.ports.transmission import Torrent
 
 
 class StubTokens:

@@ -2,9 +2,9 @@ import subprocess
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from wantlist.adapters.album_repo import AlbumRepo
-from wantlist.models import ImportSource, ImportState
-from wantlist.transmission_service import TransmissionService
+from mcm.adapters.album_repo import AlbumRepo
+from mcm.models import ImportSource, ImportState
+from mcm.transmission_service import TransmissionService
 
 
 class _OkClient:

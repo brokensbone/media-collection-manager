@@ -9,21 +9,21 @@ x-app: &app
   build:
     context: ../..
     dockerfile: deploy/Dockerfile
-  image: wantlist-local:latest
+  image: mcm-local:latest
   env_file: .env
   environment:
     # --- infra wiring for this local deploy (the real deploy sets these to its own values) ---
-    WANTLIST_DATABASE_URL: postgresql+psycopg://wantlist:wantlist@postgres:5432/wantlist
+    MCM_DATABASE_URL: postgresql+psycopg://mcm:mcm@postgres:5432/mcm
     BEETSDIR: /beets  # beets reads its config.yaml + library from here
-    WANTLIST_IMPORT_INBOX_PATH: /beets/inbox
-    WANTLIST_STATIC_DIR: /app/frontend-dist  # api serves the SPA; worker ignores it
+    MCM_IMPORT_INBOX_PATH: /beets/inbox
+    MCM_STATIC_DIR: /app/frontend-dist  # api serves the SPA; worker ignores it
     # --- watch-dir import (§13): drop albums/zips into ./watchdir on the host to test ---
-    WANTLIST_WATCHDIR_PATH: /watchdir
-    WANTLIST_WATCHDIR_POLL_SECONDS: "30"   # snappy for testing (real default 300)
-    WANTLIST_WATCHDIR_SETTLE_SECONDS: "5"  # snappy for testing (real default 60)
+    MCM_WATCHDIR_PATH: /watchdir
+    MCM_WATCHDIR_POLL_SECONDS: "30"   # snappy for testing (real default 300)
+    MCM_WATCHDIR_SETTLE_SECONDS: "5"  # snappy for testing (real default 60)
     # --- Transmission auto-land (§12): set the RPC/SSH vars in .env to enable. Also uncomment
-    #     the SSH key mount below and set WANTLIST_TRANSMISSION_SSH_KEY=/keys/id in .env. ---
-    WANTLIST_TRANSMISSION_POLL_SECONDS: "60"  # snappy for testing (real default 3600)
+    #     the SSH key mount below and set MCM_TRANSMISSION_SSH_KEY=/keys/id in .env. ---
+    MCM_TRANSMISSION_POLL_SECONDS: "60"  # snappy for testing (real default 3600)
   volumes:
     - beetsdata:/beets
     - ./beets/config.yaml:/beets/config.yaml:ro  # config lives in BEETSDIR
@@ -34,13 +34,13 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_USER: wantlist
-      POSTGRES_PASSWORD: wantlist
-      POSTGRES_DB: wantlist
+      POSTGRES_USER: mcm
+      POSTGRES_PASSWORD: mcm
+      POSTGRES_DB: mcm
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wantlist"]
+      test: ["CMD-SHELL", "pg_isready -U mcm"]
       interval: 3s
       timeout: 3s
       retries: 20
@@ -69,7 +69,7 @@ services:
 
   worker:
     <<: *app
-    command: ["python", "-m", "wantlist.worker"]
+    command: ["python", "-m", "mcm.worker"]
     depends_on:
       postgres:
         condition: service_healthy

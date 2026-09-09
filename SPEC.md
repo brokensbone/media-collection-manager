@@ -1003,11 +1003,11 @@ Built in ROADMAP **D18**.
   `job_run` table each pass, and `/metrics` derives everything by querying the DB. One
   scrape target, correct across processes, survives restarts.
 - **Metrics that matter:**
-  - `wantlist_spotify_connected`, `wantlist_spotify_reauth_days_remaining` — alert *before*
+  - `mcm_spotify_connected`, `mcm_spotify_reauth_days_remaining` — alert *before*
     the 6-month expiry (§8c) rather than discovering it after ingest has silently stopped.
-  - `wantlist_albums{state=…}` — the funnel as gauges (Decide/Acquire backlog);
-    `wantlist_albums_missing_art`.
-  - `wantlist_job_last_success_timestamp{job=…}` + run/error counters — alert if any poller
+  - `mcm_albums{state=…}` — the funnel as gauges (Decide/Acquire backlog);
+    `mcm_albums_missing_art`.
+  - `mcm_job_last_success_timestamp{job=…}` + run/error counters — alert if any poller
     (saves, play-history, watch, reconcile) stalls or errors.
 - **Boundary:** the app *exposes* metrics; the Prometheus scrape config and Grafana
   dashboards/alerts live in the `house`/`lab` repos, per the deployment split (§8b).
@@ -1017,11 +1017,11 @@ Built in ROADMAP **D18**.
 > runs, errors) is upserted by a `heartbeat()` context wrapping every poller in `jobs.py` —
 > success bumps `runs`+`last_success`, an unexpected error bumps `errors`+`last_error` and
 > re-raises. Disabled pollers (no Transmission/watch-dir config) never heartbeat, so they
-> don't show as stalled. Series emitted: `wantlist_spotify_connected`,
-> `wantlist_spotify_reauth_days_remaining` (0 = reconnect now), `wantlist_albums{state=…}`
-> (all states, 0 when absent), `wantlist_albums_missing_art`,
-> `wantlist_job_last_success_timestamp{job=…}` (0 = never), and
-> `wantlist_job_runs_total`/`wantlist_job_errors_total{job=…}` counters. All read from the DB
+> don't show as stalled. Series emitted: `mcm_spotify_connected`,
+> `mcm_spotify_reauth_days_remaining` (0 = reconnect now), `mcm_albums{state=…}`
+> (all states, 0 when absent), `mcm_albums_missing_art`,
+> `mcm_job_last_success_timestamp{job=…}` (0 = never), and
+> `mcm_job_runs_total`/`mcm_job_errors_total{job=…}` counters. All read from the DB
 > so the API reports the *worker's* liveness across the process split.
 
 ## 17. In-app user guide
