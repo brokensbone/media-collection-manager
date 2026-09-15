@@ -70,7 +70,7 @@ jobs:
           path: lab
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v19
+        uses: DeterminateSystems/nix-installer-action@v23
 
       - name: Update Media Collection Manager lock entry
         working-directory: lab
