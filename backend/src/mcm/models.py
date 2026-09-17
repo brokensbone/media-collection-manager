@@ -250,6 +250,27 @@ class BeetsAlbumCache(Base):
     country: Mapped[str | None] = mapped_column(default=None)
     secondary_types: Mapped[str | None] = mapped_column(default=None)
     genre: Mapped[str | None] = mapped_column(default=None)
+    added_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    refreshed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class BeetsTrackCache(Base):
+    """Worker-refreshed playable tracks, keyed by Beets item id.
+
+    `path` is relative to MPD's configured music directory, never an absolute Beets path.
+    """
+
+    __tablename__ = "beets_track_cache"
+
+    item_id: Mapped[str] = mapped_column(primary_key=True)
+    beets_id: Mapped[str] = mapped_column(
+        ForeignKey("beets_album_cache.beets_id", ondelete="CASCADE"), index=True
+    )
+    disc: Mapped[int | None] = mapped_column(default=None)
+    track: Mapped[int | None] = mapped_column(default=None)
+    title: Mapped[str]
+    duration_seconds: Mapped[float | None] = mapped_column(default=None)
+    path: Mapped[str]
 
 
 class Box(Base):

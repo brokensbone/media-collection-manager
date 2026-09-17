@@ -5,6 +5,8 @@ import subprocess
 import tempfile
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import PurePath
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +29,22 @@ def _facet(raw: str) -> str | None:
     return None if not raw or raw.startswith("$") else raw
 
 
+def _added(raw: str) -> datetime | None:
+    """Parse Beets's epoch or human-formatted `added` value."""
+    value = raw.strip()
+    if not value:
+        return None
+    try:
+        return datetime.fromtimestamp(float(value), UTC)
+    except (OSError, OverflowError, ValueError):
+        pass
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+
+
 @dataclass
 class BeetsAlbum:
     beets_id: str
@@ -43,6 +61,18 @@ class BeetsAlbum:
     country: str | None = None
     secondary_types: str | None = None  # beets $albumtypes (raw); MB secondary types live here
     genre: str | None = None
+    added_at: datetime | None = None
+
+
+@dataclass
+class BeetsTrack:
+    beets_id: str
+    item_id: str
+    disc: int | None
+    track: int | None
+    title: str
+    duration_seconds: float | None
+    path: str
 
 
 class BeetsClient:
@@ -72,6 +102,7 @@ class BeetsClient:
         "$country",
         "$albumtypes",
         "$genre",
+        "$added",
     )
 
     def all_albums(self) -> list[BeetsAlbum]:
@@ -83,7 +114,9 @@ class BeetsClient:
         for line in self._run("list", "-a", "-f", fmt, timeout=120).splitlines():
             if not line.strip():
                 continue
-            bid, artist, title, rgid, year, media, label, country, types, genre = line.split(_SEP)
+            bid, artist, title, rgid, year, media, label, country, types, genre, added = line.split(
+                _SEP
+            )
             albums.append(
                 BeetsAlbum(
                     beets_id=bid,
@@ -96,9 +129,44 @@ class BeetsClient:
                     country=_facet(country),
                     secondary_types=_facet(types),
                     genre=_facet(genre),
+                    added_at=_added(added),
                 )
             )
         return albums
+
+    _TRACK_FIELDS = ("$album_id", "$id", "$disc", "$track", "$title", "$length", "$path")
+
+    def all_tracks(self, *, music_directory: str) -> list[BeetsTrack]:
+        """Dump playable item data once per worker refresh.
+
+        MCM stores paths relative to MPD's music root.  That keeps the radio API useful to MPD
+        without disclosing the worker's filesystem layout or giving callers Beets access.
+        """
+        root = PurePath(music_directory)
+        tracks: list[BeetsTrack] = []
+        output = self._run("list", "-f", _SEP.join(self._TRACK_FIELDS), timeout=120)
+        for line in output.splitlines():
+            if not line.strip():
+                continue
+            album_id, item_id, disc, track, title, length, path = line.split(_SEP)
+            item_path = PurePath(path)
+            try:
+                relative = item_path.relative_to(root)
+            except ValueError:
+                log.warning("excluding Beets item outside music directory: %s", path)
+                continue
+            tracks.append(
+                BeetsTrack(
+                    beets_id=album_id,
+                    item_id=item_id,
+                    disc=int(disc) if disc.isdigit() and disc != "0" else None,
+                    track=int(track) if track.isdigit() and track != "0" else None,
+                    title=title,
+                    duration_seconds=float(length) if length.strip() else None,
+                    path=str(relative),
+                )
+            )
+        return tracks
 
     def import_dir(self, path: str) -> None:
         """Import a folder into the library non-interactively (SPEC §12/§13), leaving the inbox

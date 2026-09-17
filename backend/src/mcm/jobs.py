@@ -44,10 +44,13 @@ def _session_factory(settings: Settings) -> sessionmaker[Session]:
     return make_session_factory(make_engine(settings.database_url))
 
 
-def _refresh_library_cache(session_factory: sessionmaker[Session]) -> None:
+def _refresh_library_cache(settings: Settings, session_factory: sessionmaker[Session]) -> None:
     """Snapshot the beets catalogue into the DB (§5) so the API reads it instead of running beet.
     Worker-only: the live `beet list` happens here, never on a page load."""
-    BeetsCatalogCache(session_factory).replace(BeetsClient().all_albums())
+    beets = BeetsClient()
+    BeetsCatalogCache(session_factory).replace(
+        beets.all_albums(), beets.all_tracks(music_directory=settings.music_dir)
+    )
 
 
 def ingest_once(settings: Settings | None = None) -> None:
@@ -77,7 +80,7 @@ def reconcile_once(settings: Settings | None = None) -> None:
         resolution = build_resolution_service(settings, session_factory).resolve_unresolved()
         reconciled = build_ownership_reconciler(settings, session_factory).reconcile()
         build_alerts_service(settings, session_factory).owned(reconciled.newly_owned)
-        _refresh_library_cache(session_factory)  # keep the API's catalogue cache current
+        _refresh_library_cache(settings, session_factory)  # keep the API's catalogue cache current
         log.info(
             "reconcile: resolved=%s unresolved=%s paused=%s newly_owned=%s",
             resolution.resolved,
@@ -130,7 +133,8 @@ def run_imports_once(settings: Settings | None = None) -> None:
     with heartbeat(session_factory, "imports"):
         processed = build_import_runner(settings, session_factory).run_queued()
         if processed:
-            _refresh_library_cache(session_factory)  # an import may have changed the library
+            # An import may have changed the library.
+            _refresh_library_cache(settings, session_factory)
             log.info("imports: processed=%s", processed)
 
 
