@@ -1,8 +1,10 @@
+from datetime import UTC, datetime
+
 from sqlalchemy import delete, insert, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from ..models import BeetsAlbumCache
-from .beets import BeetsAlbum
+from ..models import BeetsAlbumCache, BeetsTrackCache
+from .beets import BeetsAlbum, BeetsTrack
 
 
 class BeetsCatalogCache:
@@ -28,6 +30,7 @@ class BeetsCatalogCache:
                     BeetsAlbumCache.country,
                     BeetsAlbumCache.secondary_types,
                     BeetsAlbumCache.genre,
+                    BeetsAlbumCache.added_at,
                 )
             )
             return [
@@ -42,12 +45,20 @@ class BeetsCatalogCache:
                     country=r[7],
                     secondary_types=r[8],
                     genre=r[9],
+                    added_at=r[10],
                 )
                 for r in rows
             ]
 
-    def replace(self, albums: list[BeetsAlbum]) -> None:
+    def replace(self, albums: list[BeetsAlbum], tracks: list[BeetsTrack] | None = None) -> None:
+        """Atomically replace the whole worker-owned snapshot.
+
+        `tracks=None` preserves the old caller contract for focused tests and for consumers that
+        only refresh album metadata. A normal worker pass supplies both lists.
+        """
+        refreshed_at = datetime.now(UTC)
         with self._sf() as session:
+            session.execute(delete(BeetsTrackCache))
             session.execute(delete(BeetsAlbumCache))
             if albums:
                 session.execute(
@@ -64,8 +75,26 @@ class BeetsCatalogCache:
                             "country": a.country,
                             "secondary_types": a.secondary_types,
                             "genre": a.genre,
+                            "added_at": a.added_at,
+                            "refreshed_at": refreshed_at,
                         }
                         for a in albums
+                    ],
+                )
+            if tracks:
+                session.execute(
+                    insert(BeetsTrackCache),
+                    [
+                        {
+                            "item_id": t.item_id,
+                            "beets_id": t.beets_id,
+                            "disc": t.disc,
+                            "track": t.track,
+                            "title": t.title,
+                            "duration_seconds": t.duration_seconds,
+                            "path": t.path,
+                        }
+                        for t in tracks
                     ],
                 )
             session.commit()

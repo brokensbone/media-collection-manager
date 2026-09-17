@@ -77,6 +77,8 @@ class Settings(BaseSettings):
     # BEETSDIR (which owns config.yaml and library.db) because a migrated config can retain an
     # obsolete absolute `directory:` path.
     beets_directory: str = ""
+    # MPD's music root. The radio catalogue stores only paths relative to this directory.
+    music_dir: str = ""
     # The Tasks view shows completed imports (imported/skipped) from this many days back; older
     # completed imports live in the archive (reached from Tasks), not the default task list.
     import_completed_window_days: int = 3

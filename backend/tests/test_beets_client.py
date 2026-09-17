@@ -52,9 +52,10 @@ def test_all_albums_parses_facets(monkeypatch: pytest.MonkeyPatch) -> None:
                 "GB",
                 "album",
                 "Dubstep",
+                "1700000000",
             ]
         ),
-        sep.join(["b2", "X", "Untagged", "", "0", "", "", "", "", ""]),
+        sep.join(["b2", "X", "Untagged", "", "0", "", "", "", "", "", ""]),
         # beets emits the literal template token (e.g. `$media`) for a field it can't resolve on an
         # album — must be treated as absent, not become a bogus "$media" value/crate.
         sep.join(
@@ -69,6 +70,7 @@ def test_all_albums_parses_facets(monkeypatch: pytest.MonkeyPatch) -> None:
                 "$country",
                 "$albumtypes",
                 "$genre",
+                "",
             ]
         ),
     ]
