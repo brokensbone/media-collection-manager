@@ -69,9 +69,7 @@ def _duration_seconds(raw: str) -> float | None:
         return None
     if tail < 0:
         return None
-    return tail + sum(
-        int(part) * 60**place for place, part in enumerate(reversed(parts[:-1]), 1)
-    )
+    return tail + sum(int(part) * 60**place for place, part in enumerate(reversed(parts[:-1]), 1))
 
 
 @dataclass
