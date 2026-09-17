@@ -182,6 +182,9 @@ class BeetsClient:
             if not line.strip():
                 continue
             album_id, item_id, disc, track, title, length, path = line.split(_SEP)
+            if not album_id:
+                log.warning("excluding Beets item without an album id: %s", item_id)
+                continue
             item_path = PurePath(path)
             relative = _relative_music_path(item_path, root, legacy_root)
             if relative is None:
