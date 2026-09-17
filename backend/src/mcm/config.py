@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     beets_directory: str = ""
     # MPD's music root. The radio catalogue stores only paths relative to this directory.
     music_dir: str = ""
+    # A one-time source prefix retained in an existing Beets DB after the music tree moved.
+    # The worker may translate this prefix to music_dir while producing its read-only MPD cache;
+    # it does not alter Beets records or make the path visible through the API.
+    legacy_music_dir: str = ""
     # The Tasks view shows completed imports (imported/skipped) from this many days back; older
     # completed imports live in the archive (reached from Tasks), not the default task list.
     import_completed_window_days: int = 3
