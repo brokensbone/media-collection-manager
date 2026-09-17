@@ -131,6 +131,26 @@ def test_all_tracks_maps_an_explicit_legacy_music_root(monkeypatch: pytest.Monke
     assert tracks[0].path == "Burial/Untrue/02 Archangel.flac"
 
 
+def test_all_tracks_parses_beets_clock_formatted_lengths(monkeypatch: pytest.MonkeyPatch) -> None:
+    sep = beets_mod._SEP
+    rows = [
+        sep.join(["11", "101", "1", "1", "Short", "2:10", "/music/A/01.flac"]),
+        sep.join(["11", "102", "1", "2", "Long", "1:02:03", "/music/A/02.flac"]),
+        sep.join(["11", "103", "1", "3", "Unknown", "not-a-length", "/music/A/03.flac"]),
+    ]
+
+    def fake_run(argv: list[str], **kwargs: Any) -> object:
+        class Result:
+            stdout = "\n".join(rows) + "\n"
+            stderr = ""
+
+        return Result()
+
+    monkeypatch.setattr(beets_mod.subprocess, "run", fake_run)
+    tracks = BeetsClient().all_tracks(music_directory="/music")
+    assert [track.duration_seconds for track in tracks] == [130.0, 3723.0, None]
+
+
 def test_import_dir_skips_duplicates_uses_asis_and_traps_directory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
