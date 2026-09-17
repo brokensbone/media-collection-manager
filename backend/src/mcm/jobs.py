@@ -49,7 +49,11 @@ def _refresh_library_cache(settings: Settings, session_factory: sessionmaker[Ses
     Worker-only: the live `beet list` happens here, never on a page load."""
     beets = BeetsClient()
     BeetsCatalogCache(session_factory).replace(
-        beets.all_albums(), beets.all_tracks(music_directory=settings.music_dir)
+        beets.all_albums(),
+        beets.all_tracks(
+            music_directory=settings.music_dir,
+            legacy_music_directory=settings.legacy_music_dir,
+        ),
     )
 
 

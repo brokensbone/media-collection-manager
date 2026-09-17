@@ -136,13 +136,16 @@ class BeetsClient:
 
     _TRACK_FIELDS = ("$album_id", "$id", "$disc", "$track", "$title", "$length", "$path")
 
-    def all_tracks(self, *, music_directory: str) -> list[BeetsTrack]:
+    def all_tracks(
+        self, *, music_directory: str, legacy_music_directory: str = ""
+    ) -> list[BeetsTrack]:
         """Dump playable item data once per worker refresh.
 
         MCM stores paths relative to MPD's music root.  That keeps the radio API useful to MPD
         without disclosing the worker's filesystem layout or giving callers Beets access.
         """
         root = PurePath(music_directory)
+        legacy_root = PurePath(legacy_music_directory) if legacy_music_directory else None
         tracks: list[BeetsTrack] = []
         output = self._run("list", "-f", _SEP.join(self._TRACK_FIELDS), timeout=120)
         for line in output.splitlines():
@@ -150,9 +153,8 @@ class BeetsClient:
                 continue
             album_id, item_id, disc, track, title, length, path = line.split(_SEP)
             item_path = PurePath(path)
-            try:
-                relative = item_path.relative_to(root)
-            except ValueError:
+            relative = _relative_music_path(item_path, root, legacy_root)
+            if relative is None:
                 log.warning("excluding Beets item outside music directory: %s", path)
                 continue
             tracks.append(
@@ -250,3 +252,22 @@ class BeetsClient:
                     continue
                 raise
         raise RuntimeError("unreachable: the retry loop returns or raises")
+
+
+def _relative_music_path(
+    item_path: PurePath, music_root: PurePath, legacy_music_root: PurePath | None
+) -> PurePath | None:
+    """Return an MPD-relative item path, including an explicitly configured legacy mapping."""
+    try:
+        return item_path.relative_to(music_root)
+    except ValueError:
+        pass
+    if legacy_music_root is not None:
+        try:
+            relative = item_path.relative_to(legacy_music_root)
+        except ValueError:
+            pass
+        else:
+            log.info("remapping legacy Beets music path to MPD root: %s", item_path)
+            return relative
+    return None

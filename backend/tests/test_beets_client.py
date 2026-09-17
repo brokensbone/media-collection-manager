@@ -97,6 +97,40 @@ def test_all_albums_parses_facets(monkeypatch: pytest.MonkeyPatch) -> None:
     assert c.secondary_types is None and c.genre is None
 
 
+def test_all_tracks_maps_an_explicit_legacy_music_root(monkeypatch: pytest.MonkeyPatch) -> None:
+    sep = beets_mod._SEP
+    rows = [
+        sep.join(
+            [
+                "11",
+                "101",
+                "1",
+                "2",
+                "Mapped track",
+                "230.5",
+                "/home/edward/.config/beets/library/Burial/Untrue/02 Archangel.flac",
+            ]
+        ),
+        sep.join(["12", "102", "1", "1", "Excluded", "100", "/other/not-music.flac"]),
+    ]
+
+    def fake_run(argv: list[str], **kwargs: Any) -> object:
+        class Result:
+            stdout = "\n".join(rows) + "\n"
+            stderr = ""
+
+        return Result()
+
+    monkeypatch.setattr(beets_mod.subprocess, "run", fake_run)
+    tracks = BeetsClient().all_tracks(
+        music_directory="/data/partial/record-library/library",
+        legacy_music_directory="/home/edward/.config/beets/library",
+    )
+    assert len(tracks) == 1
+    assert tracks[0].beets_id == "11"
+    assert tracks[0].path == "Burial/Untrue/02 Archangel.flac"
+
+
 def test_import_dir_skips_duplicates_uses_asis_and_traps_directory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
