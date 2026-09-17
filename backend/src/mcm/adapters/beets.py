@@ -45,6 +45,36 @@ def _added(raw: str) -> datetime | None:
     return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
 
 
+def _duration_seconds(raw: str) -> float | None:
+    """Parse Beets's numeric or human-formatted ``$length`` value.
+
+    Beets formats whole-second lengths as ``M:SS`` (and long items as
+    ``H:MM:SS``) in the CLI, despite the field being numeric in its database.
+    A malformed optional duration must not prevent the worker from refreshing
+    otherwise playable paths.
+    """
+    value = raw.strip()
+    if not value:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        pass
+    parts = value.split(":")
+    if len(parts) not in {2, 3} or any(not part.isdigit() for part in parts[:-1]):
+        return None
+    try:
+        tail = float(parts[-1])
+    except ValueError:
+        return None
+    if tail < 0:
+        return None
+    seconds = tail
+    for place, part in enumerate(reversed(parts[:-1]), 1):
+        seconds += int(part) * 60**place
+    return seconds
+
+
 @dataclass
 class BeetsAlbum:
     beets_id: str
@@ -164,7 +194,7 @@ class BeetsClient:
                     disc=int(disc) if disc.isdigit() and disc != "0" else None,
                     track=int(track) if track.isdigit() and track != "0" else None,
                     title=title,
-                    duration_seconds=float(length) if length.strip() else None,
+                    duration_seconds=_duration_seconds(length),
                     path=str(relative),
                 )
             )
