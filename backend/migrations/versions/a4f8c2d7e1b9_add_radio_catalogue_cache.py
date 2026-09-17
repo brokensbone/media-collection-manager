@@ -1,7 +1,7 @@
 """add worker-refreshed playable radio catalogue
 
 Revision ID: a4f8c2d7e1b9
-Revises: 63e0b5ebc654
+Revises: 37e4a66a74e5
 Create Date: 2026-09-17 10:00:00.000000
 """
 
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "a4f8c2d7e1b9"
-down_revision: str | None = "63e0b5ebc654"
+down_revision: str | None = "37e4a66a74e5"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
