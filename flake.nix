@@ -78,6 +78,27 @@
             ];
             doCheck = false;
           };
+          # Not in nixpkgs. Built from the published wheel, like pyrate-limiter above, so
+          # there is no build backend to pin — every runtime dependency it needs is already
+          # packaged.
+          typesafe-sdk = pythonPackages.buildPythonPackage rec {
+            pname = "typesafe-sdk";
+            version = "0.7.0";
+            format = "wheel";
+            src = pkgs.fetchurl {
+              url = "https://files.pythonhosted.org/packages/d3/2a/16f4163e6d8827ef80b2ed7a400c80688e1ebf571c10f143f792bdafc654/typesafe_sdk-${version}-py3-none-any.whl";
+              hash = "sha256-xtIlfEsEuNTYHP8rVUibQYh5X9RPtAuc7yb/JDstEIA=";
+            };
+            dependencies = with pythonPackages; [
+              httpx2
+              pydantic
+              pydantic-core
+              tenacity
+              typing-extensions
+            ];
+            doCheck = false;
+          };
+
           # MCM invokes beets' core commands directly. Build that core rather than the
           # nixpkgs convenience package, which bundles optional plugins and GStreamer support
           # into a multi-gigabyte desktop/media runtime closure.
@@ -127,6 +148,7 @@
               pydantic-settings
               python-multipart
               sqlalchemy
+              typesafe-sdk
               uvicorn
             ];
             doCheck = false;
