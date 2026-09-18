@@ -29,6 +29,14 @@ INSTRUCTIONS: dict[str, Any] = {
         "as the plain one. So is a different pressing, a different country's release, or a "
         "copy with bonus tracks."
     ),
+    "the title has to be the same title": (
+        "Agreeing on the artist counts for nothing on its own. The album's title must be the "
+        "title the download names, once punctuation, capitals, articles, word order and "
+        "edition words are set aside. Sharing a word or two is not sharing a title: 'Distant "
+        "Sky' is not 'Push the Sky Away'. A list of albums by the right artist, none of them "
+        "titled what the download is titled, is a no-match — pick the closest only when it is "
+        "the same record, never because it is the closest."
+    ),
     "not the same record": (
         "A different album by the same artist is not a match, however much of the name they "
         "share. Nor is a single or EP that shares its name with an album, a live recording "
