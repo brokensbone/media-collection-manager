@@ -13,6 +13,7 @@ from .factories import (
     build_crate_service,
     build_decide_service,
     build_library_assist_service,
+    build_matcher,
     build_releases_service,
     build_torrent_submission_service,
     build_transmission_service,
@@ -52,7 +53,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.radio_catalogue_service = RadioCatalogueService(session_factory)
     app.state.crate_service = build_crate_service(settings, session_factory)
     app.state.releases_service = build_releases_service(settings, session_factory)
-    app.state.imports_service = ImportsService(repo=AlbumRepo(session_factory))
+    app.state.imports_service = ImportsService(
+        repo=AlbumRepo(session_factory),
+        matcher=build_matcher(settings),
+    )
     app.state.watchdir_detection_service = build_watchdir_detection_service(
         settings, session_factory
     )

@@ -16,6 +16,7 @@ from .adapters.spotify_auth import HttpxSpotifyAuthClient
 from .adapters.tags import MediaFileTagReader
 from .adapters.token_store import TokenStore
 from .adapters.transmission import HttpxTransmissionClient
+from .adapters.typesafe_judge import TypeSafeAlbumJudge
 from .alerts import AlertsService
 from .artist_watch import ArtistWatchService
 from .auth_service import AuthService
@@ -23,6 +24,7 @@ from .config import Settings
 from .crates import CrateService
 from .decide import DecideService
 from .imports import (
+    AlbumMatcher,
     ImportDetectionService,
     ImportRunner,
     TransmissionStager,
@@ -154,6 +156,26 @@ def build_alerts_service(
     )
 
 
+def build_album_judge(settings: Settings) -> TypeSafeAlbumJudge | None:
+    """None when no key is configured, so detection falls back to the string matcher."""
+    if not settings.typesafe_api_key:
+        return None
+    return TypeSafeAlbumJudge(
+        api_key=settings.typesafe_api_key, model=settings.typesafe_model or None
+    )
+
+
+def build_matcher(settings: Settings) -> AlbumMatcher:
+    """The shared download-to-album matcher. Both detection fronts and the rematch pass
+    use one of these so they cannot drift apart."""
+    return AlbumMatcher(
+        judge=build_album_judge(settings),
+        threshold=settings.import_match_threshold,
+        candidates=settings.match_candidates,
+        min_confidence=settings.match_min_confidence,
+    )
+
+
 def build_import_detection_service(
     settings: Settings, session_factory: sessionmaker[Session]
 ) -> ImportDetectionService:
@@ -169,6 +191,7 @@ def build_import_detection_service(
         film_root=settings.film_root,
         workspace_root=settings.workspace_root,
         events=WorkerEventLog(session_factory),
+        matcher=build_matcher(settings),
     )
 
 
@@ -217,6 +240,7 @@ def build_watchdir_detection_service(
         settle_seconds=settings.watchdir_settle_seconds,
         match_threshold=settings.import_match_threshold,
         events=WorkerEventLog(session_factory),
+        matcher=build_matcher(settings),
     )
 
 

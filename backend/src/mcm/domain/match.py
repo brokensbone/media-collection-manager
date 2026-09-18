@@ -144,3 +144,72 @@ def edition_match(query: str, candidates: list[Candidate]) -> Candidate | None:
         return None
     qn = _normalize(query)
     return max(contained, key=lambda c: _score(qn, c))
+
+
+# --- broad retrieval, for judgement-based matching (§12) ----------------------
+
+# Words that say nothing about which record a download is: formats, sources, rip
+# provenance. A word missing from this list costs a little retrieval precision and
+# never causes a wrong match, because choosing among the candidates is a separate
+# judgement.
+_RETRIEVAL_JUNK = frozenset(
+    """
+    flac mp3 m4a aac ogg opus wav aiff aif alac ape wv dsf dff mpc
+    web webrip cd cdrip vinyl rip scene remux eac log cue
+    kbps 16 24 44 48 96 192 320
+    """.split()
+)
+
+_ARTICLES = frozenset({"the", "a", "an", "and", "of"})
+
+
+@dataclass
+class ScoredTarget:
+    target: MatchTarget
+    score: float
+
+
+def _content(text: str) -> set[str]:
+    return _tokens(text) - _RETRIEVAL_JUNK - _ARTICLES
+
+
+def _coverage(needles: set[str], haystack: set[str]) -> float:
+    return len(needles & haystack) / len(needles) if needles else 0.0
+
+
+def retrieval_score(name: str, target: MatchTarget) -> float:
+    """How plausible is it that this download is this album?
+
+    Artist and title score separately so a compilation (whose artist is a useless
+    "Various Artists") is still retrievable on its title alone, and a download naming
+    only the artist is still retrievable. A self-titled album has no distinctive title
+    tokens, so its artist carries both halves.
+    """
+    name_tokens = _content(name)
+    artist_tokens = _content(target.artist)
+    title_tokens = _content(target.title) - artist_tokens
+
+    artist_hit = _coverage(artist_tokens, name_tokens)
+    title_hit = _coverage(title_tokens, name_tokens) if title_tokens else artist_hit
+
+    ratio = SequenceMatcher(
+        None,
+        " ".join(sorted(name_tokens)),
+        " ".join(sorted(artist_tokens | title_tokens)),
+    ).ratio()
+    return 0.45 * max(artist_hit, title_hit) + 0.35 * min(artist_hit, title_hit) + 0.20 * ratio
+
+
+def retrieve(
+    name: str, targets: list[MatchTarget], *, limit: int, floor: float = 0.12
+) -> list[MatchTarget]:
+    """The `limit` most plausible albums for a download, best first.
+
+    Deliberately loose: its job is recall — get the right album *somewhere* into the
+    list — not precision. `floor` only drops the plainly unrelated, so a download that
+    is nothing MCM knows about comes back with a short list or an empty one. Measured
+    at 98% recall in 12 against MCM's existing matches.
+    """
+    scored = [ScoredTarget(t, s) for t in targets if (s := retrieval_score(name, t)) >= floor]
+    scored.sort(key=lambda c: -c.score)
+    return [c.target for c in scored[:limit]]

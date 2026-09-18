@@ -32,6 +32,37 @@ the Nix store.
 - `fixtures/beets/` — reproducible seeded beets library for tests.
 - `spikes/` — throwaway spikes (D0 reconcile).
 
+## Matching downloads to albums
+
+A finished download arrives named something like
+`Sasha - Fabric 99 [FLAC] {fabric}`, and MCM has to say which album that is.
+Comparing strings gets the near-misses wrong in a way no amount of tuning fixes:
+`Fabric 99` and `Fabric 19` differ by one character but are different records,
+while `Portishead (2008) Third [Mercury; B0011141-02]` and `Portishead — Third`
+differ by most of their characters and are the same one.
+
+So the two halves are split. `domain.match.retrieve` is deliberately loose and only
+has to get the right album *somewhere* into a shortlist — measured at 98% recall in
+twelve. Choosing one of them, or saying none, is a `ports.album_judge.AlbumJudge`,
+implemented against TypeSafe in `adapters.typesafe_judge`.
+
+Set `MCM_TYPESAFE_API_KEY` to enable it. Without a key the old string matcher still
+runs, and it is also the fallback if the API is unreachable, so detection never loses
+a download. A verdict below `MCM_MATCH_MIN_CONFIDENCE` is treated as no match and
+lands in the same tail as anything unrecognised, to be hand-imported.
+
+Matching otherwise happens once, when a download is first detected, so anything that
+arrived before its album was saved stays unmatched for good. `POST /imports/rematch`
+puts the Import worklist back through it — which is also how an improved matcher
+reaches what an older one decided. It redoes every music download still awaiting a
+decision, so a wrong match is corrected or cleared as well as a blank filled; rows
+already acted on are untouched. It is bounded, so call it again while the `remaining`
+it returns is above zero:
+
+```
+curl -XPOST 'http://127.0.0.1:8000/imports/rematch?limit=50'
+```
+
 ## Dev
 
 Backend (from `backend/`):

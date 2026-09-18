@@ -13,8 +13,9 @@ from .adapters.album_repo import AlbumRepo, ImportRecord, ImportRow
 from .adapters.beets import BeetsAlbum
 from .adapters.event_log import NullEventSink
 from .adapters.unpack import dispose, unpack
-from .domain.match import MatchTarget, best_match
+from .domain.match import MatchTarget, best_match, retrieve
 from .models import AlbumState, ImportSource, ImportState, ImportTarget, MediaKind
+from .ports.album_judge import AlbumJudge
 from .ports.clock import Clock
 from .ports.events import EventSink
 from .ports.file_transfer import FileTransfer
@@ -72,6 +73,44 @@ class Classification:
     matched_album_id: int | None = None
 
 
+class AlbumMatcher:
+    """Name a download's album (SPEC §12).
+
+    Retrieval is loose and only has to get the right album somewhere into a short list;
+    a judgement then picks one or says none of them — a question about meaning that the
+    string ratio cannot answer (a catalogue number is noise, a deluxe edition is the same
+    record, and in a numbered series the number *is* the identity).
+
+    A judgement below `min_confidence` is treated as no match: it lands in the same
+    no-match tail as anything else unrecognised, for the operator to hand-import. When no
+    judge is configured, or the API is unreachable, this falls back to the string matcher
+    so detection keeps working rather than losing the download.
+    """
+
+    def __init__(
+        self,
+        *,
+        judge: AlbumJudge | None,
+        threshold: float,
+        candidates: int,
+        min_confidence: float,
+    ) -> None:
+        self._judge = judge
+        self._threshold = threshold
+        self._candidates = candidates
+        self._min_confidence = min_confidence
+
+    def match(self, name: str, targets: list[MatchTarget]) -> int | None:
+        if self._judge is not None:
+            shortlist = retrieve(name, targets, limit=self._candidates)
+            judgement = self._judge.choose(name=name, candidates=shortlist)
+            if judgement is not None:
+                if judgement.target is None or judgement.confidence < self._min_confidence:
+                    return None
+                return judgement.target.id
+        return best_match(name, targets, self._threshold)
+
+
 # --- detection: one service per front (§12 Transmission / §13 watch-dir) --------------
 
 
@@ -90,10 +129,13 @@ class ImportDetectionService:
         film_root: str = "",
         workspace_root: str = "",
         events: EventSink | None = None,
+        matcher: "AlbumMatcher | None" = None,
     ):
         self._transmission = transmission
         self._repo = repo
-        self._threshold = match_threshold
+        self._matcher = matcher or AlbumMatcher(
+            judge=None, threshold=match_threshold, candidates=12, min_confidence=0.0
+        )
         self._tv_root = tv_root
         self._film_root = film_root
         self._workspace_root = workspace_root
@@ -117,7 +159,7 @@ class ImportDetectionService:
                 tv_root=self._tv_root,
                 film_root=self._film_root,
                 workspace_root=self._workspace_root,
-                matched_album_id=best_match(t.name, targets, self._threshold),
+                matched_album_id=self._matcher.match(t.name, targets),
             )
             self._repo.add_pending_import(
                 source=ImportSource.transmission,
@@ -156,6 +198,7 @@ class WatchdirDetectionService:
         archive_subdir: str,
         settle_seconds: int,
         match_threshold: float,
+        matcher: "AlbumMatcher | None" = None,
         events: EventSink | None = None,
     ):
         self._repo = repo
@@ -164,7 +207,9 @@ class WatchdirDetectionService:
         self._watch_dir = watch_dir
         self._archive_subdir = archive_subdir
         self._settle_seconds = settle_seconds
-        self._threshold = match_threshold
+        self._matcher = matcher or AlbumMatcher(
+            judge=None, threshold=match_threshold, candidates=12, min_confidence=0.0
+        )
         self._events = events or NullEventSink()
 
     def poll(self, *, force: bool = False) -> DetectResult:
@@ -194,7 +239,7 @@ class WatchdirDetectionService:
                 import_target=ImportTarget.beets,
                 classification_detail="Watch-folder audio drop.",
                 archive_path=str(drop),
-                matched_album_id=best_match(query, targets, self._threshold),
+                matched_album_id=self._matcher.match(query, targets),
             )
             self._events.emit(
                 job="watchdir", type="detected", message=f"Detected drop: '{drop.name}'"
@@ -420,12 +465,64 @@ class ImportRunner:
         return len(ids)
 
 
+@dataclass
+class RematchResult:
+    """What one rematch pass did. `remaining` is how many downloads it has not reached
+    yet, so a caller can keep going until it reaches zero."""
+
+    considered: int
+    matched: int  # now name an album, however they started
+    changed: int  # name a different album than before
+    cleared: int  # named one before and now name nothing
+    remaining: int
+
+
 class ImportsService:
     """The Import worklist (§12/§13). Clicking Import just enqueues; the worker imports in the
     background so the operator can tick a batch and come back. Rows persist with their status."""
 
-    def __init__(self, *, repo: AlbumRepo) -> None:
+    def __init__(self, *, repo: AlbumRepo, matcher: "AlbumMatcher | None" = None) -> None:
         self._repo = repo
+        self._matcher = matcher
+
+    def rematch(self, *, limit: int) -> RematchResult:
+        """Put unmatched downloads back through matching (SPEC §12).
+
+        Matching otherwise happens once, when a download is first detected, so anything
+        that arrived before its album was saved stays unmatched for good. This also lets
+        an improved matcher be applied to everything an older one decided.
+
+        Every music download still awaiting a decision is redone, not only the unmatched
+        ones, because a wrong match is worth correcting too — and it may be corrected to
+        nothing. Rows that have been acted on are untouched, and no match here was ever
+        set by hand, so nothing the operator chose can be overwritten.
+
+        Bounded by `limit` because each one is a judgement call against the API, and an
+        unbounded pass over a long tail would outlive any sensible request timeout.
+        """
+        if self._matcher is None:
+            return RematchResult(0, 0, 0, 0, 0)
+
+        rows = [r for r in self._repo.pending_imports() if r.media_kind == MediaKind.music]
+        targets = _match_targets(self._repo)
+        matched = changed = cleared = 0
+        for row in rows[:limit]:
+            album_id = self._matcher.match(row.name, targets)
+            if album_id != row.matched_album_id:
+                self._repo.set_import_match(row.id, album_id)
+                changed += 1
+                if album_id is None:
+                    cleared += 1
+            if album_id is not None:
+                matched += 1
+        considered = min(limit, len(rows))
+        return RematchResult(
+            considered=considered,
+            matched=matched,
+            changed=changed,
+            cleared=cleared,
+            remaining=len(rows) - considered,
+        )
 
     def pending(self) -> list[ImportItem]:
         """The Import worklist: downloads awaiting an Import/Discard decision (§12/§13)."""

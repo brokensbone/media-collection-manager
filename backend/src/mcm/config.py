@@ -87,7 +87,14 @@ class Settings(BaseSettings):
     # completed imports live in the archive (reached from Tasks), not the default task list.
     import_completed_window_days: int = 3
     transmission_poll_seconds: int = 3600
-    import_match_threshold: float = 0.5
+    import_match_threshold: float = 0.5  # string-matcher fallback, used when no judge
+    # Judgement-based matching (§12). Empty key = disabled, and detection falls back to the
+    # string matcher. Retrieval hands the judge this many candidates; a verdict below
+    # min-confidence is treated as no match and lands in the tail for a hand-import.
+    typesafe_api_key: str = ""
+    typesafe_model: str = ""
+    match_candidates: int = 12
+    match_min_confidence: float = 0.6
     import_process_seconds: int = 30  # how often the worker imports queued acquisitions
     tv_root: str = ""
     film_root: str = ""
