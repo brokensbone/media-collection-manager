@@ -95,6 +95,10 @@ class Settings(BaseSettings):
     typesafe_model: str = ""
     match_candidates: int = 12
     match_min_confidence: float = 0.6
+    # The same key also decides which MusicBrainz release group an album is (§5). With a
+    # judge the text search widens to the leading artist, which finds albums the quoted
+    # full credit cannot; without one it keeps the narrow search and the score gate.
+    resolution_min_probability: float = 0.6
     import_process_seconds: int = 30  # how often the worker imports queued acquisitions
     tv_root: str = ""
     film_root: str = ""

@@ -64,6 +64,28 @@ call and the whole worklist would outlive the gateway timeout, so walk it by add
 curl -XPOST 'http://127.0.0.1:8000/imports/rematch?limit=50&offset=0'
 ```
 
+## Resolving albums to MusicBrainz
+
+Every album needs a MusicBrainz release-group id before ownership can be reconciled.
+Barcode lookup settles most of them exactly. The text tier behind it has the same
+shape as the matching above, and the same problem: Spotify joins every credited
+artist with commas, so quoting the whole credit asks MusicBrainz for an artist that
+does not exist there. `Alva Noto, Ryuichi Sakamoto` finds nothing, though the album
+is present — credited `Alva Noto, 坂本龍一`.
+
+Searching the leading artist alone finds it, and also finds unrelated records:
+`Becker & Mukai — Spirit Only` returns a Margaret Becker hymnal at score 100. So the
+wider search and the judgement are a pair, and neither is safe alone. With
+`MCM_TYPESAFE_API_KEY` set, the text tier widens and a judgement picks; without one
+it keeps the narrow search and the score gate, unchanged.
+
+One thing worth knowing if you tune it. These candidate lists are short — often a
+single release group against "none of these" — so `MCM_RESOLUTION_MIN_PROBABILITY`
+gates on the probability of the answer, not on confidence. Confidence measures how
+concentrated a distribution is, and an exact artist-and-title match against one
+alternative splits 0.76/0.24: a clear answer and an unconcentrated distribution at
+the same time.
+
 ## Dev
 
 Backend (from `backend/`):

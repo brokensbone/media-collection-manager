@@ -17,6 +17,7 @@ from .adapters.tags import MediaFileTagReader
 from .adapters.token_store import TokenStore
 from .adapters.transmission import HttpxTransmissionClient
 from .adapters.typesafe_judge import TypeSafeAlbumJudge
+from .adapters.typesafe_release_group_judge import TypeSafeReleaseGroupJudge
 from .alerts import AlertsService
 from .artist_watch import ArtistWatchService
 from .auth_service import AuthService
@@ -76,6 +77,15 @@ def build_ingest_service(
     )
 
 
+def build_release_group_judge(settings: Settings) -> TypeSafeReleaseGroupJudge | None:
+    """None when no key is configured, so resolution keeps its score gate."""
+    if not settings.typesafe_api_key:
+        return None
+    return TypeSafeReleaseGroupJudge(
+        api_key=settings.typesafe_api_key, model=settings.typesafe_model or None
+    )
+
+
 def build_resolution_service(
     settings: Settings, session_factory: sessionmaker[Session]
 ) -> ResolutionService:
@@ -88,6 +98,8 @@ def build_resolution_service(
             user_agent=settings.musicbrainz_user_agent,
             min_interval=settings.musicbrainz_min_interval,
             text_min_score=settings.musicbrainz_text_min_score,
+            judge=build_release_group_judge(settings),
+            min_probability=settings.resolution_min_probability,
         ),
         repo=AlbumRepo(session_factory),
         tokens=build_auth_service(settings, session_factory),
