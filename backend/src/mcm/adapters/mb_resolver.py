@@ -6,6 +6,8 @@ from typing import Any
 
 import httpx
 
+from ..ports.release_group_judge import ReleaseGroupCandidate, ReleaseGroupJudge
+
 
 class HttpxMusicBrainzResolver:
     """Spotify→release-group resolution (§5/§14), tiers ordered cheapest-and-most-direct first:
@@ -31,6 +33,8 @@ class HttpxMusicBrainzResolver:
         text_min_score: int,
         isrc_cap: int = 3,
         max_retries: int = 3,
+        judge: ReleaseGroupJudge | None = None,
+        min_probability: float = 0.6,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._client = httpx.Client(headers={"User-Agent": user_agent}, timeout=30)
@@ -38,6 +42,8 @@ class HttpxMusicBrainzResolver:
         self._text_min_score = text_min_score
         self._isrc_cap = isrc_cap
         self._max_retries = max_retries
+        self._judge = judge
+        self._min_probability = min_probability
         self._last = 0.0
 
     def resolve(self, *, upc: str | None, isrcs: list[str], artist: str, title: str) -> str | None:
@@ -72,6 +78,13 @@ class HttpxMusicBrainzResolver:
         ]
 
     def _by_text(self, artist: str, title: str) -> str | None:
+        return (
+            self._by_text_judged(artist, title)
+            if self._judge
+            else self._by_text_scored(artist, title)
+        )
+
+    def _by_text_scored(self, artist: str, title: str) -> str | None:
         # Field-scoped bare terms for the title, not a quoted phrase: Spotify and MusicBrainz
         # punctuate/space titles differently ("Nothing/Everything" vs "Nothing / Everything"),
         # and an exact phrase misses across that. The artist stays a quoted phrase (loosening it
@@ -84,6 +97,46 @@ class HttpxMusicBrainzResolver:
         if groups and int(groups[0].get("score", 0)) >= self._text_min_score:
             return str(groups[0]["id"])
         return None
+
+    def _by_text_judged(self, artist: str, title: str) -> str | None:
+        """Search on the leading artist alone and let a judgement pick from what comes back.
+
+        Spotify joins every credited artist with commas, so quoting the whole string asks
+        MusicBrainz for a single credit that does not exist there: "Alva Noto, Ryuichi
+        Sakamoto" finds nothing, though the album is present, credited "Alva Noto, 坂本龍一".
+        Searching the first artist alone finds it — and also finds unrelated records the
+        score cannot separate, reaching 100 on a different artist's album entirely. So the
+        looser search and the judgement are a pair: neither is safe on its own.
+        """
+        terms = _terms(title)
+        if not terms:
+            return None
+        lead = _lead_artist(artist)
+        if not lead:
+            return None
+        query = f'artist:"{_esc(lead)}" AND releasegroup:({terms})'
+        groups = self._get("release-group", query).get("release-groups", [])
+        candidates = [
+            ReleaseGroupCandidate(
+                id=str(g["id"]),
+                artist=_credit(g),
+                title=str(g.get("title", "")),
+                first_release_date=g.get("first-release-date") or None,
+                primary_type=g.get("primary-type") or None,
+            )
+            for g in groups
+        ]
+        assert self._judge is not None
+        judgement = self._judge.choose(artist=artist, title=title, candidates=candidates)
+        if judgement is None:  # judge unavailable — fall back rather than lose the album
+            return self._by_text_scored(artist, title)
+        # Gate on the probability of the answer, not on confidence. Confidence measures
+        # how concentrated the distribution is, and these candidate lists are short — often a
+        # single release group against "none of these". An exact artist-and-title match splits
+        # 0.76/0.24 there, which is a clear answer and an unconcentrated distribution at once.
+        if judgement.candidate is None or judgement.probability < self._min_probability:
+            return None
+        return judgement.candidate.id
 
     def _get(self, path: str, query: str) -> dict[str, Any]:
         params = urllib.parse.urlencode({"query": query, "fmt": "json", "limit": 25})
@@ -125,3 +178,15 @@ def _terms(text: str) -> str:
     """Bare, space-separated search terms: drop Lucene punctuation (`/`, `!`, `?`, …) so a
     field query matches across Spotify↔MusicBrainz punctuation and spacing differences."""
     return " ".join(_SPECIAL.sub(" ", text).split())
+
+
+def _lead_artist(artist: str) -> str:
+    """The first credited artist. Spotify joins collaborators with commas; MusicBrainz
+    holds one credit, so only the leading name is reliably searchable."""
+    return artist.split(",")[0].strip()
+
+
+def _credit(group: dict[str, Any]) -> str:
+    """MusicBrainz's own artist credit for a release group, as it would be displayed."""
+    names = [c["artist"]["name"] for c in group.get("artist-credit", []) if c.get("artist")]
+    return ", ".join(names)

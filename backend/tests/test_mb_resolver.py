@@ -109,3 +109,174 @@ def test_persistent_503_gives_up_after_retries() -> None:
     except httpx.HTTPStatusError:
         pass
     assert route.call_count == 3  # initial try + 2 retries
+
+
+# --- judgement-based text tier (§5) -------------------------------------------
+
+ALVA = {
+    "id": "rg-alva",
+    "score": 100,
+    "title": "12 Conversations",
+    "artist-credit": [{"artist": {"name": "Alva Noto"}}, {"artist": {"name": "坂本龍一"}}],
+    "first-release-date": "2018-02-23",
+    "primary-type": "Album",
+}
+WRONG = {
+    "id": "rg-wrong",
+    "score": 100,
+    "title": "New Irish Hymns #2",
+    "artist-credit": [{"artist": {"name": "Margaret Becker"}}],
+}
+
+
+class RecordingJudge:
+    """Answers with whatever it was told to, and keeps what it was asked."""
+
+    def __init__(self, judgement: object | None) -> None:
+        self.judgement = judgement
+        self.asked: list[object] = []
+        self.artist = self.title = ""
+
+    def choose(self, *, artist: str, title: str, candidates: list[object]) -> object | None:
+        self.artist, self.title, self.asked = artist, title, candidates
+        return self.judgement
+
+
+def _judged(judge: object, min_probability: float = 0.6) -> HttpxMusicBrainzResolver:
+    return HttpxMusicBrainzResolver(
+        base_url=MB,
+        user_agent="ua",
+        min_interval=0.0,
+        text_min_score=90,
+        judge=judge,
+        min_probability=min_probability,
+    )
+
+
+@respx.mock
+def test_search_widens_to_the_leading_artist() -> None:
+    # Spotify's comma-joined credit is not a MusicBrainz artist, so quoting the whole of it
+    # asks for a credit that does not exist there. Only the leading name is searchable.
+    from mcm.ports.release_group_judge import ReleaseGroupJudgement
+
+    route = respx.get(f"{MB}/release-group").mock(
+        return_value=httpx.Response(200, json={"release-groups": [ALVA]})
+    )
+    judge = RecordingJudge(None)
+    judge.judgement = ReleaseGroupJudgement(None, 1.0, 1.0)
+    _judged(judge).resolve(
+        upc=None, isrcs=[], artist="Alva Noto, Ryuichi Sakamoto", title="12 Conversations"
+    )
+    query = urllib.parse.parse_qs(route.calls[0].request.url.query.decode())["query"][0]
+    assert 'artist:"Alva Noto"' in query
+    assert "Ryuichi Sakamoto" not in query
+
+
+@respx.mock
+def test_the_judgement_decides_not_the_score() -> None:
+    # MusicBrainz scores this 100 and it is a different artist's album entirely.
+    from mcm.ports.release_group_judge import ReleaseGroupJudgement
+
+    respx.get(f"{MB}/release-group").mock(
+        return_value=httpx.Response(200, json={"release-groups": [WRONG]})
+    )
+    respx.get(f"{MB}/recording").mock(return_value=httpx.Response(200, json={"recordings": []}))
+    judge = RecordingJudge(ReleaseGroupJudgement(None, 0.97, 0.97))
+    assert (
+        _judged(judge).resolve(upc=None, isrcs=[], artist="Becker & Mukai", title="Spirit Only")
+        is None
+    )
+
+
+@respx.mock
+def test_a_chosen_candidate_resolves() -> None:
+    from mcm.ports.release_group_judge import ReleaseGroupCandidate, ReleaseGroupJudgement
+
+    respx.get(f"{MB}/release-group").mock(
+        return_value=httpx.Response(200, json={"release-groups": [ALVA]})
+    )
+    judge = RecordingJudge(
+        ReleaseGroupJudgement(
+            ReleaseGroupCandidate(
+                id="rg-alva", artist="Alva Noto, 坂本龍一", title="12 Conversations"
+            ),
+            0.95,
+            0.72,
+        )
+    )
+    got = _judged(judge).resolve(
+        upc=None, isrcs=[], artist="Alva Noto, Ryuichi Sakamoto", title="12 Conversations"
+    )
+    assert got == "rg-alva"
+
+
+@respx.mock
+def test_the_judge_sees_the_full_spotify_credit_and_musicbrainz_own() -> None:
+    from mcm.ports.release_group_judge import ReleaseGroupJudgement
+
+    respx.get(f"{MB}/release-group").mock(
+        return_value=httpx.Response(200, json={"release-groups": [ALVA]})
+    )
+    judge = RecordingJudge(ReleaseGroupJudgement(None, 1.0, 1.0))
+    _judged(judge).resolve(
+        upc=None, isrcs=[], artist="Alva Noto, Ryuichi Sakamoto", title="12 Conversations"
+    )
+    # Narrowing the *search* must not narrow what the judgement is told.
+    assert judge.artist == "Alva Noto, Ryuichi Sakamoto"
+    assert judge.asked[0].artist == "Alva Noto, 坂本龍一"
+    assert judge.asked[0].first_release_date == "2018-02-23"
+
+
+@respx.mock
+def test_a_weak_probability_leaves_the_album_unresolved() -> None:
+    from mcm.ports.release_group_judge import ReleaseGroupCandidate, ReleaseGroupJudgement
+
+    respx.get(f"{MB}/release-group").mock(
+        return_value=httpx.Response(200, json={"release-groups": [ALVA]})
+    )
+    respx.get(f"{MB}/recording").mock(return_value=httpx.Response(200, json={"recordings": []}))
+    judge = RecordingJudge(
+        ReleaseGroupJudgement(ReleaseGroupCandidate(id="rg-alva", artist="a", title="t"), 0.4, 0.4)
+    )
+    assert _judged(judge).resolve(upc=None, isrcs=[], artist="A", title="T") is None
+
+
+@respx.mock
+def test_an_unavailable_judge_falls_back_to_the_score_gate() -> None:
+    respx.get(f"{MB}/release-group").mock(
+        return_value=httpx.Response(200, json={"release-groups": [{"id": "rg-text", "score": 95}]})
+    )
+    assert (
+        _judged(RecordingJudge(None)).resolve(upc=None, isrcs=[], artist="A", title="T")
+        == "rg-text"
+    )
+
+
+@respx.mock
+def test_the_barcode_tier_never_consults_the_judge() -> None:
+    # An exact barcode needs no judgement, and paying for one would be waste.
+    respx.get(f"{MB}/release").mock(
+        return_value=httpx.Response(200, json={"releases": [{"release-group": {"id": "rg-bar"}}]})
+    )
+    judge = RecordingJudge(None)
+    assert _judged(judge).resolve(upc="111", isrcs=[], artist="A", title="T") == "rg-bar"
+    assert judge.asked == []
+
+
+@respx.mock
+def test_a_clear_answer_is_taken_even_when_the_distribution_is_not_concentrated() -> None:
+    # A short candidate list splits 0.76/0.24 on an exact artist-and-title match: a clear
+    # answer, and an unconcentrated distribution. Gating on confidence would discard it.
+    from mcm.ports.release_group_judge import ReleaseGroupCandidate, ReleaseGroupJudgement
+
+    respx.get(f"{MB}/release-group").mock(
+        return_value=httpx.Response(200, json={"release-groups": [ALVA]})
+    )
+    judge = RecordingJudge(
+        ReleaseGroupJudgement(
+            ReleaseGroupCandidate(id="rg-alva", artist="a", title="t"),
+            0.76,
+            0.52,
+        )
+    )
+    assert _judged(judge).resolve(upc=None, isrcs=[], artist="A", title="T") == "rg-alva"
