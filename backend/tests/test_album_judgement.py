@@ -205,6 +205,36 @@ def test_rematch_is_bounded_and_reports_what_is_left() -> None:
     assert len(svc._repo.written) == 2  # only the two it reached
 
 
+def test_offset_walks_the_worklist() -> None:
+    # Without this the window never moves: every call redoes the first `limit` rows
+    # and `remaining` never falls, so a caller looping on it never terminates.
+    rows = [row(i, f"Blur - The Great Escape {i}") for i in range(5)]
+    svc = imports_service(rows, FakeJudge(Judgement(TARGETS[1], 0.9)))
+    assert svc.rematch(limit=2, offset=2).remaining == 1
+    assert [i for i, _ in svc._repo.written] == [2, 3]
+
+
+def test_walking_the_whole_worklist_terminates() -> None:
+    rows = [row(i, f"Blur - The Great Escape {i}") for i in range(5)]
+    svc = imports_service(rows, FakeJudge(Judgement(TARGETS[1], 0.9)))
+    offset = 0
+    for _ in range(10):  # a bound, so a stuck window fails rather than hangs
+        result = svc.rematch(limit=2, offset=offset)
+        offset += result.considered
+        if result.remaining == 0:
+            break
+    assert offset == 5
+    assert [i for i, _ in svc._repo.written] == [0, 1, 2, 3, 4]
+
+
+def test_an_offset_past_the_end_does_nothing() -> None:
+    rows = [row(i, f"Blur - The Great Escape {i}") for i in range(3)]
+    svc = imports_service(rows, FakeJudge(Judgement(TARGETS[1], 0.9)))
+    result = svc.rematch(limit=2, offset=99)
+    assert (result.considered, result.remaining) == (0, 0)
+    assert svc._repo.written == []
+
+
 def test_rematch_skips_non_music() -> None:
     svc = imports_service(
         [row(1, "Some Film 2019 1080p", kind="video")], FakeJudge(Judgement(TARGETS[0], 0.9))

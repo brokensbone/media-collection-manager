@@ -50,16 +50,19 @@ def scan_imports(request: Request) -> DetectResult:
 
 
 @router.post("/imports/rematch")
-def rematch_imports(request: Request, limit: int = 50) -> RematchResult:
+def rematch_imports(request: Request, limit: int = 50, offset: int = 0) -> RematchResult:
     """Put the Import worklist back through matching.
 
     Matching runs once, at detection, so a download that arrived before its album was
     saved stays unmatched for good; this is also how an improved matcher reaches what
     an older one decided. Redoes every music download still awaiting a decision, so a
-    wrong match can be corrected or cleared as well as a blank filled. Bounded — call
-    it again while `remaining` is above zero.
+    wrong match can be corrected or cleared as well as a blank filled.
+
+    Bounded, because each download is a judgement call and the whole worklist would
+    outlive the gateway timeout. Walk it by adding `considered` to `offset` while
+    `remaining` is above zero.
     """
-    return _service(request).rematch(limit=limit)
+    return _service(request).rematch(limit=limit, offset=offset)
 
 
 @router.post("/imports/{import_id}/import", status_code=204)
