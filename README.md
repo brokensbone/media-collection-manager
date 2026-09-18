@@ -56,11 +56,12 @@ arrived before its album was saved stays unmatched for good. `POST /imports/rema
 puts the Import worklist back through it — which is also how an improved matcher
 reaches what an older one decided. It redoes every music download still awaiting a
 decision, so a wrong match is corrected or cleared as well as a blank filled; rows
-already acted on are untouched. It is bounded, so call it again while the `remaining`
-it returns is above zero:
+already acted on are untouched. It is bounded, because each download is a judgement
+call and the whole worklist would outlive the gateway timeout, so walk it by adding
+`considered` to `offset` while `remaining` is above zero:
 
 ```
-curl -XPOST 'http://127.0.0.1:8000/imports/rematch?limit=50'
+curl -XPOST 'http://127.0.0.1:8000/imports/rematch?limit=50&offset=0'
 ```
 
 ## Dev

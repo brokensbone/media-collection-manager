@@ -485,7 +485,7 @@ class ImportsService:
         self._repo = repo
         self._matcher = matcher
 
-    def rematch(self, *, limit: int) -> RematchResult:
+    def rematch(self, *, limit: int, offset: int = 0) -> RematchResult:
         """Put unmatched downloads back through matching (SPEC §12).
 
         Matching otherwise happens once, when a download is first detected, so anything
@@ -499,6 +499,8 @@ class ImportsService:
 
         Bounded by `limit` because each one is a judgement call against the API, and an
         unbounded pass over a long tail would outlive any sensible request timeout.
+        `offset` walks the rest: the worklist's order does not depend on anything a pass
+        changes, so the window advances cleanly across calls.
         """
         if self._matcher is None:
             return RematchResult(0, 0, 0, 0, 0)
@@ -506,7 +508,7 @@ class ImportsService:
         rows = [r for r in self._repo.pending_imports() if r.media_kind == MediaKind.music]
         targets = _match_targets(self._repo)
         matched = changed = cleared = 0
-        for row in rows[:limit]:
+        for row in rows[offset : offset + limit]:
             album_id = self._matcher.match(row.name, targets)
             if album_id != row.matched_album_id:
                 self._repo.set_import_match(row.id, album_id)
@@ -515,13 +517,13 @@ class ImportsService:
                     cleared += 1
             if album_id is not None:
                 matched += 1
-        considered = min(limit, len(rows))
+        considered = len(rows[offset : offset + limit])
         return RematchResult(
             considered=considered,
             matched=matched,
             changed=changed,
             cleared=cleared,
-            remaining=len(rows) - considered,
+            remaining=max(0, len(rows) - (offset + considered)),
         )
 
     def pending(self) -> list[ImportItem]:
