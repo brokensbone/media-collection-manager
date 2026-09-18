@@ -83,3 +83,60 @@ def test_add_torrent_base64_encodes_metainfo() -> None:
         "method": "torrent-add",
         "arguments": {"metainfo": "ZDQ6aW5mb2RlZQ=="},
     }
+
+
+@respx.mock
+def test_add_torrent_reports_a_new_download() -> None:
+    respx.post(RPC).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "result": "success",
+                "arguments": {
+                    "torrent-added": {"id": 7, "name": "Some Album", "hashString": "abc"}
+                },
+            },
+        )
+    )
+    added = _client().add_torrent(b"d4:infodee")
+    assert (added.name, added.hash, added.already_present) == ("Some Album", "abc", False)
+
+
+@respx.mock
+def test_add_torrent_reports_one_transmission_already_had() -> None:
+    # Transmission answers "success" for a duplicate too; only the payload key differs.
+    respx.post(RPC).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "result": "success",
+                "arguments": {
+                    "torrent-duplicate": {"id": 7, "name": "Some Album", "hashString": "abc"}
+                },
+            },
+        )
+    )
+    assert _client().add_torrent(b"d4:infodee").already_present is True
+
+
+@respx.mock
+def test_add_torrent_accepts_the_underscored_spelling() -> None:
+    # The RPC documentation writes these keys with underscores; the wire uses hyphens.
+    respx.post(RPC).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "result": "success",
+                "arguments": {"torrent_duplicate": {"name": "X", "hash_string": "h"}},
+            },
+        )
+    )
+    added = _client().add_torrent(b"d4:infodee")
+    assert (added.already_present, added.hash) == (True, "h")
+
+
+@respx.mock
+def test_a_bare_success_is_treated_as_a_new_download() -> None:
+    # What the old code assumed, and what it has always meant.
+    respx.post(RPC).mock(return_value=httpx.Response(200, json={"result": "success"}))
+    assert _client().add_torrent(b"d4:infodee").already_present is False

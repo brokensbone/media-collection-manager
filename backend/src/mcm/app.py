@@ -61,7 +61,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings, session_factory
     )
     app.state.transmission_service = build_transmission_service(settings, session_factory)
-    app.state.torrent_submission_service = build_torrent_submission_service(settings)
+    app.state.torrent_submission_service = build_torrent_submission_service(
+        settings, session_factory
+    )
     app.state.metrics_service = MetricsService(
         repo=AlbumRepo(session_factory),
         auth=build_auth_service(settings, session_factory),

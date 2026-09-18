@@ -16,7 +16,20 @@ class TransmissionClient(Protocol):
     def completed_torrents(self) -> list[Torrent]: ...
 
 
+@dataclass
+class AddedTorrent:
+    """What Transmission did with a submitted .torrent.
+
+    `already_present` separates the two outcomes Transmission reports as success: a new
+    download started, and a torrent it was already carrying. Both are fine, but only one
+    of them means anything started."""
+
+    name: str
+    hash: str
+    already_present: bool
+
+
 class TorrentUploader(Protocol):
     """The small RPC surface needed to start a download from a .torrent file."""
 
-    def add_torrent(self, metainfo: bytes) -> None: ...
+    def add_torrent(self, metainfo: bytes) -> AddedTorrent: ...
