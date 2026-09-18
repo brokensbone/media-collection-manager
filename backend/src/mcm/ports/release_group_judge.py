@@ -4,9 +4,11 @@ from typing import Protocol
 
 @dataclass
 class ReleaseGroupCandidate:
-    """One MusicBrainz release-group search hit. `score` is MusicBrainz's own relevance
-    figure, carried for logging rather than for deciding — it reaches 100 on plainly wrong
-    albums once the artist is loosened enough to find anything at all."""
+    """One MusicBrainz release-group search hit.
+
+    MusicBrainz's own relevance score is deliberately left behind: it reaches 100 on
+    plainly wrong albums once the artist is loosened enough to find anything at all, so
+    carrying it would only invite the judgement to lean on it."""
 
     id: str
     artist: str
