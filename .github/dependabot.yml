@@ -10,6 +10,13 @@ updates:
     schedule:
       interval: weekly
 
+  # Keeps the flake's inputs current. flake.lock only — a version pinned inside
+  # flake.nix, like the typesafe-sdk wheel, is still ours to bump.
+  - package-ecosystem: nix
+    directory: /
+    schedule:
+      interval: weekly
+
   - package-ecosystem: npm
     directory: /frontend
     schedule:
