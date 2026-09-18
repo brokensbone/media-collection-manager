@@ -73,7 +73,7 @@ class Classification:
     matched_album_id: int | None = None
 
 
-class _Matcher:
+class AlbumMatcher:
     """Name a download's album (SPEC §12).
 
     Retrieval is loose and only has to get the right album somewhere into a short list;
@@ -129,17 +129,12 @@ class ImportDetectionService:
         film_root: str = "",
         workspace_root: str = "",
         events: EventSink | None = None,
-        judge: AlbumJudge | None = None,
-        match_candidates: int = 12,
-        match_min_confidence: float = 0.0,
+        matcher: "AlbumMatcher | None" = None,
     ):
         self._transmission = transmission
         self._repo = repo
-        self._matcher = _Matcher(
-            judge=judge,
-            threshold=match_threshold,
-            candidates=match_candidates,
-            min_confidence=match_min_confidence,
+        self._matcher = matcher or AlbumMatcher(
+            judge=None, threshold=match_threshold, candidates=12, min_confidence=0.0
         )
         self._tv_root = tv_root
         self._film_root = film_root
@@ -203,9 +198,7 @@ class WatchdirDetectionService:
         archive_subdir: str,
         settle_seconds: int,
         match_threshold: float,
-        judge: AlbumJudge | None = None,
-        match_candidates: int = 12,
-        match_min_confidence: float = 0.0,
+        matcher: "AlbumMatcher | None" = None,
         events: EventSink | None = None,
     ):
         self._repo = repo
@@ -214,11 +207,8 @@ class WatchdirDetectionService:
         self._watch_dir = watch_dir
         self._archive_subdir = archive_subdir
         self._settle_seconds = settle_seconds
-        self._matcher = _Matcher(
-            judge=judge,
-            threshold=match_threshold,
-            candidates=match_candidates,
-            min_confidence=match_min_confidence,
+        self._matcher = matcher or AlbumMatcher(
+            judge=None, threshold=match_threshold, candidates=12, min_confidence=0.0
         )
         self._events = events or NullEventSink()
 
@@ -475,12 +465,55 @@ class ImportRunner:
         return len(ids)
 
 
+@dataclass
+class RematchResult:
+    """What one rematch pass did. `remaining` is how many unmatched downloads are still
+    waiting, so a caller can keep going until it reaches zero."""
+
+    considered: int
+    matched: int
+    remaining: int
+
+
 class ImportsService:
     """The Import worklist (§12/§13). Clicking Import just enqueues; the worker imports in the
     background so the operator can tick a batch and come back. Rows persist with their status."""
 
-    def __init__(self, *, repo: AlbumRepo) -> None:
+    def __init__(self, *, repo: AlbumRepo, matcher: "AlbumMatcher | None" = None) -> None:
         self._repo = repo
+        self._matcher = matcher
+
+    def rematch(self, *, limit: int) -> RematchResult:
+        """Put unmatched downloads back through matching (SPEC §12).
+
+        Matching otherwise happens once, when a download is first detected, so anything
+        that arrived before its album was saved stays unmatched for good. This also lets
+        an improved matcher be applied to the tail that the old one left behind.
+
+        Only fills blanks: a download that already names an album is left alone, so a
+        pass can never overwrite a match the operator relies on. Bounded by `limit`
+        because each one is a judgement call against the API, and an unbounded pass over
+        a long tail would outlive any sensible request timeout.
+        """
+        if self._matcher is None:
+            return RematchResult(0, 0, 0)
+
+        unmatched = [
+            r
+            for r in self._repo.pending_imports()
+            if r.matched_album_id is None and r.media_kind == MediaKind.music
+        ]
+        targets = _match_targets(self._repo)
+        matched = 0
+        for row in unmatched[:limit]:
+            album_id = self._matcher.match(row.name, targets)
+            if album_id is not None:
+                self._repo.set_import_match(row.id, album_id)
+                matched += 1
+        considered = min(limit, len(unmatched))
+        return RematchResult(
+            considered=considered, matched=matched, remaining=len(unmatched) - considered
+        )
 
     def pending(self) -> list[ImportItem]:
         """The Import worklist: downloads awaiting an Import/Discard decision (§12/§13)."""

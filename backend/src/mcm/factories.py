@@ -24,6 +24,7 @@ from .config import Settings
 from .crates import CrateService
 from .decide import DecideService
 from .imports import (
+    AlbumMatcher,
     ImportDetectionService,
     ImportRunner,
     TransmissionStager,
@@ -164,6 +165,17 @@ def build_album_judge(settings: Settings) -> TypeSafeAlbumJudge | None:
     )
 
 
+def build_matcher(settings: Settings) -> AlbumMatcher:
+    """The shared download-to-album matcher. Both detection fronts and the rematch pass
+    use one of these so they cannot drift apart."""
+    return AlbumMatcher(
+        judge=build_album_judge(settings),
+        threshold=settings.import_match_threshold,
+        candidates=settings.match_candidates,
+        min_confidence=settings.match_min_confidence,
+    )
+
+
 def build_import_detection_service(
     settings: Settings, session_factory: sessionmaker[Session]
 ) -> ImportDetectionService:
@@ -179,9 +191,7 @@ def build_import_detection_service(
         film_root=settings.film_root,
         workspace_root=settings.workspace_root,
         events=WorkerEventLog(session_factory),
-        judge=build_album_judge(settings),
-        match_candidates=settings.match_candidates,
-        match_min_confidence=settings.match_min_confidence,
+        matcher=build_matcher(settings),
     )
 
 
@@ -230,9 +240,7 @@ def build_watchdir_detection_service(
         settle_seconds=settings.watchdir_settle_seconds,
         match_threshold=settings.import_match_threshold,
         events=WorkerEventLog(session_factory),
-        judge=build_album_judge(settings),
-        match_candidates=settings.match_candidates,
-        match_min_confidence=settings.match_min_confidence,
+        matcher=build_matcher(settings),
     )
 
 

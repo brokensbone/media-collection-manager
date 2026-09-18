@@ -1,7 +1,13 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from ..imports import DetectResult, ImportItem, ImportsService, WatchdirDetectionService
+from ..imports import (
+    DetectResult,
+    ImportItem,
+    ImportsService,
+    RematchResult,
+    WatchdirDetectionService,
+)
 from ..models import ImportTarget
 
 router = APIRouter(tags=["imports"])
@@ -41,6 +47,18 @@ def import_archive(request: Request) -> list[ImportItem]:
 @router.post("/imports/scan")
 def scan_imports(request: Request) -> DetectResult:
     return _watchdir(request).poll(force=True)
+
+
+@router.post("/imports/rematch")
+def rematch_imports(request: Request, limit: int = 50) -> RematchResult:
+    """Put unmatched downloads back through matching.
+
+    Matching runs once, at detection, so a download that arrived before its album was
+    saved stays unmatched for good; this is also how an improved matcher reaches the
+    tail an older one left behind. Only fills blanks. Bounded — call it again while
+    `remaining` is above zero.
+    """
+    return _service(request).rematch(limit=limit)
 
 
 @router.post("/imports/{import_id}/import", status_code=204)

@@ -2,7 +2,7 @@
 
 from mcm.adapters.typesafe_judge import NONE, TypeSafeAlbumJudge
 from mcm.domain.match import MatchTarget, retrieve
-from mcm.imports import _Matcher
+from mcm.imports import AlbumMatcher
 from mcm.ports.album_judge import Judgement
 
 TARGETS = [
@@ -26,8 +26,8 @@ class FakeJudge:
         return self.judgement
 
 
-def matcher(judge: object | None, *, min_confidence: float = 0.6) -> _Matcher:
-    return _Matcher(judge=judge, threshold=0.5, candidates=12, min_confidence=min_confidence)
+def matcher(judge: object | None, *, min_confidence: float = 0.6) -> AlbumMatcher:
+    return AlbumMatcher(judge=judge, threshold=0.5, candidates=12, min_confidence=min_confidence)
 
 
 # --- retrieval: recall, not precision ----------------------------------------
@@ -116,3 +116,81 @@ def test_duplicate_albums_get_distinct_options() -> None:
     labels = TypeSafeAlbumJudge._labels(twice)
     assert len(labels) == 2
     assert {t.id for t in labels.values()} == {1, 2}
+
+
+# --- the rematch pass ---------------------------------------------------------
+
+
+class FakeRepo:
+    """Just enough AlbumRepo for a rematch pass."""
+
+    def __init__(self, rows: list[object], albums: list[MatchTarget]) -> None:
+        self.rows = rows
+        self.albums = albums
+        self.written: list[tuple[int, int]] = []
+
+    def pending_imports(self) -> list[object]:
+        return self.rows
+
+    def albums_for_matching(self) -> list[MatchTarget]:
+        return self.albums
+
+    def set_import_match(self, import_id: int, album_id: int) -> None:
+        self.written.append((import_id, album_id))
+
+
+def row(id: int, name: str, *, matched: int | None = None, kind: str = "music") -> object:
+    from types import SimpleNamespace
+
+    return SimpleNamespace(id=id, name=name, matched_album_id=matched, media_kind=kind)
+
+
+def imports_service(rows: list[object], judge: object | None) -> object:
+    from mcm.imports import ImportsService
+
+    return ImportsService(repo=FakeRepo(rows, TARGETS), matcher=matcher(judge))
+
+
+def test_rematch_fills_a_blank() -> None:
+    svc = imports_service(
+        [row(1, "Blur - The Great Escape [FLAC]")], FakeJudge(Judgement(TARGETS[1], 0.9))
+    )
+    result = svc.rematch(limit=10)
+    assert (result.considered, result.matched, result.remaining) == (1, 1, 0)
+    assert svc._repo.written == [(1, 2)]
+
+
+def test_rematch_never_overwrites_an_existing_match() -> None:
+    svc = imports_service(
+        [row(1, "Blur - The Great Escape", matched=99)], FakeJudge(Judgement(TARGETS[0], 0.9))
+    )
+    assert svc.rematch(limit=10).considered == 0
+    assert svc._repo.written == []
+
+
+def test_rematch_leaves_a_no_match_alone() -> None:
+    svc = imports_service([row(1, "Something Else")], FakeJudge(Judgement(None, 0.99)))
+    result = svc.rematch(limit=10)
+    assert (result.considered, result.matched) == (1, 0)
+    assert svc._repo.written == []
+
+
+def test_rematch_is_bounded_and_reports_what_is_left() -> None:
+    rows = [row(i, f"Blur - The Great Escape {i}") for i in range(5)]
+    svc = imports_service(rows, FakeJudge(Judgement(TARGETS[1], 0.9)))
+    result = svc.rematch(limit=2)
+    assert (result.considered, result.matched, result.remaining) == (2, 2, 3)
+
+
+def test_rematch_skips_non_music() -> None:
+    svc = imports_service(
+        [row(1, "Some Film 2019 1080p", kind="video")], FakeJudge(Judgement(TARGETS[0], 0.9))
+    )
+    assert svc.rematch(limit=10).considered == 0
+
+
+def test_rematch_without_a_matcher_does_nothing() -> None:
+    from mcm.imports import ImportsService
+
+    svc = ImportsService(repo=FakeRepo([row(1, "Blur - The Great Escape")], TARGETS))
+    assert svc.rematch(limit=10).matched == 0

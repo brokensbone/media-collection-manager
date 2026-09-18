@@ -51,6 +51,16 @@ runs, and it is also the fallback if the API is unreachable, so detection never 
 a download. A verdict below `MCM_MATCH_MIN_CONFIDENCE` is treated as no match and
 lands in the same tail as anything unrecognised, to be hand-imported.
 
+Matching otherwise happens once, when a download is first detected, so anything that
+arrived before its album was saved stays unmatched for good. `POST /imports/rematch`
+puts the unmatched tail back through it — which is also how an improved matcher
+reaches what an older one left behind. It only fills blanks, never overwrites, and is
+bounded, so call it again while the `remaining` it returns is above zero:
+
+```
+curl -XPOST 'http://127.0.0.1:8000/imports/rematch?limit=50'
+```
+
 ## Dev
 
 Backend (from `backend/`):
