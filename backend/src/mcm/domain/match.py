@@ -149,9 +149,9 @@ def edition_match(query: str, candidates: list[Candidate]) -> Candidate | None:
 # --- broad retrieval, for judgement-based matching (§12) ----------------------
 
 # Words that say nothing about which record a download is: formats, sources, rip
-# provenance. Unlike the gates above this list is not load-bearing — a word missing
-# from it costs a little retrieval precision, never a wrong match, because choosing
-# among the candidates is a separate judgement.
+# provenance. A word missing from this list costs a little retrieval precision and
+# never causes a wrong match, because choosing among the candidates is a separate
+# judgement.
 _RETRIEVAL_JUNK = frozenset(
     """
     flac mp3 m4a aac ogg opus wav aiff aif alac ape wv dsf dff mpc
