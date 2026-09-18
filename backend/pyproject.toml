@@ -14,6 +14,7 @@ dependencies = [
     "beets>=2.13",
     "httpx>=0.27",  # runtime: art fetch + Spotify/MusicBrainz/Transmission adapters
     "python-multipart>=0.0.20",  # multipart parsing for torrent-file uploads
+    "typesafe-sdk>=0.7.0",
 ]
 
 [dependency-groups]

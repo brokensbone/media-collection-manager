@@ -13,8 +13,9 @@ from .adapters.album_repo import AlbumRepo, ImportRecord, ImportRow
 from .adapters.beets import BeetsAlbum
 from .adapters.event_log import NullEventSink
 from .adapters.unpack import dispose, unpack
-from .domain.match import MatchTarget, best_match
+from .domain.match import MatchTarget, best_match, retrieve
 from .models import AlbumState, ImportSource, ImportState, ImportTarget, MediaKind
+from .ports.album_judge import AlbumJudge
 from .ports.clock import Clock
 from .ports.events import EventSink
 from .ports.file_transfer import FileTransfer
@@ -72,6 +73,44 @@ class Classification:
     matched_album_id: int | None = None
 
 
+class _Matcher:
+    """Name a download's album (SPEC §12).
+
+    Retrieval is loose and only has to get the right album somewhere into a short list;
+    a judgement then picks one or says none of them — a question about meaning that the
+    string ratio cannot answer (a catalogue number is noise, a deluxe edition is the same
+    record, and in a numbered series the number *is* the identity).
+
+    A judgement below `min_confidence` is treated as no match: it lands in the same
+    no-match tail as anything else unrecognised, for the operator to hand-import. When no
+    judge is configured, or the API is unreachable, this falls back to the string matcher
+    so detection keeps working rather than losing the download.
+    """
+
+    def __init__(
+        self,
+        *,
+        judge: AlbumJudge | None,
+        threshold: float,
+        candidates: int,
+        min_confidence: float,
+    ) -> None:
+        self._judge = judge
+        self._threshold = threshold
+        self._candidates = candidates
+        self._min_confidence = min_confidence
+
+    def match(self, name: str, targets: list[MatchTarget]) -> int | None:
+        if self._judge is not None:
+            shortlist = retrieve(name, targets, limit=self._candidates)
+            judgement = self._judge.choose(name=name, candidates=shortlist)
+            if judgement is not None:
+                if judgement.target is None or judgement.confidence < self._min_confidence:
+                    return None
+                return judgement.target.id
+        return best_match(name, targets, self._threshold)
+
+
 # --- detection: one service per front (§12 Transmission / §13 watch-dir) --------------
 
 
@@ -90,10 +129,18 @@ class ImportDetectionService:
         film_root: str = "",
         workspace_root: str = "",
         events: EventSink | None = None,
+        judge: AlbumJudge | None = None,
+        match_candidates: int = 12,
+        match_min_confidence: float = 0.0,
     ):
         self._transmission = transmission
         self._repo = repo
-        self._threshold = match_threshold
+        self._matcher = _Matcher(
+            judge=judge,
+            threshold=match_threshold,
+            candidates=match_candidates,
+            min_confidence=match_min_confidence,
+        )
         self._tv_root = tv_root
         self._film_root = film_root
         self._workspace_root = workspace_root
@@ -117,7 +164,7 @@ class ImportDetectionService:
                 tv_root=self._tv_root,
                 film_root=self._film_root,
                 workspace_root=self._workspace_root,
-                matched_album_id=best_match(t.name, targets, self._threshold),
+                matched_album_id=self._matcher.match(t.name, targets),
             )
             self._repo.add_pending_import(
                 source=ImportSource.transmission,
@@ -156,6 +203,9 @@ class WatchdirDetectionService:
         archive_subdir: str,
         settle_seconds: int,
         match_threshold: float,
+        judge: AlbumJudge | None = None,
+        match_candidates: int = 12,
+        match_min_confidence: float = 0.0,
         events: EventSink | None = None,
     ):
         self._repo = repo
@@ -164,7 +214,12 @@ class WatchdirDetectionService:
         self._watch_dir = watch_dir
         self._archive_subdir = archive_subdir
         self._settle_seconds = settle_seconds
-        self._threshold = match_threshold
+        self._matcher = _Matcher(
+            judge=judge,
+            threshold=match_threshold,
+            candidates=match_candidates,
+            min_confidence=match_min_confidence,
+        )
         self._events = events or NullEventSink()
 
     def poll(self, *, force: bool = False) -> DetectResult:
@@ -194,7 +249,7 @@ class WatchdirDetectionService:
                 import_target=ImportTarget.beets,
                 classification_detail="Watch-folder audio drop.",
                 archive_path=str(drop),
-                matched_album_id=best_match(query, targets, self._threshold),
+                matched_album_id=self._matcher.match(query, targets),
             )
             self._events.emit(
                 job="watchdir", type="detected", message=f"Detected drop: '{drop.name}'"
