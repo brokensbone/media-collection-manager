@@ -51,12 +51,13 @@ def scan_imports(request: Request) -> DetectResult:
 
 @router.post("/imports/rematch")
 def rematch_imports(request: Request, limit: int = 50) -> RematchResult:
-    """Put unmatched downloads back through matching.
+    """Put the Import worklist back through matching.
 
     Matching runs once, at detection, so a download that arrived before its album was
-    saved stays unmatched for good; this is also how an improved matcher reaches the
-    tail an older one left behind. Only fills blanks. Bounded — call it again while
-    `remaining` is above zero.
+    saved stays unmatched for good; this is also how an improved matcher reaches what
+    an older one decided. Redoes every music download still awaiting a decision, so a
+    wrong match can be corrected or cleared as well as a blank filled. Bounded — call
+    it again while `remaining` is above zero.
     """
     return _service(request).rematch(limit=limit)
 

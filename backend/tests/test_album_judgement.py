@@ -156,15 +156,37 @@ def test_rematch_fills_a_blank() -> None:
         [row(1, "Blur - The Great Escape [FLAC]")], FakeJudge(Judgement(TARGETS[1], 0.9))
     )
     result = svc.rematch(limit=10)
-    assert (result.considered, result.matched, result.remaining) == (1, 1, 0)
+    assert (result.considered, result.matched, result.changed, result.remaining) == (1, 1, 1, 0)
     assert svc._repo.written == [(1, 2)]
 
 
-def test_rematch_never_overwrites_an_existing_match() -> None:
+def test_rematch_corrects_a_wrong_match() -> None:
+    # Nothing on the worklist has been acted on, and no match here was set by hand,
+    # so a match an older matcher got wrong is worth redoing.
     svc = imports_service(
-        [row(1, "Blur - The Great Escape", matched=99)], FakeJudge(Judgement(TARGETS[0], 0.9))
+        [row(1, "Blur - The Great Escape", matched=1)], FakeJudge(Judgement(TARGETS[1], 0.9))
     )
-    assert svc.rematch(limit=10).considered == 0
+    result = svc.rematch(limit=10)
+    assert (result.changed, result.cleared) == (1, 0)
+    assert svc._repo.written == [(1, 2)]
+
+
+def test_rematch_clears_a_match_the_judgement_rejects() -> None:
+    # The Fabric 99 -> Fabric 19 family: the row named an album and should not.
+    svc = imports_service(
+        [row(1, "Sasha - Fabric 99 [FLAC]", matched=3)], FakeJudge(Judgement(None, 0.97))
+    )
+    result = svc.rematch(limit=10)
+    assert (result.matched, result.changed, result.cleared) == (0, 1, 1)
+    assert svc._repo.written == [(1, None)]
+
+
+def test_rematch_leaves_an_unchanged_match_alone() -> None:
+    svc = imports_service(
+        [row(1, "Blur - The Great Escape", matched=2)], FakeJudge(Judgement(TARGETS[1], 0.9))
+    )
+    result = svc.rematch(limit=10)
+    assert (result.matched, result.changed) == (1, 0)
     assert svc._repo.written == []
 
 
@@ -180,6 +202,7 @@ def test_rematch_is_bounded_and_reports_what_is_left() -> None:
     svc = imports_service(rows, FakeJudge(Judgement(TARGETS[1], 0.9)))
     result = svc.rematch(limit=2)
     assert (result.considered, result.matched, result.remaining) == (2, 2, 3)
+    assert len(svc._repo.written) == 2  # only the two it reached
 
 
 def test_rematch_skips_non_music() -> None:

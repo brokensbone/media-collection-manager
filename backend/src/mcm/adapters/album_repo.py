@@ -934,9 +934,12 @@ class AlbumRepo:
             )
             session.commit()
 
-    def set_import_match(self, import_id: int, album_id: int) -> None:
-        """Point an import row at the album it produced — used after a reverse-match creates an
-        owned album, so the row shows that album instead of a stale 'no match'."""
+    def set_import_match(self, import_id: int, album_id: int | None) -> None:
+        """Point an import row at an album, or at nothing.
+
+        Used after a reverse-match creates an owned album, so the row shows that album
+        instead of a stale 'no match', and by the rematch pass, which may also need to
+        clear a match an earlier matcher got wrong."""
         with self._sf() as session:
             session.execute(
                 update(PendingImport)

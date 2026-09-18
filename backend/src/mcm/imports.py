@@ -467,11 +467,13 @@ class ImportRunner:
 
 @dataclass
 class RematchResult:
-    """What one rematch pass did. `remaining` is how many unmatched downloads are still
-    waiting, so a caller can keep going until it reaches zero."""
+    """What one rematch pass did. `remaining` is how many downloads it has not reached
+    yet, so a caller can keep going until it reaches zero."""
 
     considered: int
-    matched: int
+    matched: int  # now name an album, however they started
+    changed: int  # name a different album than before
+    cleared: int  # named one before and now name nothing
     remaining: int
 
 
@@ -488,31 +490,38 @@ class ImportsService:
 
         Matching otherwise happens once, when a download is first detected, so anything
         that arrived before its album was saved stays unmatched for good. This also lets
-        an improved matcher be applied to the tail that the old one left behind.
+        an improved matcher be applied to everything an older one decided.
 
-        Only fills blanks: a download that already names an album is left alone, so a
-        pass can never overwrite a match the operator relies on. Bounded by `limit`
-        because each one is a judgement call against the API, and an unbounded pass over
-        a long tail would outlive any sensible request timeout.
+        Every music download still awaiting a decision is redone, not only the unmatched
+        ones, because a wrong match is worth correcting too — and it may be corrected to
+        nothing. Rows that have been acted on are untouched, and no match here was ever
+        set by hand, so nothing the operator chose can be overwritten.
+
+        Bounded by `limit` because each one is a judgement call against the API, and an
+        unbounded pass over a long tail would outlive any sensible request timeout.
         """
         if self._matcher is None:
-            return RematchResult(0, 0, 0)
+            return RematchResult(0, 0, 0, 0, 0)
 
-        unmatched = [
-            r
-            for r in self._repo.pending_imports()
-            if r.matched_album_id is None and r.media_kind == MediaKind.music
-        ]
+        rows = [r for r in self._repo.pending_imports() if r.media_kind == MediaKind.music]
         targets = _match_targets(self._repo)
-        matched = 0
-        for row in unmatched[:limit]:
+        matched = changed = cleared = 0
+        for row in rows[:limit]:
             album_id = self._matcher.match(row.name, targets)
-            if album_id is not None:
+            if album_id != row.matched_album_id:
                 self._repo.set_import_match(row.id, album_id)
+                changed += 1
+                if album_id is None:
+                    cleared += 1
+            if album_id is not None:
                 matched += 1
-        considered = min(limit, len(unmatched))
+        considered = min(limit, len(rows))
         return RematchResult(
-            considered=considered, matched=matched, remaining=len(unmatched) - considered
+            considered=considered,
+            matched=matched,
+            changed=changed,
+            cleared=cleared,
+            remaining=len(rows) - considered,
         )
 
     def pending(self) -> list[ImportItem]:
