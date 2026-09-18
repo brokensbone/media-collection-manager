@@ -3,7 +3,7 @@ from typing import Any
 
 import httpx
 
-from ..ports.transmission import Torrent
+from ..ports.transmission import AddedTorrent, Torrent
 
 _SESSION_HEADER = "X-Transmission-Session-Id"
 _FIELDS = ["hashString", "name", "downloadDir", "percentDone", "files"]
@@ -36,14 +36,29 @@ class HttpxTransmissionClient:
             if t.get("percentDone") == 1
         ]
 
-    def add_torrent(self, metainfo: bytes) -> None:
-        """Hand a .torrent file to Transmission without retaining a local copy."""
-        self._rpc(
+    def add_torrent(self, metainfo: bytes) -> AddedTorrent:
+        """Hand a .torrent file to Transmission without retaining a local copy.
+
+        Transmission answers `success` either way and says which happened in the shape of
+        the payload: `torrent-added` for a new download, `torrent-duplicate` for one it
+        already had. Both spellings are accepted because the RPC documentation writes these
+        keys with underscores while the wire uses hyphens."""
+        data = self._rpc(
             {
                 "method": "torrent-add",
                 "arguments": {"metainfo": base64.b64encode(metainfo).decode("ascii")},
             }
         )
+        args = data.get("arguments", {})
+        for key in ("torrent-duplicate", "torrent_duplicate"):
+            if key in args:
+                return _added(args[key], already_present=True)
+        for key in ("torrent-added", "torrent_added"):
+            if key in args:
+                return _added(args[key], already_present=False)
+        # An older or unusual Transmission that says only "success": treat it as added
+        # rather than inventing a duplicate, since that is what it has always meant.
+        return AddedTorrent(name="", hash="", already_present=False)
 
     def _rpc(self, body: dict[str, Any]) -> dict[str, Any]:
         for attempt in range(2):
@@ -55,3 +70,11 @@ class HttpxTransmissionClient:
             resp.raise_for_status()
             return resp.json()  # type: ignore[no-any-return]
         raise RuntimeError("Transmission session-id handshake failed")
+
+
+def _added(payload: dict[str, Any], *, already_present: bool) -> AddedTorrent:
+    return AddedTorrent(
+        name=str(payload.get("name", "")),
+        hash=str(payload.get("hashString") or payload.get("hash_string") or ""),
+        already_present=already_present,
+    )

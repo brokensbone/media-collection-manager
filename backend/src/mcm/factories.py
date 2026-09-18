@@ -229,7 +229,9 @@ def build_transmission_service(
     )
 
 
-def build_torrent_submission_service(settings: Settings) -> TorrentSubmissionService:
+def build_torrent_submission_service(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> TorrentSubmissionService:
     return TorrentSubmissionService(
         uploader=HttpxTransmissionClient(
             rpc_url=settings.transmission_rpc_url,
@@ -237,6 +239,9 @@ def build_torrent_submission_service(settings: Settings) -> TorrentSubmissionSer
             password=settings.transmission_password,
         ),
         api_configured=bool(settings.transmission_rpc_url),
+        # Submitting a torrent happens in the API process, but the activity feed is one
+        # log for the whole application, not a worker diary.
+        events=WorkerEventLog(session_factory),
     )
 
 

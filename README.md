@@ -32,6 +32,26 @@ the Nix store.
 - `fixtures/beets/` — reproducible seeded beets library for tests.
 - `spikes/` — throwaway spikes (D0 reconcile).
 
+## Everything that happens goes in the activity feed
+
+The app mostly runs unattended, so the activity feed (`GET /events`, the Activity view)
+is where you find out what it did. **Anything that changes something, or that a person
+asked for, emits an event** — an import started, a torrent submitted, an album resolved
+or marked owned, a want dropped. One row per meaningful step, not per network call.
+
+That means a new feature is not finished when it works; it is finished when you can see
+that it worked. A response body tells whoever pressed the button, once. The feed is what
+is left an hour later, and it is the only place an unattended job can speak from at all.
+
+Emit from wherever the work happens. The feed is one log for the whole application: the
+worker writes most of it, but the API process writes too, and `WorkerEventLog` is
+available on both sides.
+
+Not emitting is a decision, so say so in a comment where the work happens. Reads, polls
+that found nothing, and per-item chatter inside a batch are the usual reasons — the feed
+keeps a rolling window of the most recent rows, so a job that emits per item will push
+everything else out of it.
+
 ## Matching downloads to albums
 
 A finished download arrives named something like

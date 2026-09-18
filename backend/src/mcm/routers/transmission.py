@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from ..adapters.album_repo import TransmissionRow
+from ..ports.transmission import AddedTorrent
 from ..torrent_submission_service import TorrentSubmissionService
 from ..transmission_service import ConnectionReport, TransmissionService
 
@@ -40,14 +41,29 @@ async def add_torrent(
         metainfos.append(metainfo)
 
     try:
-        for metainfo in metainfos:
-            _submission_service(request).submit(metainfo)
+        results = [_submission_service(request).submit(metainfo) for metainfo in metainfos]
     except Exception as e:
         raise HTTPException(
             status_code=502, detail=f"Transmission rejected the torrent: {e}"
         ) from e
-    count = len(metainfos)
-    return {"detail": f"{count} torrent{'s' if count != 1 else ''} added to Transmission."}
+    return {"detail": _submission_detail(results)}
+
+
+def _submission_detail(results: list[AddedTorrent]) -> str:
+    """Report the two outcomes separately. Transmission calls both of them success, so a
+    plain count of files chosen reads as a count of downloads started, which it is not."""
+    already = sum(1 for r in results if r.already_present)
+    started = len(results) - already
+    if not already:
+        return f"{started} torrent{'s' if started != 1 else ''} added to Transmission."
+    if not started:
+        was = "was" if already == 1 else "were"
+        return f"{already} torrent{'s' if already != 1 else ''} {was} already in Transmission."
+    was = "was" if already == 1 else "were"
+    return (
+        f"{started} torrent{'s' if started != 1 else ''} added to Transmission; "
+        f"{already} {was} already there."
+    )
 
 
 @router.post("/test")
