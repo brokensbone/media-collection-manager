@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     # it does not alter Beets records or make the path visible through the API.
     legacy_music_dir: str = ""
     # Radio playback is deliberately opt-in: a worker only contacts MPD when its deployment
-    # supplies a host.  The Kite deployment uses its loopback MPD at 07:00/09:00 Europe/London.
+    # supplies a host.
     mpd_host: str = ""
     mpd_port: int = 6600
     radio_timezone: str = "Europe/London"
