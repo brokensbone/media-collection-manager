@@ -6,11 +6,14 @@ from collections.abc import Callable
 from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 from .config import Settings
 from .jobs import (
     alerts_once,
     ingest_once,
+    load_radio_once,
+    play_radio_once,
     poll_plays_once,
     poll_transmission_once,
     poll_watchdir_once,
@@ -44,6 +47,19 @@ def build_scheduler(settings: Settings) -> BackgroundScheduler:
         every(poll_watchdir_once, settings.watchdir_poll_seconds, "watchdir")
     every(run_imports_once, settings.import_process_seconds, "imports")
     every(alerts_once, settings.alerts_poll_seconds, "alerts")
+    if settings.mpd_host:
+        scheduler.add_job(
+            load_radio_once,
+            CronTrigger(day_of_week="mon-fri", hour=7, timezone=settings.radio_timezone),
+            args=[settings],
+            id="radio_load",
+        )
+        scheduler.add_job(
+            play_radio_once,
+            CronTrigger(day_of_week="mon-fri", hour=9, timezone=settings.radio_timezone),
+            args=[settings],
+            id="radio_play",
+        )
     return scheduler
 
 

@@ -2,12 +2,14 @@ import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session, sessionmaker
 
 from .adapters.album_repo import AlbumRepo
 from .adapters.beets import BeetsClient
 from .adapters.beets_cache import BeetsCatalogCache
+from .adapters.mpd import MpdClient, MpdError
 from .config import Settings
 from .db import make_engine, make_session_factory
 from .factories import (
@@ -23,6 +25,7 @@ from .factories import (
     build_resolution_service,
     build_watchdir_detection_service,
 )
+from .radio_schedules import RadioScheduleService, ScheduleError
 
 log = logging.getLogger(__name__)
 
@@ -165,6 +168,55 @@ def alerts_once(settings: Settings | None = None) -> None:
             reauth_due=reauth_due, decide_count=decide_count
         )
         log.info("alerts: reauth_due=%s decide_count=%s", reauth_due, decide_count)
+
+
+def _radio_paths(settings: Settings, session_factory: sessionmaker[Session]) -> list[str] | None:
+    today = datetime.now(ZoneInfo(settings.radio_timezone)).date()
+    return RadioScheduleService(session_factory).playable_paths(today)
+
+
+def load_radio_once(settings: Settings | None = None) -> None:
+    """At 07:00 local time, replace MPD's queue with today's complete plan, paused."""
+    settings = settings or Settings()
+    if not settings.mpd_host:
+        log.info("radio load skipped: MCM_MPD_HOST is not configured")
+        return
+    session_factory = _session_factory(settings)
+    with heartbeat(session_factory, "radio_load"):
+        try:
+            paths = _radio_paths(settings, session_factory)
+            if paths is None:
+                log.info("radio load skipped: no schedule for today")
+                return
+            MpdClient(settings.mpd_host, settings.mpd_port).load(paths)
+        except (MpdError, ScheduleError):
+            log.exception("radio load failed")
+            raise
+        log.info("radio loaded: tracks=%s", len(paths))
+
+
+def play_radio_once(settings: Settings | None = None) -> None:
+    """At 09:00 local time, start only the queue that this morning's plan resolved to."""
+    settings = settings or Settings()
+    if not settings.mpd_host:
+        log.info("radio play skipped: MCM_MPD_HOST is not configured")
+        return
+    session_factory = _session_factory(settings)
+    with heartbeat(session_factory, "radio_play"):
+        try:
+            paths = _radio_paths(settings, session_factory)
+            if paths is None:
+                log.info("radio play skipped: no schedule for today")
+                return
+            mpd = MpdClient(settings.mpd_host, settings.mpd_port)
+            if mpd.playlist_paths() != paths:
+                log.warning("radio play skipped: MPD queue no longer matches today's schedule")
+                return
+            mpd.play()
+        except (MpdError, ScheduleError):
+            log.exception("radio play failed")
+            raise
+        log.info("radio playing: tracks=%s", len(paths))
 
 
 if __name__ == "__main__":
