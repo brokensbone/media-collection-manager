@@ -69,7 +69,7 @@ def test_radio_catalogue_exposes_recent_albums_and_cache_freshness(
     assert client.get("/radio/status").json()["catalogue_refreshed_at"] is not None
 
 
-def test_radio_schedule_is_path_free_and_expands_the_reviewed_album_contents(
+def test_radio_schedule_is_path_free_and_expands_album_contents(
     clean_album_tables: sessionmaker[Session],
 ) -> None:
     cache = BeetsCatalogCache(clean_album_tables)
@@ -84,7 +84,6 @@ def test_radio_schedule_is_path_free_and_expands_the_reviewed_album_contents(
     response = client.put(
         "/radio/schedules/2026-09-21",
         json={
-            "state": "draft",
             "note": "A deliberately gentle Monday.",
             "sessions": [
                 {
@@ -137,7 +136,10 @@ def test_radio_schedule_is_path_free_and_expands_the_reviewed_album_contents(
         ],
     }
     assert "path" not in str(body)
-    assert client.get("/radio/schedules").json()[0]["schedule_date"] == "2026-09-21"
+    summary = client.get("/radio/schedules").json()[0]
+    assert summary["schedule_date"] == "2026-09-21"
+    assert "state" not in summary
+    assert "state" not in body
 
 
 def test_radio_schedule_rejects_an_unavailable_selection(

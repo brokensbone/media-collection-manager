@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 
 type ScheduleSummary = {
 	schedule_date: string;
-	state: "draft" | "approved";
 	note: string | null;
 	session_count: number;
 	duration_seconds: number;
@@ -79,7 +78,6 @@ export function Radio() {
 						onClick={() => setSelected(day.schedule_date)}
 					>
 						{day.schedule_date}
-						<span className="badge">{day.state}</span>
 					</button>
 				))}
 			</div>
@@ -99,7 +97,6 @@ function ScheduleDay({ schedule }: { schedule: Schedule }) {
 						{duration(schedule.duration_seconds)}
 					</p>
 				</div>
-				<span className="badge">{schedule.state}</span>
 			</div>
 			{schedule.note ? <p className="radio-note">{schedule.note}</p> : null}
 			<div className="radio-timeline">

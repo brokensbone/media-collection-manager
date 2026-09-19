@@ -1,4 +1,4 @@
-"""Reviewable radio schedules expressed only in stable MCM catalogue identifiers."""
+"""Radio schedules expressed only in stable MCM catalogue identifiers."""
 
 from dataclasses import dataclass
 from datetime import date
@@ -37,7 +37,6 @@ class ScheduleSessionInput:
 
 @dataclass
 class ScheduleInput:
-    state: str
     note: str | None
     sessions: list[ScheduleSessionInput]
 
@@ -68,7 +67,6 @@ class ScheduleSessionView:
 @dataclass
 class ScheduleView:
     schedule_date: date
-    state: str
     note: str | None
     duration_seconds: float
     sessions: list[ScheduleSessionView]
@@ -77,7 +75,6 @@ class ScheduleView:
 @dataclass
 class ScheduleSummary:
     schedule_date: date
-    state: str
     note: str | None
     session_count: int
     duration_seconds: float
@@ -119,9 +116,6 @@ class RadioScheduleService:
                 )
                 schedule.note = input.note
 
-            # The future queue runner can require this explicit approval rather than inferring it
-            # from a UI action.
-            schedule.state = input.state
             for session_position, session_input in enumerate(input.sessions):
                 row = RadioScheduleSession(
                     schedule_id=schedule.id,
@@ -147,8 +141,6 @@ class RadioScheduleService:
             return self._view(session, schedule)
 
     def _validate(self, input: ScheduleInput) -> None:
-        if input.state not in {"draft", "approved"}:
-            raise ScheduleError("state must be draft or approved")
         if not input.sessions:
             raise ScheduleError("a schedule needs at least one session")
         with self._sf() as session:
@@ -174,7 +166,6 @@ class RadioScheduleService:
         view = self._view(session, schedule)
         return ScheduleSummary(
             schedule_date=view.schedule_date,
-            state=view.state,
             note=view.note,
             session_count=len(view.sessions),
             duration_seconds=view.duration_seconds,
@@ -189,7 +180,6 @@ class RadioScheduleService:
         segments = [self._session_view(session, row) for row in sessions]
         return ScheduleView(
             schedule_date=schedule.schedule_date,
-            state=schedule.state,
             note=schedule.note,
             duration_seconds=sum(s.duration_seconds for s in segments),
             sessions=segments,

@@ -31,7 +31,6 @@ class ScheduleSessionBody(BaseModel):
 
 
 class ScheduleBody(BaseModel):
-    state: str = "draft"
     note: str | None = None
     sessions: list[ScheduleSessionBody]
 
@@ -42,7 +41,6 @@ def _service(request: Request) -> RadioScheduleService:
 
 def _input(body: ScheduleBody) -> ScheduleInput:
     return ScheduleInput(
-        state=body.state,
         note=body.note,
         sessions=[
             ScheduleSessionInput(

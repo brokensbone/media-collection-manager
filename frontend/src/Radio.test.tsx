@@ -20,7 +20,6 @@ describe("Radio", () => {
 								? [
 										{
 											schedule_date: "2026-09-21",
-											state: "draft",
 											note: "Monday shape",
 											session_count: 2,
 											duration_seconds: 7200,
@@ -28,7 +27,6 @@ describe("Radio", () => {
 									]
 								: {
 										schedule_date: "2026-09-21",
-										state: "draft",
 										note: "Monday shape",
 										session_count: 2,
 										duration_seconds: 7200,

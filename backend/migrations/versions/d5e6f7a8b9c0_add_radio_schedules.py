@@ -1,4 +1,4 @@
-"""add reviewable radio schedules
+"""add radio schedules
 
 Revision ID: d5e6f7a8b9c0
 Revises: a4f8c2d7e1b9
@@ -21,7 +21,6 @@ def upgrade() -> None:
         "radio_schedule",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("schedule_date", sa.Date(), nullable=False),
-        sa.Column("state", sa.String(), nullable=False, server_default="draft"),
         sa.Column("note", sa.String(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),

@@ -275,13 +275,12 @@ class BeetsTrackCache(Base):
 
 
 class RadioSchedule(Base):
-    """A reviewed radio day. Selections use Beets identifiers, never file paths."""
+    """A radio day. Selections use Beets identifiers, never file paths."""
 
     __tablename__ = "radio_schedule"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     schedule_date: Mapped[date] = mapped_column(Date, unique=True, index=True)
-    state: Mapped[str] = mapped_column(default="draft")  # draft or explicitly reviewed/approved
     note: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
