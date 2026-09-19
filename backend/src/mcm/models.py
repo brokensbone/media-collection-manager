@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 
 from sqlalchemy import (
     JSON,
+    Date,
     DateTime,
     ForeignKey,
     LargeBinary,
@@ -271,6 +272,47 @@ class BeetsTrackCache(Base):
     title: Mapped[str]
     duration_seconds: Mapped[float | None] = mapped_column(default=None)
     path: Mapped[str]
+
+
+class RadioSchedule(Base):
+    """A radio day. Selections use Beets identifiers, never file paths."""
+
+    __tablename__ = "radio_schedule"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    schedule_date: Mapped[date] = mapped_column(Date, unique=True, index=True)
+    note: Mapped[str | None] = mapped_column(default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class RadioScheduleSession(Base):
+    __tablename__ = "radio_schedule_session"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    schedule_id: Mapped[int] = mapped_column(
+        ForeignKey("radio_schedule.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int]
+    kind: Mapped[str]  # track_hour or album_session
+    title: Mapped[str]
+    starts_at: Mapped[str | None] = mapped_column(default=None)  # local clock label, e.g. 09:00
+    note: Mapped[str | None] = mapped_column(default=None)
+
+
+class RadioScheduleItem(Base):
+    __tablename__ = "radio_schedule_item"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("radio_schedule_session.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int]
+    kind: Mapped[str]  # track or album
+    beets_id: Mapped[str | None] = mapped_column(default=None)
+    item_id: Mapped[str | None] = mapped_column(default=None)
 
 
 class Box(Base):
