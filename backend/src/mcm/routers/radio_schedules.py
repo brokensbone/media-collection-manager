@@ -60,7 +60,7 @@ def _input(body: ScheduleBody) -> ScheduleInput:
 
 @router.get("")
 def schedules(request: Request) -> list[ScheduleSummary]:
-    return _service(request).list()
+    return _service(request).list_schedules()
 
 
 @router.get("/{schedule_date}")

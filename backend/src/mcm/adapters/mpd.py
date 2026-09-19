@@ -1,7 +1,7 @@
 """The deliberately small MPD protocol seam used by the radio worker."""
 
 import socket
-from typing import BinaryIO
+from typing import BinaryIO, cast
 
 
 class MpdError(Exception):
@@ -34,7 +34,7 @@ class MpdClient:
             connection = socket.create_connection((self._host, self._port), timeout=10)
         except OSError as exc:
             raise MpdError(f"could not connect to MPD at {self._host}:{self._port}: {exc}") from exc
-        reader = connection.makefile("rwb")
+        reader = cast(BinaryIO, connection.makefile("rwb"))
         greeting = self._readline(reader)
         if not greeting.startswith("OK MPD "):
             reader.close()

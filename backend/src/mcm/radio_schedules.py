@@ -84,7 +84,7 @@ class RadioScheduleService:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._sf = session_factory
 
-    def list(self) -> list[ScheduleSummary]:
+    def list_schedules(self) -> list[ScheduleSummary]:
         with self._sf() as session:
             schedules = session.scalars(
                 select(RadioSchedule).order_by(RadioSchedule.schedule_date.desc())
