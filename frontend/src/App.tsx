@@ -10,6 +10,7 @@ import { Imports } from "./Imports";
 import { Library } from "./Library";
 import { Owned } from "./Owned";
 import { Releases } from "./Releases";
+import { Radio } from "./Radio";
 import { SpotifyStatus } from "./SpotifyStatus";
 import { Tasks } from "./Tasks";
 import { Transmission } from "./Transmission";
@@ -22,7 +23,8 @@ type View =
 	| "transmission"
 	| "activity"
 	| "archive"
-	| "crates";
+	| "crates"
+	| "radio";
 
 const SECTIONS: Section[] = [
 	"all",
@@ -45,6 +47,7 @@ function readHash(): { view: View; section: Section } {
 	if (h === "activity") return { view: "activity", section: "all" };
 	if (h === "archive") return { view: "archive", section: "all" };
 	if (h === "crates") return { view: "crates", section: "all" };
+	if (h === "radio") return { view: "radio", section: "all" };
 	if ((SECTIONS as string[]).includes(h))
 		return { view: "app", section: h as Section };
 	return { view: "app", section: "all" };
@@ -123,6 +126,13 @@ export default function App() {
 					<button
 						type="button"
 						className="linklike"
+						onClick={() => setView(view === "radio" ? "app" : "radio")}
+					>
+						{view === "radio" ? "Dashboard" : "Radio"}
+					</button>
+					<button
+						type="button"
+						className="linklike"
 						onClick={() => setView(view === "guide" ? "app" : "guide")}
 					>
 						{view === "guide" ? "Dashboard" : "Guide"}
@@ -161,6 +171,8 @@ export default function App() {
 				<Activity />
 			) : view === "crates" ? (
 				<Crates />
+			) : view === "radio" ? (
+				<Radio />
 			) : view === "archive" ? (
 				<section>
 					<h2>Completed archive</h2>

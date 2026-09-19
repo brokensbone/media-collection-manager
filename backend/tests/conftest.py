@@ -17,6 +17,9 @@ from mcm.models import (
     JobRun,
     PendingImport,
     PlayHistory,
+    RadioSchedule,
+    RadioScheduleItem,
+    RadioScheduleSession,
     RecordBox,
     SeenRelease,
     WorkerEvent,
@@ -41,6 +44,9 @@ def pg_session_factory() -> Iterator[sessionmaker[Session]]:
 def clean_album_tables(pg_session_factory: sessionmaker[Session]) -> sessionmaker[Session]:
     """A session factory with the album tables emptied first (shared container is reused)."""
     with pg_session_factory() as session:
+        session.execute(delete(RadioScheduleItem))
+        session.execute(delete(RadioScheduleSession))
+        session.execute(delete(RadioSchedule))
         session.execute(delete(WorkerEvent))
         session.execute(delete(BeetsTrackCache))
         session.execute(delete(RecordBox))
