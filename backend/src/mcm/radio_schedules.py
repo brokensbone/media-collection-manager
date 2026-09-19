@@ -84,7 +84,7 @@ class RadioScheduleService:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._sf = session_factory
 
-    def list(self) -> list[ScheduleSummary]:
+    def list_schedules(self) -> list[ScheduleSummary]:
         with self._sf() as session:
             schedules = session.scalars(
                 select(RadioSchedule).order_by(RadioSchedule.schedule_date.desc())
@@ -97,6 +97,56 @@ class RadioScheduleService:
                 select(RadioSchedule).where(RadioSchedule.schedule_date == schedule_date)
             )
             return self._view(session, schedule) if schedule else None
+
+    def playable_paths(self, schedule_date: date) -> list[str] | None:
+        """Resolve a dated plan immediately before loading it into MPD.
+
+        Paths remain an internal worker concern: the schedule API and its stored selections
+        continue to use only catalogue identifiers.
+        """
+        with self._sf() as session:
+            schedule = session.scalar(
+                select(RadioSchedule).where(RadioSchedule.schedule_date == schedule_date)
+            )
+            if schedule is None:
+                return None
+            sessions = session.scalars(
+                select(RadioScheduleSession)
+                .where(RadioScheduleSession.schedule_id == schedule.id)
+                .order_by(RadioScheduleSession.position)
+            ).all()
+            paths: list[str] = []
+            for segment in sessions:
+                selections = session.scalars(
+                    select(RadioScheduleItem)
+                    .where(RadioScheduleItem.session_id == segment.id)
+                    .order_by(RadioScheduleItem.position)
+                ).all()
+                if not selections:
+                    raise ScheduleError(f"session {segment.position + 1} has no selections")
+                for selection in selections:
+                    if selection.kind == "track":
+                        track = session.get(BeetsTrackCache, selection.item_id)
+                        if track is None or not track.path:
+                            raise ScheduleError(f"unavailable playable track {selection.item_id}")
+                        paths.append(track.path)
+                    elif selection.kind == "album":
+                        tracks = session.scalars(
+                            select(BeetsTrackCache)
+                            .where(BeetsTrackCache.beets_id == selection.beets_id)
+                            .order_by(
+                                BeetsTrackCache.disc.nulls_last(),
+                                BeetsTrackCache.track.nulls_last(),
+                            )
+                        ).all()
+                        if not tracks:
+                            raise ScheduleError(f"unavailable playable album {selection.beets_id}")
+                        paths.extend(track.path for track in tracks if track.path)
+                    else:
+                        raise ScheduleError(f"unknown schedule selection kind {selection.kind}")
+            if not paths:
+                raise ScheduleError("schedule has no playable tracks")
+            return paths
 
     def replace(self, schedule_date: date, input: ScheduleInput) -> ScheduleView:
         self._validate(input)

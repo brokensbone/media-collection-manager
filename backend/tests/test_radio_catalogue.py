@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
@@ -8,7 +9,12 @@ from mcm.adapters.beets_cache import BeetsCatalogCache
 from mcm.app import create_app
 from mcm.config import Settings
 from mcm.radio_catalogue import RadioCatalogueService
-from mcm.radio_schedules import RadioScheduleService
+from mcm.radio_schedules import (
+    RadioScheduleService,
+    ScheduleInput,
+    ScheduleItemInput,
+    ScheduleSessionInput,
+)
 
 
 def _client(sf: sessionmaker[Session]) -> TestClient:
@@ -160,3 +166,45 @@ def test_radio_schedule_rejects_an_unavailable_selection(
     )
     assert response.status_code == 400
     assert response.json()["detail"] == "unknown playable track missing"
+
+
+def test_radio_schedule_resolves_paths_only_for_the_worker(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    cache = BeetsCatalogCache(clean_album_tables)
+    cache.replace(
+        [BeetsAlbum("1", "Artist", "Album", None)],
+        [
+            BeetsTrack("1", "11", 1, 1, "One", 100, "artist/album/one.flac"),
+            BeetsTrack("1", "12", 1, 2, "Two", 100, "artist/album/two.flac"),
+        ],
+    )
+    service = RadioScheduleService(clean_album_tables)
+    day = datetime.now(ZoneInfo("Europe/London")).date()
+    service.replace(
+        day,
+        ScheduleInput(
+            note=None,
+            sessions=[
+                ScheduleSessionInput(
+                    kind="track_hour",
+                    title="Tracks",
+                    starts_at="09:00",
+                    note=None,
+                    items=[ScheduleItemInput(kind="track", beets_id=None, item_id="12")],
+                ),
+                ScheduleSessionInput(
+                    kind="album_session",
+                    title="Album",
+                    starts_at="10:00",
+                    note=None,
+                    items=[ScheduleItemInput(kind="album", beets_id="1", item_id=None)],
+                ),
+            ],
+        ),
+    )
+    assert service.playable_paths(day) == [
+        "artist/album/two.flac",
+        "artist/album/one.flac",
+        "artist/album/two.flac",
+    ]

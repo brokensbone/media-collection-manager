@@ -83,6 +83,11 @@ class Settings(BaseSettings):
     # The worker may translate this prefix to music_dir while producing its read-only MPD cache;
     # it does not alter Beets records or make the path visible through the API.
     legacy_music_dir: str = ""
+    # Radio playback is deliberately opt-in: a worker only contacts MPD when its deployment
+    # supplies a host.
+    mpd_host: str = ""
+    mpd_port: int = 6600
+    radio_timezone: str = "Europe/London"
     # The Tasks view shows completed imports (imported/skipped) from this many days back; older
     # completed imports live in the archive (reached from Tasks), not the default task list.
     import_completed_window_days: int = 3
