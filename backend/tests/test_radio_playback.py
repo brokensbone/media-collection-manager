@@ -57,6 +57,9 @@ def test_radio_load_then_play_only_when_the_queue_still_matches(
             FakeMpd.queue = paths
             calls.append(("load", paths))
 
+        def refresh_database(self) -> None:
+            calls.append("refresh")
+
         def playlist_paths(self) -> list[str]:
             calls.append("playlistinfo")
             return FakeMpd.queue
@@ -69,6 +72,7 @@ def test_radio_load_then_play_only_when_the_queue_still_matches(
     settings = Settings(mpd_host="mpd.example")
     load_radio_once(settings)
     play_radio_once(settings)
+    assert calls.index("refresh") < calls.index(("load", expected))
     assert ("load", expected) in calls
     assert calls[-1] == "play"
 
