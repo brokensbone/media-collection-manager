@@ -40,38 +40,57 @@ const SECTIONS: Section[] = [
 // The active tab lives in the URL hash (#guide, #transmission, #acquire, …) so a refresh or
 // a shared link restores the same view. A view may carry a query (e.g. #tasks?log=42 deep-links
 // a failure log), so match on the path part before '?'.
-function readHash(): { view: View; section: Section } {
+function readHash(): {
+	view: View;
+	section: Section;
+	radioDate: string | null;
+} {
 	const h = window.location.hash.replace(/^#/, "").split("?")[0];
-	if (h === "guide") return { view: "guide", section: "all" };
-	if (h === "transmission") return { view: "transmission", section: "all" };
-	if (h === "activity") return { view: "activity", section: "all" };
-	if (h === "archive") return { view: "archive", section: "all" };
-	if (h === "crates") return { view: "crates", section: "all" };
-	if (h === "radio") return { view: "radio", section: "all" };
+	if (h === "guide") return { view: "guide", section: "all", radioDate: null };
+	if (h === "transmission")
+		return { view: "transmission", section: "all", radioDate: null };
+	if (h === "activity")
+		return { view: "activity", section: "all", radioDate: null };
+	if (h === "archive")
+		return { view: "archive", section: "all", radioDate: null };
+	if (h === "crates")
+		return { view: "crates", section: "all", radioDate: null };
+	if (h === "radio") return { view: "radio", section: "all", radioDate: null };
+	const radioDate = h.match(/^radio\/(\d{4}-\d{2}-\d{2})$/)?.[1];
+	if (radioDate) return { view: "radio", section: "all", radioDate };
 	if ((SECTIONS as string[]).includes(h))
-		return { view: "app", section: h as Section };
-	return { view: "app", section: "all" };
+		return { view: "app", section: h as Section, radioDate: null };
+	return { view: "app", section: "all", radioDate: null };
 }
 
 export default function App() {
 	const [view, setView] = useState<View>(() => readHash().view);
 	const [section, setSection] = useState<Section>(() => readHash().section);
+	const [radioDate, setRadioDate] = useState<string | null>(
+		() => readHash().radioDate,
+	);
 	const [query, setQuery] = useState("");
 
 	useEffect(() => {
-		const target = view === "app" ? section : view;
+		const target =
+			view === "app"
+				? section
+				: view === "radio" && radioDate
+					? `radio/${radioDate}`
+					: view;
 		// Compare only the path part: a view is free to keep its own query (e.g. #tasks?log=42), and
 		// rewriting it here would clobber that. Only write when the actual view/section changed.
 		if (window.location.hash.replace(/^#/, "").split("?")[0] !== target) {
 			window.location.hash = target;
 		}
-	}, [view, section]);
+	}, [view, section, radioDate]);
 
 	useEffect(() => {
 		function onHash() {
 			const r = readHash();
 			setView(r.view);
 			setSection(r.section);
+			setRadioDate(r.radioDate);
 		}
 		window.addEventListener("hashchange", onHash);
 		return () => window.removeEventListener("hashchange", onHash);
@@ -126,7 +145,14 @@ export default function App() {
 					<button
 						type="button"
 						className="linklike"
-						onClick={() => setView(view === "radio" ? "app" : "radio")}
+						onClick={() => {
+							if (view === "radio") {
+								setView("app");
+							} else {
+								setRadioDate(null);
+								setView("radio");
+							}
+						}}
 					>
 						{view === "radio" ? "Dashboard" : "Radio"}
 					</button>
@@ -172,7 +198,7 @@ export default function App() {
 			) : view === "crates" ? (
 				<Crates />
 			) : view === "radio" ? (
-				<Radio />
+				<Radio selectedDate={radioDate} />
 			) : view === "archive" ? (
 				<section>
 					<h2>Completed archive</h2>

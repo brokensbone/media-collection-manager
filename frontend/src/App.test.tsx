@@ -24,6 +24,7 @@ function stubFetch() {
 afterEach(() => {
 	cleanup();
 	vi.unstubAllGlobals();
+	window.location.hash = "";
 });
 
 describe("App", () => {
@@ -40,6 +41,43 @@ describe("App", () => {
 		expect(screen.getByRole("heading", { name: "How mcm works" })).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "Dashboard" }));
 		expect(screen.queryByRole("heading", { name: "How mcm works" })).toBeNull();
+	});
+
+	it("opens a dated radio programme from its direct URL", async () => {
+		window.location.hash = "radio/2026-09-22";
+		vi.stubGlobal(
+			"fetch",
+			vi.fn((url: string) =>
+				Promise.resolve({
+					ok: true,
+					json: () =>
+						Promise.resolve(
+							url === "/radio/schedules"
+								? [
+										{
+											schedule_date: "2026-09-22",
+											note: null,
+											session_count: 0,
+											duration_seconds: 0,
+										},
+									]
+								: {
+										schedule_date: "2026-09-22",
+										note: null,
+										session_count: 0,
+										duration_seconds: 0,
+										sessions: [],
+									},
+						),
+				}),
+			),
+		);
+
+		render(<App />);
+		expect(
+			await screen.findByRole("heading", { name: "2026-09-22" }),
+		).toBeTruthy();
+		expect(fetch).toHaveBeenCalledWith("/radio/schedules/2026-09-22");
 	});
 
 	it("filters the visible tables as you type", async () => {

@@ -47,12 +47,49 @@ describe("Radio", () => {
 			),
 		);
 
-		render(<Radio />);
+		render(<Radio selectedDate={null} />);
 		expect(await screen.findByText("Morning club warm-up")).toBeTruthy();
 		expect(screen.getByText("09:00")).toBeTruthy();
 		expect(screen.getByText("Gentle pulse.")).toBeTruthy();
 		await waitFor(() =>
 			expect(fetch).toHaveBeenCalledWith("/radio/schedules/2026-09-21"),
 		);
+	});
+
+	it("gives every programme day a direct link", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn((url: string) =>
+				Promise.resolve({
+					ok: true,
+					json: () =>
+						Promise.resolve(
+							url === "/radio/schedules"
+								? [
+										{
+											schedule_date: "2026-09-21",
+											note: null,
+											session_count: 0,
+											duration_seconds: 0,
+										},
+									]
+								: {
+										schedule_date: "2026-09-21",
+										note: null,
+										session_count: 0,
+										duration_seconds: 0,
+										sessions: [],
+									},
+						),
+				}),
+			),
+		);
+
+		render(<Radio selectedDate={null} />);
+		expect(
+			(await screen.findByRole("link", { name: "2026-09-21" })).getAttribute(
+				"href",
+			),
+		).toBe("#radio/2026-09-21");
 	});
 });
