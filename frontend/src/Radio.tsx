@@ -35,21 +35,21 @@ function duration(seconds: number) {
 	return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
 }
 
-export function Radio() {
+export function Radio({ selectedDate }: { selectedDate: string | null }) {
 	const [schedules, setSchedules] = useState<ScheduleSummary[] | null>(null);
-	const [selected, setSelected] = useState<string | null>(null);
 	const [schedule, setSchedule] = useState<Schedule | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
 		fetch("/radio/schedules")
 			.then((r) => (r.ok ? r.json() : Promise.reject()))
-			.then((days: ScheduleSummary[]) => {
-				setSchedules(days);
-				setSelected(days[0]?.schedule_date ?? null);
-			})
+			.then((days: ScheduleSummary[]) => setSchedules(days))
 			.catch(() => setError("Couldn’t load radio schedules."));
 	}, []);
+
+	const selected = schedules?.some((day) => day.schedule_date === selectedDate)
+		? selectedDate
+		: (schedules?.[0]?.schedule_date ?? null);
 
 	const load = useCallback(() => {
 		if (!selected) return;
@@ -71,14 +71,13 @@ export function Radio() {
 		<section className="radio">
 			<div className="radio-days">
 				{schedules.map((day) => (
-					<button
+					<a
 						key={day.schedule_date}
-						type="button"
+						href={`#radio/${day.schedule_date}`}
 						className={selected === day.schedule_date ? "active" : ""}
-						onClick={() => setSelected(day.schedule_date)}
 					>
 						{day.schedule_date}
-					</button>
+					</a>
 				))}
 			</div>
 			{schedule ? <ScheduleDay schedule={schedule} /> : <p>Loading…</p>}
