@@ -28,6 +28,7 @@ from .imports import (
     AlbumMatcher,
     ImportDetectionService,
     ImportRunner,
+    ImportsService,
     TransmissionStager,
     VideoLibraryImporter,
     WatchdirDetectionService,
@@ -41,6 +42,12 @@ from .reconcile import OwnershipReconciler
 from .releases import ReleasesService
 from .resolution import ResolutionService
 from .reverse_match import ReverseMatcher
+from .telegram_worklist import (
+    TelegramClient,
+    TelegramWorklistPoller,
+    WorklistService,
+    WorklistStore,
+)
 from .torrent_submission_service import TorrentSubmissionService
 from .transmission_service import TransmissionService
 
@@ -315,6 +322,31 @@ def build_crate_service(settings: Settings, session_factory: sessionmaker[Sessio
         repo=BoxRepo(session_factory),
         library=build_library_assist_service(settings, session_factory),
         soft_cap=settings.crate_soft_cap,
+    )
+
+
+def build_telegram_worklist_poller(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> TelegramWorklistPoller | None:
+    """Disabled by default. Polling is deliberately worker-only and needs an explicit chat ACL."""
+    chats = {
+        chat.strip() for chat in settings.telegram_worklist_chat_ids.split(",") if chat.strip()
+    }
+    if not settings.telegram_bot_token or not chats:
+        return None
+    store = WorklistStore(session_factory)
+    return TelegramWorklistPoller(
+        client=TelegramClient(settings.telegram_bot_token),
+        service=WorklistService(
+            store=store,
+            decide=build_decide_service(settings, session_factory),
+            imports=ImportsService(
+                repo=AlbumRepo(session_factory), matcher=build_matcher(settings)
+            ),
+            crates=build_crate_service(settings, session_factory),
+        ),
+        store=store,
+        chats=chats,
     )
 
 

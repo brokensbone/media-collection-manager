@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     # a hard gate. Tunable.
     crate_soft_cap: int = 50
 
+    # Telegram worklist. The worker uses long polling only when both values are set: no inbound
+    # HTTP endpoint is exposed. `telegram_worklist_chat_ids` is a comma-separated allow-list of
+    # numeric Telegram chat ids, rather than a broad "anyone who finds the bot" switch.
+    telegram_bot_token: str = ""
+    telegram_worklist_chat_ids: str = ""
+    telegram_worklist_poll_seconds: int = 5
+
     # Verdict / Decide (§6a): snooze duration, plus the "listened" (play-history) hint thresholds.
     verdict_snooze_days: int = 14
     verdict_listened_tracks: int = 4
