@@ -23,6 +23,7 @@ from .factories import (
     build_ownership_reconciler,
     build_play_history_service,
     build_resolution_service,
+    build_telegram_worklist_poller,
     build_watchdir_detection_service,
 )
 from .radio_schedules import RadioScheduleService, ScheduleError
@@ -168,6 +169,17 @@ def alerts_once(settings: Settings | None = None) -> None:
             reauth_due=reauth_due, decide_count=decide_count
         )
         log.info("alerts: reauth_due=%s decide_count=%s", reauth_due, decide_count)
+
+
+def poll_telegram_worklist_once(settings: Settings | None = None) -> None:
+    """Receive explicit /work commands and inline-button callbacks; no proactive messages."""
+    settings = settings or Settings()
+    session_factory = _session_factory(settings)
+    poller = build_telegram_worklist_poller(settings, session_factory)
+    if poller is None:
+        return
+    with heartbeat(session_factory, "telegram_worklist"):
+        poller.poll()
 
 
 def _radio_paths(settings: Settings, session_factory: sessionmaker[Session]) -> list[str] | None:

@@ -26,6 +26,16 @@ sets that variable itself. Runtime configuration remains environment-based; see
 integration should run migrations before the API and worker, and manage all credentials outside
 the Nix store.
 
+## Telegram worklist
+
+The optional worklist bot is a worker-only, long-polling integration: it opens no public webhook
+or callback endpoint. Create a dedicated bot with BotFather, place its token in the deployment's
+secret environment file, and set both `MCM_TELEGRAM_BOT_TOKEN` and
+`MCM_TELEGRAM_WORKLIST_CHAT_IDS`. The latter is a comma-separated allow-list of numeric Telegram
+chat IDs. If either is empty, the bot is disabled. Add the bot to the intended private chat and
+send `/work`; it then presents one item at a time with inline buttons. The token must never be
+committed or put in Nix configuration/store paths.
+
 ## Layout
 
 - `backend/` — FastAPI service (Python 3.12, uv). Ports/adapters with a pure core (§14).
