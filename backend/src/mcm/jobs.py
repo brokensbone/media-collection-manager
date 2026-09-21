@@ -188,7 +188,9 @@ def load_radio_once(settings: Settings | None = None) -> None:
             if paths is None:
                 log.info("radio load skipped: no schedule for today")
                 return
-            MpdClient(settings.mpd_host, settings.mpd_port).load(paths)
+            mpd = MpdClient(settings.mpd_host, settings.mpd_port)
+            mpd.refresh_database()
+            mpd.load(paths)
         except (MpdError, ScheduleError):
             log.exception("radio load failed")
             raise

@@ -1,6 +1,7 @@
 """The deliberately small MPD protocol seam used by the radio worker."""
 
 import socket
+import time
 from typing import BinaryIO, cast
 
 
@@ -19,6 +20,24 @@ class MpdClient:
             self._command(reader, "clear")
             for path in paths:
                 self._command(reader, f"add {self._quote(path)}")
+
+    def refresh_database(self, *, timeout_seconds: float = 300) -> None:
+        """Make newly imported music visible before resolving a radio day.
+
+        Beets can have a current catalogue entry before MPD has scanned its file.
+        Waiting here avoids clearing the morning queue only to fail part-way through
+        adding a schedule containing such a track.
+        """
+        deadline = time.monotonic() + timeout_seconds
+        with self._connection() as reader:
+            self._command(reader, "update")
+            while True:
+                status = self._command(reader, "status")
+                if not any(line.startswith("updating_db: ") for line in status):
+                    return
+                if time.monotonic() >= deadline:
+                    raise MpdError("timed out waiting for MPD's music database update")
+                time.sleep(1)
 
     def playlist_paths(self) -> list[str]:
         with self._connection() as reader:
