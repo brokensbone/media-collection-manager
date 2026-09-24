@@ -14,6 +14,12 @@ type Torrent = {
 
 type Check = { ok: boolean; detail: string };
 type TestReport = { api: Check; ssh: Check };
+type UploadResult = {
+	position: number;
+	filename: string;
+	name: string;
+	already_present: boolean;
+};
 
 export function Transmission() {
 	const [torrents, setTorrents] = useState<Torrent[] | null>(null);
@@ -22,6 +28,7 @@ export function Transmission() {
 	const [torrentFiles, setTorrentFiles] = useState<File[]>([]);
 	const [uploading, setUploading] = useState(false);
 	const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+	const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
 
 	useEffect(() => {
 		fetch("/transmission/torrents")
@@ -44,6 +51,7 @@ export function Transmission() {
 		if (torrentFiles.length === 0) return;
 		setUploading(true);
 		setUploadStatus(null);
+		setUploadResults([]);
 		const form = new FormData();
 		for (const torrentFile of torrentFiles) form.append("files", torrentFile);
 		try {
@@ -51,9 +59,13 @@ export function Transmission() {
 				method: "POST",
 				body: form,
 			});
-			const body = (await response.json()) as { detail?: string };
+			const body = (await response.json()) as {
+				detail?: string;
+				results?: UploadResult[];
+			};
 			if (!response.ok) throw new Error(body.detail ?? "Upload failed.");
 			setUploadStatus(body.detail ?? "Torrents added to Transmission.");
+			setUploadResults(body.results ?? []);
 			setTorrentFiles([]);
 		} catch (error) {
 			setUploadStatus(
@@ -107,6 +119,17 @@ export function Transmission() {
 					</button>
 				</div>
 				{uploadStatus && <p className="upload-status">{uploadStatus}</p>}
+				{uploadResults.length > 0 && (
+					<ul className="upload-results">
+						{uploadResults.map((result) => (
+							<li key={result.position}>
+								{result.filename}
+								{result.name && ` (${result.name})`}:{" "}
+								{result.already_present ? "already in Transmission" : "added"}
+							</li>
+						))}
+					</ul>
+				)}
 			</section>
 
 			<section>
