@@ -198,7 +198,7 @@ export default function App() {
 			) : view === "crates" ? (
 				<Crates />
 			) : view === "radio" ? (
-				<Radio selectedDate={radioDate} />
+				<Radio selectedDate={radioDate} onSelectDate={setRadioDate} />
 			) : view === "archive" ? (
 				<section>
 					<h2>Completed archive</h2>
