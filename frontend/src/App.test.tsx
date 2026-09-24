@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
@@ -78,6 +84,44 @@ describe("App", () => {
 			await screen.findByRole("heading", { name: "2026-09-22" }),
 		).toBeTruthy();
 		expect(fetch).toHaveBeenCalledWith("/radio/schedules/2026-09-22");
+	});
+
+	it("keeps the clicked radio date in the URL and across a reload", async () => {
+		window.location.hash = "radio";
+		vi.stubGlobal(
+			"fetch",
+			vi.fn((url: string) =>
+				Promise.resolve({
+					ok: true,
+					json: () =>
+						Promise.resolve(
+							url === "/radio/schedules"
+								? ["2026-09-25", "2026-09-22"].map((schedule_date) => ({
+										schedule_date,
+										note: null,
+										session_count: 0,
+										duration_seconds: 0,
+									}))
+								: {
+										schedule_date: url.split("/").at(-1),
+										note: null,
+										session_count: 0,
+										duration_seconds: 0,
+										sessions: [],
+									},
+						),
+				}),
+			),
+		);
+
+		const page = render(<App />);
+		fireEvent.click(await screen.findByRole("link", { name: "2026-09-22" }));
+		await waitFor(() => expect(window.location.hash).toBe("#radio/2026-09-22"));
+		page.unmount();
+		render(<App />);
+		expect(
+			await screen.findByRole("heading", { name: "2026-09-22" }),
+		).toBeTruthy();
 	});
 
 	it("filters the visible tables as you type", async () => {

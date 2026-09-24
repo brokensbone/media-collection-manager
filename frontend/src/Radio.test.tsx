@@ -92,4 +92,45 @@ describe("Radio", () => {
 			),
 		).toBe("#radio/2026-09-21");
 	});
+
+	it("opens today's programme by default when later dates are scheduled", async () => {
+		const now = new Date();
+		const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+		const tomorrow = new Date(
+			now.getFullYear(),
+			now.getMonth(),
+			now.getDate() + 1,
+		);
+		const later = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn((url: string) =>
+				Promise.resolve({
+					ok: true,
+					json: () =>
+						Promise.resolve(
+							url === "/radio/schedules"
+								? [later, today].map((schedule_date) => ({
+										schedule_date,
+										note: null,
+										session_count: 0,
+										duration_seconds: 0,
+									}))
+								: {
+										schedule_date: today,
+										note: null,
+										session_count: 0,
+										duration_seconds: 0,
+										sessions: [],
+									},
+						),
+				}),
+			),
+		);
+
+		render(<Radio selectedDate={null} />);
+		await waitFor(() =>
+			expect(fetch).toHaveBeenCalledWith(`/radio/schedules/${today}`),
+		);
+	});
 });

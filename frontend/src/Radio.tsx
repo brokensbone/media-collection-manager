@@ -35,7 +35,13 @@ function duration(seconds: number) {
 	return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
 }
 
-export function Radio({ selectedDate }: { selectedDate: string | null }) {
+export function Radio({
+	selectedDate,
+	onSelectDate,
+}: {
+	selectedDate: string | null;
+	onSelectDate?: (date: string) => void;
+}) {
 	const [schedules, setSchedules] = useState<ScheduleSummary[] | null>(null);
 	const [schedule, setSchedule] = useState<Schedule | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -47,9 +53,13 @@ export function Radio({ selectedDate }: { selectedDate: string | null }) {
 			.catch(() => setError("Couldn’t load radio schedules."));
 	}, []);
 
+	const now = new Date();
+	const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 	const selected = schedules?.some((day) => day.schedule_date === selectedDate)
 		? selectedDate
-		: (schedules?.[0]?.schedule_date ?? null);
+		: schedules?.some((day) => day.schedule_date === today)
+			? today
+			: (schedules?.[0]?.schedule_date ?? null);
 
 	const load = useCallback(() => {
 		if (!selected) return;
@@ -74,6 +84,7 @@ export function Radio({ selectedDate }: { selectedDate: string | null }) {
 					<a
 						key={day.schedule_date}
 						href={`#radio/${day.schedule_date}`}
+						onClick={() => onSelectDate?.(day.schedule_date)}
 						className={selected === day.schedule_date ? "active" : ""}
 					>
 						{day.schedule_date}
