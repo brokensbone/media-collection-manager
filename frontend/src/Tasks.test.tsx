@@ -40,6 +40,14 @@ afterEach(() => {
 });
 
 describe("Tasks", () => {
+	it("highlights a linked import task", async () => {
+		window.location.hash = "#tasks?item=42";
+		mockApi([item({ id: 42, name: "Linked", state: "importing" })]);
+		render(<Tasks />);
+		await screen.findByText("Linked");
+		expect(document.getElementById("task-42")?.className).toBe("linked");
+	});
+
 	it("groups rows by status", async () => {
 		mockApi([
 			item({ id: 1, name: "Running", state: "importing" }),
