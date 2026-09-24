@@ -120,12 +120,11 @@ describe("Transmission", () => {
 		await screen.findByText(
 			"1 torrent added to Transmission; 1 was already there.",
 		);
-		expect(screen.getByText("first.torrent (First Album): added")).toBeTruthy();
 		expect(
-			screen.getByText(
-				"second.torrent (Second Album): already in Transmission",
-			),
+			screen.getByText("Already in Transmission — check for import:"),
 		).toBeTruthy();
+		expect(screen.getByText("Second Album")).toBeTruthy();
+		expect(screen.queryByText("First Album")).toBeNull();
 		const posted = fetchMock.mock.calls.find((c) => c[1]?.method === "POST");
 		expect(posted).toBeDefined();
 		const [url, options] = posted as [string, RequestInit];

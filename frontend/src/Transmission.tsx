@@ -65,7 +65,9 @@ export function Transmission() {
 			};
 			if (!response.ok) throw new Error(body.detail ?? "Upload failed.");
 			setUploadStatus(body.detail ?? "Torrents added to Transmission.");
-			setUploadResults(body.results ?? []);
+			setUploadResults(
+				(body.results ?? []).filter((result) => result.already_present),
+			);
 			setTorrentFiles([]);
 		} catch (error) {
 			setUploadStatus(
@@ -120,15 +122,14 @@ export function Transmission() {
 				</div>
 				{uploadStatus && <p className="upload-status">{uploadStatus}</p>}
 				{uploadResults.length > 0 && (
-					<ul className="upload-results">
-						{uploadResults.map((result) => (
-							<li key={result.position}>
-								{result.filename}
-								{result.name && ` (${result.name})`}:{" "}
-								{result.already_present ? "already in Transmission" : "added"}
-							</li>
-						))}
-					</ul>
+					<>
+						<p>Already in Transmission — check for import:</p>
+						<ul className="upload-results">
+							{uploadResults.map((result) => (
+								<li key={result.position}>{result.name || result.filename}</li>
+							))}
+						</ul>
+					</>
 				)}
 			</section>
 
