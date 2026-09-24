@@ -320,6 +320,9 @@ a {
 .upload-status {
 	margin: 8px 0 0;
 }
+.upload-results {
+	margin: 4px 0 0;
+}
 .resolving {
 	margin: 4px 0 8px;
 	font-size: 0.9em;
