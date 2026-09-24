@@ -91,7 +91,10 @@ export default function App() {
 			setView(r.view);
 			setSection(r.section);
 			setRadioDate(r.radioDate);
-			if (r.section === "import" && window.location.hash.includes("?item="))
+			if (
+				(r.section === "import" || r.section === "tasks") &&
+				window.location.hash.includes("?item=")
+			)
 				setQuery("");
 		}
 		window.addEventListener("hashchange", onHash);
