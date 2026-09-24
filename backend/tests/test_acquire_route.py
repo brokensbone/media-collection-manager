@@ -9,7 +9,7 @@ from mcm.adapters.beets import BeetsAlbum
 from mcm.app import create_app
 from mcm.config import Settings
 from mcm.library_assist import LibraryAssistService
-from mcm.models import Album, AlbumState, Provenance
+from mcm.models import Album, AlbumState, ImportSource, ImportState, PendingImport, Provenance
 
 from .fakes import StubLibraryCatalog
 
@@ -71,3 +71,35 @@ def test_queue_exposes_possibly_owned(clean_album_tables: sessionmaker[Session])
     item = client.get("/acquire").json()[0]
     assert item["possibly_owned"] is True
     assert item["owned_hint"] == "A — Want It (Remaster)"
+
+
+def test_acquire_links_only_detected_imports_matched_to_want(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    sf = clean_album_tables
+    client, _ = _client(sf)
+    album_id = client.get("/acquire").json()[0]["id"]
+    with sf() as session:
+        session.add_all(
+            [
+                PendingImport(
+                    source=ImportSource.transmission,
+                    source_key="waiting",
+                    name="A - Want It",
+                    matched_album_id=album_id,
+                    state=ImportState.detected,
+                ),
+                PendingImport(
+                    source=ImportSource.transmission,
+                    source_key="done",
+                    name="Old copy",
+                    matched_album_id=album_id,
+                    state=ImportState.imported,
+                ),
+            ]
+        )
+        session.commit()
+    links = client.get("/acquire").json()[0]["pending_imports"]
+    assert len(links) == 1
+    assert links[0]["name"] == "A - Want It"
+    assert links[0]["matched_album_id"] == album_id

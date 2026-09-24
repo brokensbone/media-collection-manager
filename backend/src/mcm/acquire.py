@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .adapters.album_repo import AlbumRepo
+from .adapters.album_repo import AlbumRepo, PendingImportLink
 from .domain.bandcamp import bandcamp_search_url
 from .library_assist import LibraryAssistService, LinkCandidate
 
@@ -16,6 +16,7 @@ class AcquireItem:
     owned_hint: str | None
     spotify_id: str | None
     album_type: str | None
+    pending_imports: list[PendingImportLink]
 
 
 class AcquireService:
@@ -30,6 +31,7 @@ class AcquireService:
     def queue(self) -> list[AcquireItem]:
         rows = self._repo.acquire_queue()
         hints = self._assist.owned_hints([(r.id, r.artist, r.title) for r in rows])
+        pending = self._repo.acquire_pending_imports([r.id for r in rows])
         return [
             AcquireItem(
                 id=row.id,
@@ -41,6 +43,7 @@ class AcquireService:
                 owned_hint=hints[row.id].owned_hint if row.id in hints else None,
                 spotify_id=row.spotify_id,
                 album_type=row.album_type,
+                pending_imports=pending.get(row.id, []),
             )
             for row in rows
         ]

@@ -80,6 +80,13 @@ class AcquireRow:
 
 
 @dataclass
+class PendingImportLink:
+    id: int
+    name: str
+    matched_album_id: int
+
+
+@dataclass
 class SuggestedRow:
     id: int
     artist: str
@@ -470,6 +477,26 @@ class AlbumRepo:
                 .order_by(Album.artist, Album.title)
             )
             return [AcquireRow(r[0], r[1], r[2], r[3], r[4], r[5]) for r in rows]
+
+    def acquire_pending_imports(self, album_ids: list[int]) -> dict[int, list[PendingImportLink]]:
+        """Detected imports already matched to albums in Acquire."""
+        if not album_ids:
+            return {}
+        with self._sf() as session:
+            rows = session.execute(
+                select(PendingImport.id, PendingImport.name, PendingImport.matched_album_id)
+                .where(
+                    PendingImport.state == ImportState.detected,
+                    PendingImport.matched_album_id.in_(album_ids),
+                )
+                .order_by(PendingImport.created_at.desc(), PendingImport.id.desc())
+            )
+            by_album: dict[int, list[PendingImportLink]] = {}
+            for import_id, name, album_id in rows:
+                by_album.setdefault(album_id, []).append(
+                    PendingImportLink(import_id, name, album_id)
+                )
+            return by_album
 
     def mark_owned_manual(self, album_id: int, beets_id: str | None) -> None:
         """A sticky manual ownership link (§4/§5) — reconcile never clobbers it. Closes the
