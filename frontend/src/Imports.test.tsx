@@ -44,9 +44,19 @@ function item(over: Record<string, unknown> = {}) {
 afterEach(() => {
 	cleanup();
 	vi.unstubAllGlobals();
+	window.location.hash = "";
 });
 
 describe("Imports", () => {
+	it("highlights the import selected by an Acquire link", async () => {
+		window.location.hash = "#import?item=42";
+		mockApi([item({ id: 42, name: "Matched download" })]);
+		render(<Imports />);
+		const row = (await screen.findByText("Matched download")).closest("tr");
+		expect(row?.id).toBe("import-42");
+		expect(row?.className).toBe("linked");
+	});
+
 	it("shows the source, matched want, a no-match label and destination", async () => {
 		mockApi([
 			item({
