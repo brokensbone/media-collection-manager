@@ -38,11 +38,11 @@
             dependencies = old.dependencies ++ [ pythonPackages.typing-inspection ];
           });
           uvicorn = pythonPackages.uvicorn.overridePythonAttrs (_: {
-            version = "0.52.1";
+            version = "0.53.0";
             src = pkgs.fetchPypi {
               pname = "uvicorn";
-              version = "0.52.1";
-              hash = "sha256-ES7GYYFBiay8zT97hkYBR8wGX8ksCCGvp4kYeA5DVN0=";
+              version = "0.53.0";
+              hash = "sha256-qTVvDLibO4YhUpxdXuvWm/4VT0w/aLTPLeR+RfqFXC4=";
             };
           });
           fastapi = pythonPackages.fastapi.overridePythonAttrs (_: { doCheck = false; });
