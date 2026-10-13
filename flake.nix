@@ -159,7 +159,7 @@
             pname = "mcm-frontend";
             version = "0.1.0";
             src = ./frontend;
-            npmDepsHash = "sha256-bYEwovVwGxnlMmjD1tXDFs+i3dSF72rnIlBZcc4WCbA=";
+            npmDepsHash = "sha256-d0atAXqTBzVdwyPbo3SX2AE/ri3gRo3XWRT59zhVTkU=";
             npmBuildScript = "build";
             installPhase = ''
               runHook preInstall
