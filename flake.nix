@@ -46,9 +46,18 @@
             };
           });
           fastapi = pythonPackages.fastapi.overridePythonAttrs (_: { doCheck = false; });
-          # APScheduler 3.11.2's upstream process-pool tests are flaky under the current
-          # sandboxed Python build. MCM's own tests cover its scheduler integration.
-          apscheduler = pythonPackages.apscheduler.overridePythonAttrs (_: { doCheck = false; });
+          # Keep Nix's runtime aligned with backend/pyproject.toml. MCM's own tests
+          # cover its scheduler integration; upstream process-pool tests are flaky
+          # under the sandboxed Python build.
+          apscheduler = pythonPackages.apscheduler.overridePythonAttrs (_: {
+            version = "3.11.3";
+            src = pkgs.fetchPypi {
+              pname = "apscheduler";
+              version = "3.11.3";
+              hash = "sha256-zS/MkzADmoGliTRyrUn6zyOm1WBMvh2RjINcbeeDTVo=";
+            };
+            doCheck = false;
+          });
           # nixpkgs currently packages requests-ratelimiter 0.7.0, which is
           # incompatible with its pyrate-limiter 3.x package. Keep this pair
           # aligned with backend/uv.lock until nixpkgs catches up.
