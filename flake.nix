@@ -15,6 +15,15 @@
           lib = pkgs.lib;
           python = pkgs.python312;
           pythonPackages = python.pkgs;
+          # Keep Nix's runtime aligned with backend/pyproject.toml until nixpkgs catches up.
+          sqlalchemy = pythonPackages.sqlalchemy.overridePythonAttrs (_: {
+            version = "2.0.53";
+            src = pkgs.fetchPypi {
+              pname = "sqlalchemy";
+              version = "2.0.53";
+              hash = "sha256-tWiorAd4mIwnEEdgF/90+13Lm5Mi11cYnD1/xMyAJvo=";
+            };
+          });
           # These releases are pinned by backend/uv.lock but landed after the
           # current nixos-unstable package set. Keep their Nix definitions
           # explicit until nixpkgs catches up, so the package respects the
