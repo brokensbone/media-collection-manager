@@ -13,7 +13,12 @@ type Item = {
 	owned_hint: string | null;
 	spotify_id: string | null;
 	album_type: string | null;
-	pending_imports: { id: number; name: string; matched_album_id: number }[];
+	pending_imports: {
+		id: number;
+		name: string;
+		matched_album_id: number;
+		state: "detected" | "queued" | "importing" | "failed";
+	}[];
 };
 
 type Candidate = {
@@ -58,10 +63,15 @@ export function Acquire({
 	const [results, setResults] = useState<Candidate[] | null>(null);
 
 	useEffect(() => {
-		fetch("/acquire")
-			.then((r) => r.json())
-			.then(setItems)
-			.catch(() => setItems([]));
+		const refresh = () => {
+			fetch("/acquire")
+				.then((r) => r.json())
+				.then(setItems)
+				.catch(() => setItems([]));
+		};
+		refresh();
+		const timer = setInterval(refresh, 4000);
+		return () => clearInterval(timer);
 	}, []);
 
 	// Search the library while the Mark-owned modal is open.
@@ -143,8 +153,17 @@ export function Acquire({
 								)}
 								{it.pending_imports?.map((pending) => (
 									<div key={pending.id}>
-										<a href={`#import?item=${pending.id}`}>
-											Waiting in Import: {pending.name}
+										<a
+											href={`#${pending.state === "detected" ? "import" : "tasks"}?item=${pending.id}`}
+										>
+											{pending.state === "detected"
+												? "Waiting in Import"
+												: pending.state === "failed"
+													? "Import failed"
+													: pending.state === "queued"
+														? "Import queued"
+														: "Importing"}
+											: {pending.name}
 										</a>
 									</div>
 								))}

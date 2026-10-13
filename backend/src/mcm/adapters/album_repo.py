@@ -84,6 +84,7 @@ class PendingImportLink:
     id: int
     name: str
     matched_album_id: int
+    state: str
 
 
 @dataclass
@@ -479,22 +480,34 @@ class AlbumRepo:
             return [AcquireRow(r[0], r[1], r[2], r[3], r[4], r[5]) for r in rows]
 
     def acquire_pending_imports(self, album_ids: list[int]) -> dict[int, list[PendingImportLink]]:
-        """Detected imports already matched to albums in Acquire."""
+        """Unfinished imports already matched to albums in Acquire."""
         if not album_ids:
             return {}
         with self._sf() as session:
             rows = session.execute(
-                select(PendingImport.id, PendingImport.name, PendingImport.matched_album_id)
+                select(
+                    PendingImport.id,
+                    PendingImport.name,
+                    PendingImport.matched_album_id,
+                    PendingImport.state,
+                )
                 .where(
-                    PendingImport.state == ImportState.detected,
+                    PendingImport.state.in_(
+                        (
+                            ImportState.detected,
+                            ImportState.queued,
+                            ImportState.importing,
+                            ImportState.failed,
+                        )
+                    ),
                     PendingImport.matched_album_id.in_(album_ids),
                 )
                 .order_by(PendingImport.created_at.desc(), PendingImport.id.desc())
             )
             by_album: dict[int, list[PendingImportLink]] = {}
-            for import_id, name, album_id in rows:
+            for import_id, name, album_id, state in rows:
                 by_album.setdefault(album_id, []).append(
-                    PendingImportLink(import_id, name, album_id)
+                    PendingImportLink(import_id, name, album_id, state.value)
                 )
             return by_album
 

@@ -15,11 +15,20 @@
           lib = pkgs.lib;
           python = pkgs.python312;
           pythonPackages = python.pkgs;
+          # Keep Nix's runtime aligned with backend/pyproject.toml until nixpkgs catches up.
+          sqlalchemy = pythonPackages.sqlalchemy.overridePythonAttrs (_: {
+            version = "2.0.53";
+            src = pkgs.fetchPypi {
+              pname = "sqlalchemy";
+              version = "2.0.53";
+              hash = "sha256-tWiorAd4mIwnEEdgF/90+13Lm5Mi11cYnD1/xMyAJvo=";
+            };
+          });
           # These releases are pinned by backend/uv.lock but landed after the
           # current nixos-unstable package set. Keep their Nix definitions
           # explicit until nixpkgs catches up, so the package respects the
           # backend's declared runtime minimum versions.
-          alembic = pythonPackages.alembic.overridePythonAttrs (_: {
+          alembic = (pythonPackages.alembic.override { inherit sqlalchemy; }).overridePythonAttrs (_: {
             version = "1.19.1";
             doCheck = false;
             src = pkgs.fetchPypi {
@@ -38,17 +47,26 @@
             dependencies = old.dependencies ++ [ pythonPackages.typing-inspection ];
           });
           uvicorn = pythonPackages.uvicorn.overridePythonAttrs (_: {
-            version = "0.52.1";
+            version = "0.53.0";
             src = pkgs.fetchPypi {
               pname = "uvicorn";
-              version = "0.52.1";
-              hash = "sha256-ES7GYYFBiay8zT97hkYBR8wGX8ksCCGvp4kYeA5DVN0=";
+              version = "0.53.0";
+              hash = "sha256-qTVvDLibO4YhUpxdXuvWm/4VT0w/aLTPLeR+RfqFXC4=";
             };
           });
           fastapi = pythonPackages.fastapi.overridePythonAttrs (_: { doCheck = false; });
-          # APScheduler 3.11.2's upstream process-pool tests are flaky under the current
-          # sandboxed Python build. MCM's own tests cover its scheduler integration.
-          apscheduler = pythonPackages.apscheduler.overridePythonAttrs (_: { doCheck = false; });
+          # Keep Nix's runtime aligned with backend/pyproject.toml. MCM's own tests
+          # cover its scheduler integration; upstream process-pool tests are flaky
+          # under the sandboxed Python build.
+          apscheduler = pythonPackages.apscheduler.overridePythonAttrs (_: {
+            version = "3.11.3";
+            src = pkgs.fetchPypi {
+              pname = "apscheduler";
+              version = "3.11.3";
+              hash = "sha256-zS/MkzADmoGliTRyrUn6zyOm1WBMvh2RjINcbeeDTVo=";
+            };
+            doCheck = false;
+          });
           # nixpkgs currently packages requests-ratelimiter 0.7.0, which is
           # incompatible with its pyrate-limiter 3.x package. Keep this pair
           # aligned with backend/uv.lock until nixpkgs catches up.
@@ -159,7 +177,7 @@
             pname = "mcm-frontend";
             version = "0.1.0";
             src = ./frontend;
-            npmDepsHash = "sha256-bYEwovVwGxnlMmjD1tXDFs+i3dSF72rnIlBZcc4WCbA=";
+            npmDepsHash = "sha256-d0atAXqTBzVdwyPbo3SX2AE/ri3gRo3XWRT59zhVTkU=";
             npmBuildScript = "build";
             installPhase = ''
               runHook preInstall
