@@ -28,7 +28,7 @@
           # current nixos-unstable package set. Keep their Nix definitions
           # explicit until nixpkgs catches up, so the package respects the
           # backend's declared runtime minimum versions.
-          alembic = pythonPackages.alembic.overridePythonAttrs (_: {
+          alembic = (pythonPackages.alembic.override { inherit sqlalchemy; }).overridePythonAttrs (_: {
             version = "1.19.1";
             doCheck = false;
             src = pkgs.fetchPypi {
