@@ -33,6 +33,10 @@ export function Imports({
 	const [items, setItems] = useState<ImportItem[] | null>(null);
 	const [scanning, setScanning] = useState(false);
 	const [typeFilter, setTypeFilter] = useState<"all" | ItemType>("all");
+	const linkedId = Number(
+		new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("item"),
+	);
+	const focused = useRef(false);
 
 	// Import/Discard both remove the row from this decision list (it becomes a Task, or is
 	// dismissed). Hold the removed ids so an in-flight poll can't flash a row back before the
@@ -74,6 +78,19 @@ export function Imports({
 		const t = setInterval(refresh, 4000);
 		return () => clearInterval(t);
 	}, [refresh]);
+
+	useEffect(() => {
+		if (
+			!linkedId ||
+			!items?.some((it) => it.id === linkedId) ||
+			focused.current
+		)
+			return;
+		focused.current = true;
+		document
+			.getElementById(`import-${linkedId}`)
+			?.scrollIntoView?.({ block: "center" });
+	}, [items, linkedId]);
 
 	const act = useCallback(
 		(id: number, method: "POST" | "DELETE") => {
@@ -144,7 +161,11 @@ export function Imports({
 			</colgroup>
 			<tbody>
 				{rows.map((it) => (
-					<tr key={it.id}>
+					<tr
+						key={it.id}
+						id={`import-${it.id}`}
+						className={it.id === linkedId ? "linked" : undefined}
+					>
 						<td className="muted">{it.source}</td>
 						<td>
 							<div>{it.name}</div>
