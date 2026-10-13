@@ -14,7 +14,8 @@ The flake is the supported upstream packaging interface. It exposes these packag
 
 - `mcm-api` — serves the API and bundled SPA. It listens on 127.0.0.1:8000 by default;
   set `MCM_HOST` and `MCM_PORT` to override that.
-- `mcm-worker` — runs scheduled polling and import work.
+- `mcm-worker` — runs scheduled polling, import work, and (when an MPD host is configured)
+  weekday radio loading at 07:00 and playback at 09:00 Europe/London.
 - `mcm-migrate` — runs Alembic, e.g. `mcm-migrate upgrade head`.
 - `frontend` and `backend` — separately consumable build outputs.
 - `image` — an OCI image whose default command is `mcm-api`.
@@ -25,12 +26,42 @@ sets that variable itself. Runtime configuration remains environment-based; see
 integration should run migrations before the API and worker, and manage all credentials outside
 the Nix store.
 
+## Telegram worklist
+
+The optional worklist bot is a worker-only, long-polling integration: it opens no public webhook
+or callback endpoint. Create a dedicated bot with BotFather, place its token in the deployment's
+secret environment file, and set both `MCM_TELEGRAM_BOT_TOKEN` and
+`MCM_TELEGRAM_WORKLIST_CHAT_IDS`. The latter is a comma-separated allow-list of numeric Telegram
+chat IDs. If either is empty, the bot is disabled. Add the bot to the intended private chat and
+send `/work`; it then presents one item at a time with inline buttons. The token must never be
+committed or put in Nix configuration/store paths.
+
 ## Layout
 
 - `backend/` — FastAPI service (Python 3.12, uv). Ports/adapters with a pure core (§14).
 - `frontend/` — React + TypeScript SPA (Vite).
 - `fixtures/beets/` — reproducible seeded beets library for tests.
 - `spikes/` — throwaway spikes (D0 reconcile).
+
+## Everything that happens goes in the activity feed
+
+The app mostly runs unattended, so the activity feed (`GET /events`, the Activity view)
+is where you find out what it did. **Anything that changes something, or that a person
+asked for, emits an event** — an import started, a torrent submitted, an album resolved
+or marked owned, a want dropped. One row per meaningful step, not per network call.
+
+That means a new feature is not finished when it works; it is finished when you can see
+that it worked. A response body tells whoever pressed the button, once. The feed is what
+is left an hour later, and it is the only place an unattended job can speak from at all.
+
+Emit from wherever the work happens. The feed is one log for the whole application: the
+worker writes most of it, but the API process writes too, and `WorkerEventLog` is
+available on both sides.
+
+Not emitting is a decision, so say so in a comment where the work happens. Reads, polls
+that found nothing, and per-item chatter inside a batch are the usual reasons — the feed
+keeps a rolling window of the most recent rows, so a job that emits per item will push
+everything else out of it.
 
 ## Matching downloads to albums
 

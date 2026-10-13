@@ -82,7 +82,23 @@ describe("Transmission", () => {
 				return Promise.resolve({
 					ok: true,
 					json: () =>
-						Promise.resolve({ detail: "2 torrents added to Transmission." }),
+						Promise.resolve({
+							detail: "1 torrent added to Transmission; 1 was already there.",
+							results: [
+								{
+									position: 0,
+									filename: "first.torrent",
+									name: "First Album",
+									already_present: false,
+								},
+								{
+									position: 1,
+									filename: "second.torrent",
+									name: "Second Album",
+									already_present: true,
+								},
+							],
+						}),
 				});
 			}
 			return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
@@ -101,7 +117,14 @@ describe("Transmission", () => {
 		});
 		fireEvent.click(screen.getByRole("button", { name: "Start download" }));
 
-		await screen.findByText("2 torrents added to Transmission.");
+		await screen.findByText(
+			"1 torrent added to Transmission; 1 was already there.",
+		);
+		expect(
+			screen.getByText("Already in Transmission — check for import:"),
+		).toBeTruthy();
+		expect(screen.getByText("Second Album")).toBeTruthy();
+		expect(screen.queryByText("First Album")).toBeNull();
 		const posted = fetchMock.mock.calls.find((c) => c[1]?.method === "POST");
 		expect(posted).toBeDefined();
 		const [url, options] = posted as [string, RequestInit];
