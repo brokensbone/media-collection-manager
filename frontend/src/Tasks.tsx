@@ -41,6 +41,10 @@ export function Tasks({
 		archive ? null : logFromHash(),
 	);
 	const removed = useRef<Set<number>>(new Set());
+	const linkedId = Number(
+		new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("item"),
+	);
+	const focused = useRef(false);
 
 	const toggleLog = useCallback(
 		(id: number) => {
@@ -104,6 +108,19 @@ export function Tasks({
 			?.scrollIntoView?.({ block: "center" });
 	}, [openLog, items]);
 
+	useEffect(() => {
+		if (
+			!linkedId ||
+			!items?.some((it) => it.id === linkedId) ||
+			focused.current
+		)
+			return;
+		focused.current = true;
+		document
+			.getElementById(`task-${linkedId}`)
+			?.scrollIntoView?.({ block: "center" });
+	}, [items, linkedId]);
+
 	if (!items) return <p>Loading…</p>;
 
 	const shown = query
@@ -125,7 +142,10 @@ export function Tasks({
 			<tbody>
 				{list.map((it) => (
 					<Fragment key={it.id}>
-						<tr id={`task-${it.id}`}>
+						<tr
+							id={`task-${it.id}`}
+							className={it.id === linkedId ? "linked" : undefined}
+						>
 							<td className="muted">{it.source}</td>
 							<td>
 								<div>{it.name}</div>

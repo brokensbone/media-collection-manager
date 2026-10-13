@@ -73,7 +73,7 @@ def test_queue_exposes_possibly_owned(clean_album_tables: sessionmaker[Session])
     assert item["owned_hint"] == "A — Want It (Remaster)"
 
 
-def test_acquire_links_only_detected_imports_matched_to_want(
+def test_acquire_links_unfinished_imports_matched_to_want(
     clean_album_tables: sessionmaker[Session],
 ) -> None:
     sf = clean_album_tables
@@ -91,6 +91,27 @@ def test_acquire_links_only_detected_imports_matched_to_want(
                 ),
                 PendingImport(
                     source=ImportSource.transmission,
+                    source_key="queued",
+                    name="Queued copy",
+                    matched_album_id=album_id,
+                    state=ImportState.queued,
+                ),
+                PendingImport(
+                    source=ImportSource.transmission,
+                    source_key="importing",
+                    name="Importing copy",
+                    matched_album_id=album_id,
+                    state=ImportState.importing,
+                ),
+                PendingImport(
+                    source=ImportSource.transmission,
+                    source_key="failed",
+                    name="Failed copy",
+                    matched_album_id=album_id,
+                    state=ImportState.failed,
+                ),
+                PendingImport(
+                    source=ImportSource.transmission,
                     source_key="done",
                     name="Old copy",
                     matched_album_id=album_id,
@@ -100,6 +121,10 @@ def test_acquire_links_only_detected_imports_matched_to_want(
         )
         session.commit()
     links = client.get("/acquire").json()[0]["pending_imports"]
-    assert len(links) == 1
-    assert links[0]["name"] == "A - Want It"
-    assert links[0]["matched_album_id"] == album_id
+    assert {link["name"]: link["state"] for link in links} == {
+        "A - Want It": "detected",
+        "Queued copy": "queued",
+        "Importing copy": "importing",
+        "Failed copy": "failed",
+    }
+    assert all(link["matched_album_id"] == album_id for link in links)

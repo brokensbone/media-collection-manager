@@ -90,7 +90,14 @@ describe("Acquire", () => {
 	it("links a matched pending download to its Import row", async () => {
 		mockApi([
 			item({
-				pending_imports: [{ id: 42, name: "A - T1 FLAC", matched_album_id: 1 }],
+				pending_imports: [
+					{
+						id: 42,
+						name: "A - T1 FLAC",
+						matched_album_id: 1,
+						state: "detected",
+					},
+				],
 			}),
 		]);
 		render(<Acquire />);
@@ -98,6 +105,26 @@ describe("Acquire", () => {
 			name: "Waiting in Import: A - T1 FLAC",
 		});
 		expect(link.getAttribute("href")).toBe("#import?item=42");
+	});
+
+	it("links an importing download to its Task row", async () => {
+		mockApi([
+			item({
+				pending_imports: [
+					{
+						id: 42,
+						name: "A - T1 FLAC",
+						matched_album_id: 1,
+						state: "importing",
+					},
+				],
+			}),
+		]);
+		render(<Acquire />);
+		const link = await screen.findByRole("link", {
+			name: "Importing: A - T1 FLAC",
+		});
+		expect(link.getAttribute("href")).toBe("#tasks?item=42");
 	});
 
 	it("mark owned opens a modal, searches the library, and links the chosen album", async () => {
