@@ -27,7 +27,7 @@ def torrents(request: Request) -> list[TransmissionRow]:
 @router.post("/torrents")
 async def add_torrent(
     request: Request, files: Annotated[list[UploadFile], File()]
-) -> dict[str, str]:
+) -> dict[str, object]:
     metainfos: list[bytes] = []
     for file in files:
         if not file.filename or not file.filename.lower().endswith(".torrent"):
@@ -46,7 +46,18 @@ async def add_torrent(
         raise HTTPException(
             status_code=502, detail=f"Transmission rejected the torrent: {e}"
         ) from e
-    return {"detail": _submission_detail(results)}
+    return {
+        "detail": _submission_detail(results),
+        "results": [
+            {
+                "position": position,
+                "filename": file.filename,
+                "name": result.name,
+                "already_present": result.already_present,
+            }
+            for position, (file, result) in enumerate(zip(files, results, strict=True))
+        ],
+    }
 
 
 def _submission_detail(results: list[AddedTorrent]) -> str:

@@ -22,6 +22,7 @@ from .factories import (
 from .imports import ImportsService
 from .metrics import MetricsService
 from .radio_catalogue import RadioCatalogueService
+from .radio_schedules import RadioScheduleService
 from .routers import acquire as acquire_router
 from .routers import art as art_router
 from .routers import auth as auth_router
@@ -33,6 +34,7 @@ from .routers import imports as imports_router
 from .routers import library as library_router
 from .routers import metrics as metrics_router
 from .routers import radio as radio_router
+from .routers import radio_schedules as radio_schedules_router
 from .routers import releases as releases_router
 from .routers import transmission as transmission_router
 
@@ -51,6 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.acquire_service = build_acquire_service(settings, session_factory)
     app.state.library_assist_service = build_library_assist_service(settings, session_factory)
     app.state.radio_catalogue_service = RadioCatalogueService(session_factory)
+    app.state.radio_schedule_service = RadioScheduleService(session_factory)
     app.state.crate_service = build_crate_service(settings, session_factory)
     app.state.releases_service = build_releases_service(settings, session_factory)
     app.state.imports_service = ImportsService(
@@ -73,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(art_router.router)
     app.include_router(library_router.router)
     app.include_router(radio_router.router)
+    app.include_router(radio_schedules_router.router)
     app.include_router(crates_router.router)
     app.include_router(decide_router.router)
     app.include_router(acquire_router.router)

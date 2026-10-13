@@ -13,6 +13,7 @@ type Item = {
 	owned_hint: string | null;
 	spotify_id: string | null;
 	album_type: string | null;
+	pending_imports: { id: number; name: string; matched_album_id: number }[];
 };
 
 type Candidate = {
@@ -140,6 +141,13 @@ export function Acquire({
 								{it.possibly_owned && (
 									<div className="muted">possibly owned: {it.owned_hint}</div>
 								)}
+								{it.pending_imports?.map((pending) => (
+									<div key={pending.id}>
+										<a href={`#import?item=${pending.id}`}>
+											Waiting in Import: {pending.name}
+										</a>
+									</div>
+								))}
 							</td>
 							<td>
 								<div className="acquire-links">

@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     # a hard gate. Tunable.
     crate_soft_cap: int = 50
 
+    # Telegram worklist. The worker uses long polling only when both values are set: no inbound
+    # HTTP endpoint is exposed. `telegram_worklist_chat_ids` is a comma-separated allow-list of
+    # numeric Telegram chat ids, rather than a broad "anyone who finds the bot" switch.
+    telegram_bot_token: str = ""
+    telegram_worklist_chat_ids: str = ""
+    telegram_worklist_poll_seconds: int = 5
+
     # Verdict / Decide (§6a): snooze duration, plus the "listened" (play-history) hint thresholds.
     verdict_snooze_days: int = 14
     verdict_listened_tracks: int = 4
@@ -83,6 +90,11 @@ class Settings(BaseSettings):
     # The worker may translate this prefix to music_dir while producing its read-only MPD cache;
     # it does not alter Beets records or make the path visible through the API.
     legacy_music_dir: str = ""
+    # Radio playback is deliberately opt-in: a worker only contacts MPD when its deployment
+    # supplies a host.
+    mpd_host: str = ""
+    mpd_port: int = 6600
+    radio_timezone: str = "Europe/London"
     # The Tasks view shows completed imports (imported/skipped) from this many days back; older
     # completed imports live in the archive (reached from Tasks), not the default task list.
     import_completed_window_days: int = 3

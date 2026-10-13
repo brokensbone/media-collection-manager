@@ -14,7 +14,8 @@ The flake is the supported upstream packaging interface. It exposes these packag
 
 - `mcm-api` — serves the API and bundled SPA. It listens on 127.0.0.1:8000 by default;
   set `MCM_HOST` and `MCM_PORT` to override that.
-- `mcm-worker` — runs scheduled polling and import work.
+- `mcm-worker` — runs scheduled polling, import work, and (when an MPD host is configured)
+  weekday radio loading at 07:00 and playback at 09:00 Europe/London.
 - `mcm-migrate` — runs Alembic, e.g. `mcm-migrate upgrade head`.
 - `frontend` and `backend` — separately consumable build outputs.
 - `image` — an OCI image whose default command is `mcm-api`.
@@ -24,6 +25,16 @@ sets that variable itself. Runtime configuration remains environment-based; see
 [`deploy/local/.env.example`](deploy/local/.env.example) for the available settings. A host
 integration should run migrations before the API and worker, and manage all credentials outside
 the Nix store.
+
+## Telegram worklist
+
+The optional worklist bot is a worker-only, long-polling integration: it opens no public webhook
+or callback endpoint. Create a dedicated bot with BotFather, place its token in the deployment's
+secret environment file, and set both `MCM_TELEGRAM_BOT_TOKEN` and
+`MCM_TELEGRAM_WORKLIST_CHAT_IDS`. The latter is a comma-separated allow-list of numeric Telegram
+chat IDs. If either is empty, the bot is disabled. Add the bot to the intended private chat and
+send `/work`; it then presents one item at a time with inline buttons. The token must never be
+committed or put in Nix configuration/store paths.
 
 ## Layout
 
