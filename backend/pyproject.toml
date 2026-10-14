@@ -23,7 +23,7 @@ dev = [
     "ruff>=0.6",
     "mypy>=2.3.1",
     "respx>=0.23.1",
-    "testcontainers[postgres]>=4.8",
+    "testcontainers[postgres]>=4.15.0",
 ]
 
 [build-system]
