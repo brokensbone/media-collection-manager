@@ -3,6 +3,7 @@ from datetime import date
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from ..navidrome_sync import NavidromeSyncService, NavidromeSyncView
 from ..radio_schedules import (
     RadioScheduleService,
     ScheduleError,
@@ -14,6 +15,30 @@ from ..radio_schedules import (
 )
 
 router = APIRouter(prefix="/radio/schedules", tags=["radio"])
+
+
+class NavidromeDestinationBody(BaseModel):
+    enabled: bool = True
+
+
+@router.get("/{schedule_date}/navidrome")
+def navidrome_status(schedule_date: date, request: Request) -> NavidromeSyncView:
+    service: NavidromeSyncService = request.app.state.navidrome_sync_service
+    result = service.status(schedule_date)
+    if result is None:
+        raise HTTPException(status_code=404, detail="No schedule for this date")
+    return result
+
+
+@router.put("/{schedule_date}/navidrome", status_code=202)
+def select_navidrome(
+    schedule_date: date, body: NavidromeDestinationBody, request: Request
+) -> NavidromeSyncView:
+    service: NavidromeSyncService = request.app.state.navidrome_sync_service
+    result = service.select(schedule_date, body.enabled)
+    if result is None:
+        raise HTTPException(status_code=404, detail="No schedule for this date")
+    return result
 
 
 class ScheduleItemBody(BaseModel):

@@ -4,12 +4,14 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
+import httpx
 from sqlalchemy.orm import Session, sessionmaker
 
 from .adapters.album_repo import AlbumRepo
 from .adapters.beets import BeetsClient
 from .adapters.beets_cache import BeetsCatalogCache
 from .adapters.mpd import MpdClient, MpdError
+from .adapters.navidrome import NavidromeClient
 from .config import Settings
 from .db import make_engine, make_session_factory
 from .factories import (
@@ -26,9 +28,19 @@ from .factories import (
     build_telegram_worklist_poller,
     build_watchdir_detection_service,
 )
+from .navidrome_sync import NavidromeSyncService
 from .radio_schedules import RadioScheduleService, ScheduleError
 
 log = logging.getLogger(__name__)
+
+
+def sync_navidrome_once(settings: Settings) -> None:
+    if not settings.navidrome_url:
+        return
+    session_factory = _session_factory(settings)
+    with heartbeat(session_factory, "navidrome"):
+        with httpx.Client(timeout=30) as client:
+            NavidromeSyncService(session_factory).sync_pending(NavidromeClient(settings, client))
 
 
 @contextmanager

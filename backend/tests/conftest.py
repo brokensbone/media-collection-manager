@@ -17,6 +17,7 @@ from mcm.models import (
     JobRun,
     PendingImport,
     PlayHistory,
+    RadioNavidromeSync,
     RadioSchedule,
     RadioScheduleItem,
     RadioScheduleSession,
@@ -48,6 +49,7 @@ def clean_album_tables(pg_session_factory: sessionmaker[Session]) -> sessionmake
     with pg_session_factory() as session:
         session.execute(delete(TelegramWorklistOffer))
         session.execute(delete(TelegramWorklistState))
+        session.execute(delete(RadioNavidromeSync))
         session.execute(delete(RadioScheduleItem))
         session.execute(delete(RadioScheduleSession))
         session.execute(delete(RadioSchedule))

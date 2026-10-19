@@ -94,6 +94,15 @@ class Settings(BaseSettings):
     # supplies a host.
     mpd_host: str = ""
     mpd_port: int = 6600
+    # Independent, opt-in destination for dated programmes. Credentials are worker-only.
+    navidrome_url: str = ""
+    navidrome_api_key: str = ""
+    navidrome_username: str = ""
+    navidrome_password: str = ""
+    navidrome_poll_seconds: int = 60
+    # Optional prefix in Subsonic song paths, stripped before exact relative-path matching.
+    navidrome_path_prefix: str = ""
+    navidrome_music_folder_id: str = ""
     radio_timezone: str = "Europe/London"
     # The Tasks view shows completed imports (imported/skipped) from this many days back; older
     # completed imports live in the archive (reached from Tasks), not the default task list.

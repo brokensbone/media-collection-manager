@@ -21,6 +21,7 @@ from .factories import (
 )
 from .imports import ImportsService
 from .metrics import MetricsService
+from .navidrome_sync import NavidromeSyncService
 from .radio_catalogue import RadioCatalogueService
 from .radio_schedules import RadioScheduleService
 from .routers import acquire as acquire_router
@@ -54,6 +55,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.library_assist_service = build_library_assist_service(settings, session_factory)
     app.state.radio_catalogue_service = RadioCatalogueService(session_factory)
     app.state.radio_schedule_service = RadioScheduleService(session_factory)
+    app.state.navidrome_sync_service = NavidromeSyncService(session_factory)
     app.state.crate_service = build_crate_service(settings, session_factory)
     app.state.releases_service = build_releases_service(settings, session_factory)
     app.state.imports_service = ImportsService(
