@@ -32,7 +32,9 @@ The existing MPD scheduling behaviour is unchanged. This change adds API control
 
 Navidrome normally reports virtual filenames derived from tags, even when the files are on
 the same machine. **Enable Report Real Path for the MCM player in Navidrome Settings →
-Players** after its first connection. Virtual paths are rejected before any playlist writes.
+Players** after its first connection (displayed as `MCM [MCM]`; HTTP user agent `MCM/1`). A stable user agent
+keeps this player setting across HTTP-library updates. Virtual paths are rejected before
+any playlist writes.
 Set `MCM_NAVIDROME_PATH_PREFIX` to the absolute music root Navidrome sees; if omitted, the
 worker uses `MCM_MUSIC_DIR`. This strips the service's mount root before matching.
 

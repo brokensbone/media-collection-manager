@@ -52,7 +52,10 @@ class NavidromeClient:
             response = self.client.post(
                 self.settings.navidrome_url.rstrip("/") + "/rest/" + endpoint,
                 content=urlencode(auth + params).encode(),
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "User-Agent": "MCM/1",
+                },
             )
             response.raise_for_status()
             body = response.json()["subsonic-response"]

@@ -39,6 +39,7 @@ class Server:
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
+        assert request.headers["User-Agent"] == "MCM/1"
         assert not request.url.query  # credentials and song lists must stay out of logs
         params = parse_qs(request.content.decode(), keep_blank_values=True)
         assert params["apiKey"] == ["secret"]
