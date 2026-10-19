@@ -3,12 +3,13 @@
 from dataclasses import dataclass
 from datetime import date
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from .models import (
     BeetsAlbumCache,
     BeetsTrackCache,
+    RadioNavidromeSync,
     RadioSchedule,
     RadioScheduleItem,
     RadioScheduleSession,
@@ -141,7 +142,9 @@ class RadioScheduleService:
                         ).all()
                         if not tracks:
                             raise ScheduleError(f"unavailable playable album {selection.beets_id}")
-                        paths.extend(track.path for track in tracks if track.path)
+                        if any(not track.path for track in tracks):
+                            raise ScheduleError(f"unavailable playable album {selection.beets_id}")
+                        paths.extend(track.path for track in tracks)
                     else:
                         raise ScheduleError(f"unknown schedule selection kind {selection.kind}")
             if not paths:
@@ -187,6 +190,15 @@ class RadioScheduleService:
                             item_id=item.item_id,
                         )
                     )
+            # This durable queue survives API/worker restarts. Only opted-in days are queued.
+            session.execute(
+                update(RadioNavidromeSync)
+                .where(
+                    RadioNavidromeSync.schedule_id == schedule.id,
+                    RadioNavidromeSync.enabled.is_(True),
+                )
+                .values(status="pending", error=None, unmatched_paths=[])
+            )
             session.commit()
             return self._view(session, schedule)
 

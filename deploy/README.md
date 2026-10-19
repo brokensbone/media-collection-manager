@@ -1,5 +1,61 @@
 # Deploy
 
+## Optional Navidrome radio destination
+
+Navidrome sync is independent of MPD. No programmes are selected by default. After applying
+the database migrations, configure the **worker** with `MCM_NAVIDROME_URL` (server base URL,
+including any reverse-proxy prefix, without `/rest`) and `MCM_NAVIDROME_API_KEY`. Servers
+without OpenSubsonic API-key support can use `MCM_NAVIDROME_USERNAME` and
+`MCM_NAVIDROME_PASSWORD` instead (salted token authentication). Keep these in deployment
+secrets, not the repository. A dedicated playlist-owning account is recommended.
+
+For an existing programme:
+
+```http
+PUT /radio/schedules/2026-10-19/navidrome
+Content-Type: application/json
+
+{"enabled": true}
+```
+
+The API returns 202 with a durable `pending` state. The worker processes selected programmes
+at startup and every `MCM_NAVIDROME_POLL_SECONDS` (default 60). Programme edits automatically
+queue another sync. Repeating this PUT requests an independent retry, including after manual
+Navidrome edits. Read `GET /radio/schedules/2026-10-19/navidrome` for enabled/status,
+playlist ID, last attempt/success, last successful track count, error and unmatched relative
+file paths. States are `disabled`, `pending`, `synced`, and `error`; errors retry on the next
+poll. Without worker configuration, requests remain pending.
+
+Set `{"enabled": false}` to stop future syncs. This retains the remote playlist and its saved
+ID, so enabling again updates the same copy. No MPD action selects or syncs to Navidrome.
+The existing MPD scheduling behaviour is unchanged. This change adds API controls only.
+
+Navidrome normally reports virtual filenames derived from tags, even when the files are on
+the same machine. **Enable Report Real Path for the MCM player in Navidrome Settings →
+Players** after its first connection. Virtual paths are rejected before any playlist writes.
+Set `MCM_NAVIDROME_PATH_PREFIX` to the absolute music root Navidrome sees; if omitted, the
+worker uses `MCM_MUSIC_DIR`. This strips the service's mount root before matching.
+
+Songs are indexed through paginated OpenSubsonic `search3` and matched by exact relative
+file path, including case and extension. Order and repeated selections are preserved. If
+the two services see different mount roots, use Navidrome's root for the prefix; unrelated
+roots are rejected. For multiple
+music folders, `MCM_NAVIDROME_MUSIC_FOLDER_ID` can restrict matching to one. Missing,
+unscanned or ambiguous paths fail the entire sync before changing a playlist: no fuzzy
+recording substitutions or silently truncated programmes. Album selections with unavailable
+paths also fail rather than dropping tracks.
+
+Playlists are named `MCM Radio — YYYY-MM-DD`. Reserve these names for MCM in the configured
+account: after a lost create response the worker recovers a unique playlist with this name;
+multiple matches require manual cleanup. Later writes use the saved remote ID and verify the
+returned song order by reading the playlist back. A deleted remote playlist is reported as
+an error rather than silently creating a replacement. Credentials and song lists use form
+POST bodies rather than URLs. Keep the configured server/account stable once IDs are saved.
+
+API reference: [OpenSubsonic playlists](https://opensubsonic.netlify.app/docs/endpoints/createplaylist/),
+[catalogue pagination](https://opensubsonic.netlify.app/docs/endpoints/search3/),
+[API-key authentication](https://opensubsonic.netlify.app/docs/extensions/apikeyauth/).
+
 Two self-contained Docker Compose setups, each a plain `docker compose up -d` from its own
 directory (they share the [`Dockerfile`](Dockerfile)):
 

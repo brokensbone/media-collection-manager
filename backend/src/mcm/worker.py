@@ -20,6 +20,7 @@ from .jobs import (
     poll_watchdir_once,
     reconcile_once,
     run_imports_once,
+    sync_navidrome_once,
     watch_artists_once,
 )
 
@@ -48,6 +49,8 @@ def build_scheduler(settings: Settings) -> BackgroundScheduler:
         every(poll_watchdir_once, settings.watchdir_poll_seconds, "watchdir")
     every(run_imports_once, settings.import_process_seconds, "imports")
     every(alerts_once, settings.alerts_poll_seconds, "alerts")
+    if settings.navidrome_url:
+        every(sync_navidrome_once, settings.navidrome_poll_seconds, "navidrome")
     if settings.telegram_bot_token and settings.telegram_worklist_chat_ids:
         every(
             poll_telegram_worklist_once,

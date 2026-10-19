@@ -288,6 +288,24 @@ class RadioSchedule(Base):
     )
 
 
+class RadioNavidromeSync(Base):
+    """One independent destination choice per programme; no row means not selected."""
+
+    __tablename__ = "radio_navidrome_sync"
+
+    schedule_id: Mapped[int] = mapped_column(
+        ForeignKey("radio_schedule.id", ondelete="CASCADE"), primary_key=True
+    )
+    enabled: Mapped[bool] = mapped_column(default=True)
+    status: Mapped[str] = mapped_column(default="pending")
+    playlist_id: Mapped[str | None] = mapped_column(default=None)
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    error: Mapped[str | None] = mapped_column(default=None)
+    unmatched_paths: Mapped[list[str]] = mapped_column(JSON, default=list)
+    track_count: Mapped[int] = mapped_column(default=0)
+
+
 class RadioScheduleSession(Base):
     __tablename__ = "radio_schedule_session"
 
