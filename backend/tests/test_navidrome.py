@@ -36,6 +36,8 @@ class Server:
         self.fail = False
         self.lose_create_response = False
         self.corrupt_readback = False
+        self.public = False
+        self.fail_sharing = False
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
@@ -76,9 +78,21 @@ class Server:
                 self.lose_create_response = False
                 raise httpx.ReadTimeout("secret", request=request)
             result["playlist"] = {"id": "p1"}
+        elif endpoint == "updatePlaylist":
+            assert params["playlistId"] == ["p1"]
+            assert params["public"] == ["true"]
+            if self.fail_sharing:
+                return httpx.Response(
+                    200,
+                    json={"subsonic-response": {"status": "failed", "error": {"code": 50}}},
+                )
+            self.public = True
         elif endpoint == "getPlaylist":
             result["playlist"] = {
-                "entry": [{"id": song} for song in ([] if self.corrupt_readback else self.playlist)]
+                "public": self.public,
+                "entry": [
+                    {"id": song} for song in ([] if self.corrupt_readback else self.playlist)
+                ],
             }
         else:
             raise AssertionError(endpoint)
@@ -138,6 +152,7 @@ def test_opt_in_edit_retry_disable_and_reenable(clean_album_tables: sessionmaker
     assert api.put(ROOT, json={"enabled": True}).status_code == 202
     service.sync_pending(client)
     assert server.playlist == ["a", "b", "a"]
+    assert server.public
     status = api.get(ROOT).json()
     assert status["status"] == "synced" and status["playlist_id"] == "p1"
     assert status["track_count"] == 3 and status["last_synced_at"]
@@ -222,6 +237,39 @@ def test_readback_mismatch_is_not_success(clean_album_tables: sessionmaker[Sessi
     status = service.status(DAY)
     assert status and status.status == "error" and status.playlist_id == "p1"
     assert status.last_synced_at is None
+
+
+def test_sharing_failure_recovers_existing_playlist_without_duplicates() -> None:
+    server = Server()
+    client = server.client()
+    server.fail_sharing = True
+    with pytest.raises(NavidromeError, match="updatePlaylist"):
+        client.replace_playlist("MCM Radio — 2026-10-19", None, ["a", "b"])
+    assert server.exists and not server.public
+    server.fail_sharing = False
+    playlist_id = client.replace_playlist("MCM Radio — 2026-10-19", None, ["a", "b"])
+    assert playlist_id == "p1" and server.public
+    client.verify_playlist(playlist_id, ["a", "b"])
+    creates = [params for endpoint, params in server.calls if endpoint == "createPlaylist"]
+    assert "name" in creates[0] and creates[1]["playlistId"] == ["p1"]
+
+
+def test_private_readback_is_not_success() -> None:
+    server = Server()
+    client = server.client()
+    playlist_id = client.replace_playlist("MCM Radio — 2026-10-19", None, ["a"])
+    server.public = False
+    with pytest.raises(NavidromeError, match="not visible"):
+        client.verify_playlist(playlist_id, ["a"])
+
+
+def test_updating_an_existing_private_playlist_shares_it() -> None:
+    server = Server()
+    server.exists = True
+    client = server.client()
+    assert client.replace_playlist("MCM Radio — 2026-10-19", "p1", ["b", "a"]) == "p1"
+    assert server.public
+    client.verify_playlist("p1", ["b", "a"])
 
 
 def test_path_roots_and_scheduler_independence() -> None:
