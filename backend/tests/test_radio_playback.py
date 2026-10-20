@@ -16,7 +16,9 @@ from mcm.radio_schedules import (
 )
 
 
-def _today_schedule(session_factory: sessionmaker[Session]) -> list[str]:
+def _today_schedule(
+    session_factory: sessionmaker[Session], starts_at: str | None = "09:00"
+) -> list[str]:
     cache = BeetsCatalogCache(session_factory)
     cache.replace(
         [BeetsAlbum("1", "Artist", "Album", None)],
@@ -31,7 +33,7 @@ def _today_schedule(session_factory: sessionmaker[Session]) -> list[str]:
                 ScheduleSessionInput(
                     kind="track_hour",
                     title="Morning",
-                    starts_at="09:00",
+                    starts_at=starts_at,
                     note=None,
                     items=[ScheduleItemInput(kind="track", beets_id=None, item_id="11")],
                 )
@@ -79,3 +81,21 @@ def test_radio_load_then_play_only_when_the_queue_still_matches(
     FakeMpd.queue = ["something-else.flac"]
     play_radio_once(settings)
     assert calls[-1] == "playlistinfo"
+
+
+def test_on_demand_schedule_is_playable_but_never_controls_mpd(
+    clean_album_tables: sessionmaker[Session], monkeypatch: MonkeyPatch
+) -> None:
+    expected = _today_schedule(clean_album_tables, starts_at=None)
+    today = datetime.now(ZoneInfo("Europe/London")).date()
+    # The shared resolver must remain available to Navidrome sync.
+    assert RadioScheduleService(clean_album_tables).playable_paths(today) == expected
+
+    def unexpected_mpd(host: str, port: int) -> None:
+        raise AssertionError("an on-demand schedule must not connect to MPD")
+
+    monkeypatch.setattr("mcm.jobs._session_factory", lambda _: clean_album_tables)
+    monkeypatch.setattr("mcm.jobs.MpdClient", unexpected_mpd)
+    settings = Settings(mpd_host="mpd.example")
+    load_radio_once(settings)
+    play_radio_once(settings)

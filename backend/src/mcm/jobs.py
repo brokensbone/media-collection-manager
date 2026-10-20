@@ -196,7 +196,13 @@ def poll_telegram_worklist_once(settings: Settings | None = None) -> None:
 
 def _radio_paths(settings: Settings, session_factory: sessionmaker[Session]) -> list[str] | None:
     today = datetime.now(ZoneInfo(settings.radio_timezone)).date()
-    return RadioScheduleService(session_factory).playable_paths(today)
+    service = RadioScheduleService(session_factory)
+    schedule = service.get(today)
+    # Plans without a broadcast time are on-demand listening, e.g. a train journey.
+    # Navidrome resolves the same selections independently of this MPD-only guard.
+    if schedule is None or not any(segment.starts_at for segment in schedule.sessions):
+        return None
+    return service.playable_paths(today)
 
 
 def load_radio_once(settings: Settings | None = None) -> None:
