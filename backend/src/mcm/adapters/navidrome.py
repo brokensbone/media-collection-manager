@@ -119,9 +119,15 @@ class NavidromeClient:
         result = self.call("createPlaylist", params).get("playlist", {})
         if not result.get("id"):
             raise NavidromeError("Navidrome did not return a playlist ID")
-        return str(result["id"])
+        playlist_id = str(result["id"])
+        # The integration account owns these playlists; share them with the
+        # server's other users so they can listen from their own accounts.
+        self.call("updatePlaylist", [("playlistId", playlist_id), ("public", "true")])
+        return playlist_id
 
     def verify_playlist(self, playlist_id: str, songs: list[str]) -> None:
         playlist = self.call("getPlaylist", [("id", playlist_id)]).get("playlist", {})
+        if playlist.get("public") is not True:
+            raise NavidromeError("Navidrome playlist is not visible to other users")
         if [str(entry["id"]) for entry in playlist.get("entry", [])] != songs:
             raise NavidromeError("Navidrome playlist read-back did not match programme order")

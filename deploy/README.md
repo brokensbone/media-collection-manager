@@ -28,6 +28,10 @@ poll. Without worker configuration, requests remain pending.
 
 Set `{"enabled": false}` to stop future syncs. This retains the remote playlist and its saved
 ID, so enabling again updates the same copy. No MPD action selects or syncs to Navidrome.
+
+MCM playlists are shared with other users on the Navidrome server (`public=true`),
+so listeners can find them from their own accounts rather than the integration account.
+Sync verifies both track order and shared visibility; a sharing failure remains retryable.
 The existing MPD scheduling behaviour is unchanged. This change adds API controls only.
 
 Navidrome normally reports virtual filenames derived from tags, even when the files are on
