@@ -26,6 +26,11 @@ sets that variable itself. Runtime configuration remains environment-based; see
 integration should run migrations before the API and worker, and manage all credentials outside
 the Nix store.
 
+Radio programmes with no session start times are for on-demand listening, such as
+Navidrome train playlists. The weekday MPD load and play jobs skip those programmes;
+include a session start time to opt a programme into scheduled office playback.
+Navidrome selection and sync remain independent of session start times.
+
 ## Telegram worklist
 
 The optional worklist bot is a worker-only, long-polling integration: it opens no public webhook
