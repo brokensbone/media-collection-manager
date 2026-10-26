@@ -3,13 +3,20 @@
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-  outputs = { self, nixpkgs }:
+  outputs =
+    { self, nixpkgs }:
     let
-      systems = [ "x86_64-linux" "aarch64-linux" ];
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
     in
     {
-      packages = forAllSystems (system:
+      formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.nixfmt);
+
+      packages = forAllSystems (
+        system:
         let
           pkgs = import nixpkgs { inherit system; };
           lib = pkgs.lib;
@@ -54,7 +61,9 @@
               hash = "sha256-qTVvDLibO4YhUpxdXuvWm/4VT0w/aLTPLeR+RfqFXC4=";
             };
           });
-          fastapi = pythonPackages.fastapi.overridePythonAttrs (_: { doCheck = false; });
+          fastapi = pythonPackages.fastapi.overridePythonAttrs (_: {
+            doCheck = false;
+          });
           # Keep Nix's runtime aligned with backend/pyproject.toml. MCM's own tests
           # cover its scheduler integration; upstream process-pool tests are flaky
           # under the sandboxed Python build.
@@ -194,7 +203,10 @@
 
           api = pkgs.writeShellApplication {
             name = "mcm-api";
-            runtimeInputs = [ pkgs.openssh pkgs.rsync ];
+            runtimeInputs = [
+              pkgs.openssh
+              pkgs.rsync
+            ];
             text = ''
               export MCM_STATIC_DIR="''${MCM_STATIC_DIR:-${frontend}}"
               exec ${pythonEnv}/bin/python -m uvicorn mcm.app:app \
@@ -209,7 +221,11 @@
             # Beets is a Python dependency of the backend, but Python's runtime closure
             # does not expose its console scripts on PATH.  The worker invokes `beet`
             # directly for imports and catalogue refreshes.
-            runtimeInputs = [ pkgs.openssh pkgs.rsync beets ];
+            runtimeInputs = [
+              pkgs.openssh
+              pkgs.rsync
+              beets
+            ];
             text = ''
               exec ${pythonEnv}/bin/python -m mcm.worker "$@"
             '';
@@ -224,20 +240,33 @@
           };
         in
         rec {
-          inherit api backend frontend migrations worker;
+          inherit
+            api
+            backend
+            frontend
+            migrations
+            worker
+            ;
           mcm-api = api;
           mcm-worker = worker;
           mcm-migrate = migrations;
           image = pkgs.dockerTools.buildLayeredImage {
             name = "mcm";
             tag = "latest";
-            contents = [ api worker migrations ];
+            contents = [
+              api
+              worker
+              migrations
+            ];
             config = {
               Cmd = [ "${api}/bin/mcm-api" ];
-              ExposedPorts = { "8000/tcp" = { }; };
+              ExposedPorts = {
+                "8000/tcp" = { };
+              };
             };
           };
           default = api;
-        });
+        }
+      );
     };
 }
