@@ -9,7 +9,7 @@ dependencies = [
     "pydantic-settings>=2.15.0",
     "sqlalchemy>=2.0.53",
     "alembic>=1.19.1",
-    "psycopg[binary]>=3.3.5",
+    "psycopg[binary]>=3.3.6",
     "apscheduler>=3.11.3",
     "beets>=2.13",
     "httpx>=0.28.1",  # runtime: art fetch + Spotify/MusicBrainz/Transmission adapters
@@ -21,9 +21,9 @@ dependencies = [
 dev = [
     "pytest>=9.1.1",
     "ruff>=0.6",
-    "mypy>=2.3.1",
+    "mypy>=2.4.0",
     "respx>=0.23.1",
-    "testcontainers[postgres]>=4.8",
+    "testcontainers[postgres]>=4.15.0",
 ]
 
 [build-system]
