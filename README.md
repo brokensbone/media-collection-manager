@@ -143,4 +143,11 @@ npm run typecheck
 npm run dev      # dev server
 ```
 
-CI (`.github/workflows/ci.yml`) runs all of the above on every push and PR.
+Nix packaging (from the repository root):
+```
+nix fmt -- flake.nix         # format flake.nix
+nix fmt -- --check flake.nix  # check formatting
+```
+
+CI (`.github/workflows/ci.yml`) runs the backend and frontend checks, Nix formatting
+check, and Nix package build on every push to main and every PR.
