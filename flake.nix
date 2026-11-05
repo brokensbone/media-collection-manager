@@ -63,16 +63,39 @@
           });
           # FastAPI releases faster than nixpkgs. Reuse uv's verified source so
           # Dependabot's lockfile updates also update this override.
-          fastapiLock =
-            lib.findFirst (p: p.name == "fastapi") (throw "fastapi missing from uv.lock")
+          lockedPackage =
+            name:
+            lib.findFirst (p: p.name == name) (throw "${name} missing from uv.lock")
               (builtins.fromTOML (builtins.readFile ./backend/uv.lock)).package;
+          fastapiLock = lockedPackage "fastapi";
+          # FastAPI 0.162 also requires a newer OpenTelemetry API than nixpkgs.
+          # Use its universal wheel to avoid coupling to the upstream monorepo.
+          opentelemetry-api = pythonPackages.buildPythonPackage {
+            pname = "opentelemetry-api";
+            version = (lockedPackage "opentelemetry-api").version;
+            format = "wheel";
+            src =
+              let
+                wheel =
+                  lib.findFirst (w: lib.hasSuffix "-py3-none-any.whl" w.url)
+                    (throw "opentelemetry-api universal wheel missing from uv.lock")
+                    (lockedPackage "opentelemetry-api").wheels;
+              in
+              pkgs.fetchurl {
+                inherit (wheel) url;
+                sha256 = lib.removePrefix "sha256:" wheel.hash;
+              };
+            dependencies = [ pythonPackages.typing-extensions ];
+            pythonImportsCheck = [ "opentelemetry.trace" ];
+            doCheck = false;
+          };
           fastapi = pythonPackages.fastapi.overridePythonAttrs (old: {
             version = fastapiLock.version;
             src = pkgs.fetchurl {
               url = fastapiLock.sdist.url;
               sha256 = lib.removePrefix "sha256:" fastapiLock.sdist.hash;
             };
-            dependencies = old.dependencies ++ [ pythonPackages.opentelemetry-api ];
+            dependencies = old.dependencies ++ [ opentelemetry-api ];
             doCheck = false;
           });
           # Keep Nix's runtime aligned with backend/pyproject.toml. MCM's own tests
