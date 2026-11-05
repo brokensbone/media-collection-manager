@@ -5,10 +5,17 @@ updates:
     schedule:
       interval: weekly
 
-  - package-ecosystem: pip
+  # Update the resolved environment, without raising supported minimums on
+  # every release. Nix may legitimately package an older compatible version.
+  - package-ecosystem: uv
     directory: /backend
     schedule:
       interval: weekly
+    versioning-strategy: lockfile-only
+    groups:
+      backend-dependencies:
+        patterns:
+          - "*"
 
   # Keeps the flake's inputs current. flake.lock only — a version pinned inside
   # flake.nix, like the typesafe-sdk wheel, is still ours to bump.
