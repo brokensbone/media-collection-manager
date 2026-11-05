@@ -61,7 +61,18 @@
               hash = "sha256-qTVvDLibO4YhUpxdXuvWm/4VT0w/aLTPLeR+RfqFXC4=";
             };
           });
-          fastapi = pythonPackages.fastapi.overridePythonAttrs (_: {
+          # FastAPI releases faster than nixpkgs. Reuse uv's verified source so
+          # Dependabot's lockfile updates also update this override.
+          fastapiLock =
+            lib.findFirst (p: p.name == "fastapi") (throw "fastapi missing from uv.lock")
+              (builtins.fromTOML (builtins.readFile ./backend/uv.lock)).package;
+          fastapi = pythonPackages.fastapi.overridePythonAttrs (old: {
+            version = fastapiLock.version;
+            src = pkgs.fetchurl {
+              url = fastapiLock.sdist.url;
+              sha256 = lib.removePrefix "sha256:" fastapiLock.sdist.hash;
+            };
+            dependencies = old.dependencies ++ [ pythonPackages.opentelemetry-api ];
             doCheck = false;
           });
           # Keep Nix's runtime aligned with backend/pyproject.toml. MCM's own tests
