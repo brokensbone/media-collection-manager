@@ -1,3 +1,5 @@
+import logging
+import time
 import urllib.parse
 from collections.abc import Iterable, Iterator
 from datetime import datetime
@@ -6,6 +8,8 @@ from typing import Any
 import httpx
 
 from ..ports.spotify_api import Play, SavedAlbum
+
+log = logging.getLogger(__name__)
 
 
 class HttpxSpotifyApiClient:
@@ -20,9 +24,7 @@ class HttpxSpotifyApiClient:
         headers = {"Authorization": f"Bearer {access_token}"}
         url: str | None = f"{self._api_url}/me/albums?limit=50"
         while url:
-            resp = httpx.get(url, headers=headers, timeout=30)
-            resp.raise_for_status()
-            page = resp.json()
+            page = self._get_json(url, headers)
             yield from self._parse_page(page)
             url = page.get("next")
 
@@ -106,9 +108,36 @@ class HttpxSpotifyApiClient:
 
     @staticmethod
     def _get_json(url: str, headers: dict[str, str]) -> dict[str, Any]:
-        resp = httpx.get(url, headers=headers, timeout=30)
-        resp.raise_for_status()
-        return resp.json()  # type: ignore[no-any-return]
+        # Retry the current page only, so already-yielded albums are not duplicated.
+        for attempt in range(6):
+            try:
+                resp = httpx.get(url, headers=headers, timeout=30)
+                resp.raise_for_status()
+            except (httpx.TransportError, httpx.HTTPStatusError) as exc:
+                status = (
+                    exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
+                )
+                if attempt == 5 or (status is not None and status not in {429, 500, 502, 503, 504}):
+                    raise
+                delay = float(2 ** (attempt + 1))
+                if status == 429 and isinstance(exc, httpx.HTTPStatusError):
+                    try:
+                        delay = max(delay, float(exc.response.headers.get("Retry-After", "0")))
+                    except ValueError:
+                        pass
+                    # Never retry before a long server-requested rate-limit pause.
+                    if delay > 60:
+                        raise
+                log.warning(
+                    "Spotify request retry: status=%s attempt=%s delay=%ss",
+                    status,
+                    attempt + 1,
+                    delay,
+                )
+                time.sleep(delay)
+                continue
+            return resp.json()  # type: ignore[no-any-return]
+        raise AssertionError("unreachable")
 
     def _parse_page(self, page: dict[str, Any]) -> Iterator[SavedAlbum]:
         for item in page["items"]:
