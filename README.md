@@ -151,3 +151,16 @@ nix fmt -- --check flake.nix  # check formatting
 
 CI (`.github/workflows/ci.yml`) runs the backend and frontend checks, Nix formatting
 check, and Nix package build on every push to main and every PR.
+
+Dependabot uses the `uv` ecosystem to update `backend/uv.lock` in one weekly PR.
+Its `lockfile-only` strategy preserves the supported minimum versions in
+`pyproject.toml`; raise those deliberately when the application needs a newer API.
+After changing requirements, run `uv lock` and commit the lockfile. CI uses
+`uv sync --locked` so it cannot silently repair a stale lockfile.
+
+The Nix runtime uses nixpkgs plus the overrides in `flake.nix`, so its dependency
+versions can differ from the uv development environment while satisfying the same
+requirements. The FastAPI override reads its version and source hash from
+`uv.lock`. Other overrides still need updating when a requirement exceeds the
+version supplied by Nix. Keep Nix's runtime dependency checks enabled: they catch
+real packaging mismatches rather than application test failures.
