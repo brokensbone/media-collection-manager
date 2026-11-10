@@ -20,7 +20,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
-    "ruff>=0.6",
+    "ruff>=0.17.4",
     "mypy>=2.4.1",
     "respx>=0.23.1",
     "testcontainers[postgres]>=4.15.0",
