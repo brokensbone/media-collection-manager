@@ -107,6 +107,8 @@ describe("Transmission", () => {
 		render(<Transmission />);
 
 		const input = screen.getByLabelText(/upload a .torrent file/i);
+		// iOS can disable .torrent files when an accept filter names an unrecognised type.
+		expect(input.hasAttribute("accept")).toBe(false);
 		fireEvent.change(input, {
 			target: {
 				files: [

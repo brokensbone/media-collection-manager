@@ -106,7 +106,6 @@ export function Transmission() {
 					<input
 						aria-label="Upload a .torrent file"
 						type="file"
-						accept=".torrent,application/x-bittorrent"
 						multiple
 						onChange={(event) =>
 							setTorrentFiles(Array.from(event.target.files ?? []))
