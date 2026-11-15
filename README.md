@@ -151,3 +151,10 @@ nix fmt -- --check flake.nix  # check formatting
 
 CI (`.github/workflows/ci.yml`) runs the backend and frontend checks, Nix formatting
 check, and Nix package build on every push to main and every PR.
+
+Dependabot updates `backend/uv.lock` and `frontend/package-lock.json`, and neither
+needs a matching change in `flake.nix`. The Nix package does not read `uv.lock`: it
+takes Python dependencies from nixpkgs plus the overrides in `flake.nix`, and its
+build fails if one is older than a minimum in `pyproject.toml`. So Dependabot leaves
+those minimums alone; raise one by hand, together with the override that satisfies
+it, then run `uv lock`. CI uses `uv sync --locked`, so a stale lockfile fails.

@@ -186,7 +186,10 @@
             pname = "mcm-frontend";
             version = "0.1.0";
             src = ./frontend;
-            npmDepsHash = "sha256-x+WAhQqRdYrct58pmjZnRXqCO+7PkFM6VfMLy9cq088=";
+            # Dependencies are fetched by the integrity hashes in package-lock.json,
+            # so a lockfile update needs no hash changed here.
+            npmDeps = pkgs.importNpmLock { npmRoot = ./frontend; };
+            npmConfigHook = pkgs.importNpmLock.npmConfigHook;
             npmBuildScript = "build";
             installPhase = ''
               runHook preInstall

@@ -5,10 +5,17 @@ updates:
     schedule:
       interval: weekly
 
-  - package-ecosystem: pip
+  # Lockfile only: raising a minimum in pyproject.toml breaks the Nix build
+  # until flake.nix packages that version, so minimums are ours to raise.
+  - package-ecosystem: uv
     directory: /backend
     schedule:
       interval: weekly
+    versioning-strategy: lockfile-only
+    groups:
+      backend-dependencies:
+        patterns:
+          - "*"
 
   # Keeps the flake's inputs current. flake.lock only — a version pinned inside
   # flake.nix, like the typesafe-sdk wheel, is still ours to bump.
