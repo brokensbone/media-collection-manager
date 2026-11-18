@@ -1,4 +1,10 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Radio } from "./Radio";
 
@@ -8,6 +14,53 @@ afterEach(() => {
 });
 
 describe("Radio", () => {
+	it("keeps older schedules in a month archive and supports direct links", async () => {
+		const dates = [
+			"2026-11-19",
+			"2026-11-17",
+			"2026-11-16",
+			"2026-11-14",
+			"2026-11-12",
+			"2026-10-30",
+		];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn((url: string) =>
+				Promise.resolve({
+					ok: true,
+					json: () =>
+						Promise.resolve(
+							url === "/radio/schedules"
+								? dates.map((schedule_date) => ({
+										schedule_date,
+										note: null,
+										session_count: 0,
+										duration_seconds: 0,
+									}))
+								: {
+										schedule_date: url.split("/").at(-1),
+										note: null,
+										session_count: 0,
+										duration_seconds: 0,
+										sessions: [],
+									},
+						),
+				}),
+			),
+		);
+		const { rerender } = render(<Radio selectedDate={null} />);
+		const archive = await screen.findByText("Older programmes (1)");
+		expect(archive.closest("details")?.open).toBe(false);
+		fireEvent.click(archive);
+		fireEvent.click(screen.getByText("2026-10"));
+		expect(
+			screen.getByRole("link", { name: "2026-10-30" }).getAttribute("href"),
+		).toBe("#radio/2026-10-30");
+		rerender(<Radio selectedDate="2026-10-30" />);
+		await waitFor(() =>
+			expect(fetch).toHaveBeenCalledWith("/radio/schedules/2026-10-30"),
+		);
+	});
 	it("shows a dated schedule with marked session boundaries and notes", async () => {
 		vi.stubGlobal(
 			"fetch",
