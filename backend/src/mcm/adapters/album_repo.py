@@ -348,7 +348,7 @@ class AlbumRepo:
                     Album.owned_link_source.is_distinct_from(LinkSource.manual),
                 )
             )
-            return [(album_id, rgid) for album_id, rgid in rows]
+            return [(album_id, rgid) for album_id, rgid in rows if rgid is not None]
 
     def labels_for(self, album_ids: list[int]) -> dict[int, str]:
         """`Artist — Title` per album id, for activity-feed messages."""
@@ -413,6 +413,7 @@ class AlbumRepo:
             return {
                 r[0]: PlayStat(distinct_tracks=r[1], first_played=r[2], last_played=r[3])
                 for r in rows
+                if r[0] is not None
             }
 
     def add_plays(self, plays: list[Play]) -> int:
@@ -506,6 +507,8 @@ class AlbumRepo:
             )
             by_album: dict[int, list[PendingImportLink]] = {}
             for import_id, name, album_id, state in rows:
+                if album_id is None:
+                    continue
                 by_album.setdefault(album_id, []).append(
                     PendingImportLink(import_id, name, album_id, state.value)
                 )
@@ -1118,7 +1121,7 @@ class AlbumRepo:
             )
             out: dict[str, OwnedEnrichment] = {}
             for rgid, album_id, art, spotify_id in rows:
-                if rgid not in out:
+                if rgid is not None and rgid not in out:
                     out[rgid] = OwnedEnrichment(
                         album_id=album_id, has_art=bool(art), spotify_id=spotify_id
                     )
@@ -1138,7 +1141,7 @@ class AlbumRepo:
             )
             out: dict[str, OwnedEnrichment] = {}
             for beets_id, album_id, art, spotify_id in rows:
-                if beets_id not in out:
+                if beets_id is not None and beets_id not in out:
                     out[beets_id] = OwnedEnrichment(
                         album_id=album_id, has_art=bool(art), spotify_id=spotify_id
                     )

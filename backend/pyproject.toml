@@ -4,14 +4,14 @@ version = "0.1.0"
 description = "Smart want-list over Spotify + beets"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.141.1",
+    "fastapi>=0.162.2",
     "uvicorn[standard]>=0.53.0",
-    "pydantic-settings>=2.15.0",
+    "pydantic-settings>=2.16.2",
     "sqlalchemy>=2.0.53",
-    "alembic>=1.19.1",
+    "alembic>=1.20.1",
     "psycopg[binary]>=3.3.6",
     "apscheduler>=3.11.3",
-    "beets>=2.13",
+    "beets>=2.14.1",
     "httpx>=0.28.1",  # runtime: art fetch + Spotify/MusicBrainz/Transmission adapters
     "python-multipart>=0.0.20",  # multipart parsing for torrent-file uploads
     "typesafe-sdk>=0.7.0",
@@ -20,7 +20,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
-    "ruff>=0.6",
+    "ruff>=0.17.4",
     "mypy>=2.4.1",
     "respx>=0.23.1",
     "testcontainers[postgres]>=4.15.0",
