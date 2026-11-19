@@ -77,20 +77,46 @@ export function Radio({
 	if (schedules.length === 0)
 		return <p className="muted">No radio schedules have been planned yet.</p>;
 
+	const recent = schedules.slice(0, 5);
+	const older = schedules.slice(5);
+	const visible = older.some((day) => day.schedule_date === selected)
+		? [...recent, ...older.filter((day) => day.schedule_date === selected)]
+		: recent;
+	const months = [
+		...new Set(older.map((day) => day.schedule_date.slice(0, 7))),
+	];
+	const dayLink = (day: ScheduleSummary) => (
+		<a
+			key={day.schedule_date}
+			href={`#radio/${day.schedule_date}`}
+			onClick={() => onSelectDate?.(day.schedule_date)}
+			className={selected === day.schedule_date ? "active" : ""}
+			aria-current={selected === day.schedule_date ? "date" : undefined}
+		>
+			{day.schedule_date}
+		</a>
+	);
+
 	return (
 		<section className="radio">
-			<div className="radio-days">
-				{schedules.map((day) => (
-					<a
-						key={day.schedule_date}
-						href={`#radio/${day.schedule_date}`}
-						onClick={() => onSelectDate?.(day.schedule_date)}
-						className={selected === day.schedule_date ? "active" : ""}
-					>
-						{day.schedule_date}
-					</a>
-				))}
-			</div>
+			<nav aria-label="Radio programmes">
+				<div className="radio-days">{visible.map(dayLink)}</div>
+				{older.length > 0 && (
+					<details className="radio-archive">
+						<summary>Older programmes ({older.length})</summary>
+						{months.map((month) => (
+							<details className="radio-archive-month" key={month}>
+								<summary>{month}</summary>
+								<div className="radio-days">
+									{older
+										.filter((day) => day.schedule_date.startsWith(month))
+										.map(dayLink)}
+								</div>
+							</details>
+						))}
+					</details>
+				)}
+			</nav>
 			{schedule ? <ScheduleDay schedule={schedule} /> : <p>Loading…</p>}
 		</section>
 	);

@@ -471,6 +471,22 @@ a {
 	gap: 6px;
 	margin: 18px 0;
 }
+
+.radio-archive {
+	margin: 0.75rem 0 1.25rem;
+}
+
+.radio-archive summary {
+	cursor: pointer;
+}
+
+.radio-archive-month {
+	margin: 0.75rem 0 0 1rem;
+}
+
+.radio-archive-month .radio-days {
+	margin-top: 0.5rem;
+}
 .radio-days a {
 	border: 1px solid var(--border);
 	border-radius: 3px;
