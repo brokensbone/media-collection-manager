@@ -78,9 +78,7 @@ def test_reresolve_picks_up_release_once_it_appears_in_mb(
 
     grown_mb = ResolutionService(
         api=StubSpotifyApiClient([]),  # type: ignore[arg-type]
-        resolver=StubMusicBrainzResolver(
-            {"Later": "rg-later"}
-        ),  # MB now has it  # type: ignore[arg-type]
+        resolver=StubMusicBrainzResolver({"Later": "rg-later"}),  # MB now has it  # type: ignore[arg-type]
         repo=AlbumRepo(sf),
         tokens=StubTokens(),  # type: ignore[arg-type]
         backoff_base_seconds=0,

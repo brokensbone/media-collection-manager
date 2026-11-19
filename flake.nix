@@ -36,20 +36,18 @@
           # explicit until nixpkgs catches up, so the package respects the
           # backend's declared runtime minimum versions.
           alembic = (pythonPackages.alembic.override { inherit sqlalchemy; }).overridePythonAttrs (_: {
-            version = "1.19.1";
+            version = (lockedPackage "alembic").version;
             doCheck = false;
-            src = pkgs.fetchPypi {
-              pname = "alembic";
-              version = "1.19.1";
-              hash = "sha256-4PygUYEYx4rMST4xvLVALxkAV6r234tblc6UxHic9kg=";
+            src = pkgs.fetchurl {
+              url = (lockedPackage "alembic").sdist.url;
+              sha256 = lib.removePrefix "sha256:" (lockedPackage "alembic").sdist.hash;
             };
           });
           pydantic-settings = pythonPackages."pydantic-settings".overridePythonAttrs (old: {
-            version = "2.15.0";
-            src = pkgs.fetchPypi {
-              pname = "pydantic_settings";
-              version = "2.15.0";
-              hash = "sha256-aUt5PoT3Zrp2qQ6978AdCpoEXasDgr7nA5Pak3Eq0Rc=";
+            version = (lockedPackage "pydantic-settings").version;
+            src = pkgs.fetchurl {
+              url = (lockedPackage "pydantic-settings").sdist.url;
+              sha256 = lib.removePrefix "sha256:" (lockedPackage "pydantic-settings").sdist.hash;
             };
             dependencies = old.dependencies ++ [ pythonPackages.typing-inspection ];
           });
@@ -61,7 +59,41 @@
               hash = "sha256-qTVvDLibO4YhUpxdXuvWm/4VT0w/aLTPLeR+RfqFXC4=";
             };
           });
-          fastapi = pythonPackages.fastapi.overridePythonAttrs (_: {
+          # FastAPI releases faster than nixpkgs. Reuse uv's verified source so
+          # Dependabot's lockfile updates also update this override.
+          lockedPackage =
+            name:
+            lib.findFirst (p: p.name == name) (throw "${name} missing from uv.lock")
+              (builtins.fromTOML (builtins.readFile ./backend/uv.lock)).package;
+          fastapiLock = lockedPackage "fastapi";
+          # FastAPI 0.162 also requires a newer OpenTelemetry API than nixpkgs.
+          # Use its universal wheel to avoid coupling to the upstream monorepo.
+          opentelemetry-api = pythonPackages.buildPythonPackage {
+            pname = "opentelemetry-api";
+            version = (lockedPackage "opentelemetry-api").version;
+            format = "wheel";
+            src =
+              let
+                wheel =
+                  lib.findFirst (w: lib.hasSuffix "-py3-none-any.whl" w.url)
+                    (throw "opentelemetry-api universal wheel missing from uv.lock")
+                    (lockedPackage "opentelemetry-api").wheels;
+              in
+              pkgs.fetchurl {
+                inherit (wheel) url;
+                sha256 = lib.removePrefix "sha256:" wheel.hash;
+              };
+            dependencies = [ pythonPackages.typing-extensions ];
+            pythonImportsCheck = [ "opentelemetry.trace" ];
+            doCheck = false;
+          };
+          fastapi = pythonPackages.fastapi.overridePythonAttrs (old: {
+            version = fastapiLock.version;
+            src = pkgs.fetchurl {
+              url = fastapiLock.sdist.url;
+              sha256 = lib.removePrefix "sha256:" fastapiLock.sdist.hash;
+            };
+            dependencies = old.dependencies ++ [ opentelemetry-api ];
             doCheck = false;
           });
           # Keep Nix's runtime aligned with backend/pyproject.toml. MCM's own tests
@@ -131,12 +163,10 @@
           # into a multi-gigabyte desktop/media runtime closure.
           beets = pythonPackages.buildPythonPackage rec {
             pname = "beets";
-            version = "2.13.1";
-            src = pkgs.fetchFromGitHub {
-              owner = "beetbox";
-              repo = "beets";
-              tag = "v${version}";
-              hash = "sha256-f25Uv7PRKBFUWah6pvEwwTFjxXKQfmAP2fyTNFJyWB0=";
+            version = (lockedPackage "beets").version;
+            src = pkgs.fetchurl {
+              url = (lockedPackage "beets").sdist.url;
+              sha256 = lib.removePrefix "sha256:" (lockedPackage "beets").sdist.hash;
             };
             pyproject = true;
             build-system = [ pythonPackages.hatchling ];
