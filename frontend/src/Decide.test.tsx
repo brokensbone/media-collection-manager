@@ -12,7 +12,17 @@ function mockApi(items: unknown) {
 	const fetchMock = vi.fn((_url: string, opts?: { method?: string }) =>
 		opts?.method === "POST"
 			? Promise.resolve({ ok: true })
-			: Promise.resolve({ json: () => Promise.resolve(items) }),
+			: Promise.resolve({
+					json: () =>
+						Promise.resolve(
+							Array.isArray(items)
+								? items.map((item) => ({
+										release_year: new Date().getFullYear(),
+										...item,
+									}))
+								: items,
+						),
+				}),
 	);
 	vi.stubGlobal("fetch", fetchMock);
 	return fetchMock;
@@ -24,6 +34,27 @@ afterEach(() => {
 });
 
 describe("Decide", () => {
+	it("defaults to this year's releases, keeps the backlog accessible and applies hotkeys to the shown rows", async () => {
+		const year = new Date().getFullYear();
+		const fetchMock = mockApi([
+			{ id: 1, artist: "A", title: "Old", reason: "", release_year: year - 1 },
+			{ id: 2, artist: "B", title: "New", reason: "", release_year: year },
+			{ id: 3, artist: "C", title: "Unknown", reason: "", release_year: null },
+		]);
+		render(<Decide />);
+		await screen.findByText("New");
+		expect(screen.queryByText("Old")).toBeNull();
+		expect(screen.queryByText("Unknown")).toBeNull();
+		fireEvent.keyDown(document.body, { key: "y" });
+		await waitFor(() =>
+			expect(fetchMock).toHaveBeenCalledWith("/albums/2/keep", {
+				method: "POST",
+			}),
+		);
+		fireEvent.click(screen.getByRole("button", { name: /All albums/ }));
+		expect(screen.getByText("Old")).toBeTruthy();
+		expect(screen.getByText("Unknown")).toBeTruthy();
+	});
 	it("lists items with their reason", async () => {
 		mockApi([
 			{ id: 1, artist: "A", title: "T1", reason: "30d", has_art: false },

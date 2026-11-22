@@ -31,6 +31,27 @@ def test_ingest_adds_then_dedups(clean_album_tables: sessionmaker[Session]) -> N
     assert AlbumRepo(clean_album_tables).existing_spotify_ids() == {"a1", "a2"}
 
 
+def test_saved_album_release_year_is_backfilled_without_changing_verdict(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    sf = clean_album_tables
+    svc = _service(sf)
+    svc.ingest_saves()
+    with sf() as session:
+        album = session.query(Album).filter_by(spotify_id="a1").one()
+        album.state = AlbumState.wanted
+        session.commit()
+    api = StubSpotifyApiClient(
+        [SavedAlbum("a1", "Artist", None, "One", None, None, None, release_year=2026)]
+    )
+    svc._api = api  # type: ignore[assignment]
+    svc.ingest_saves()
+    with sf() as session:
+        album = session.query(Album).filter_by(spotify_id="a1").one()
+        assert album.release_year == 2026
+        assert album.state == AlbumState.wanted
+
+
 def test_ingest_pauses_on_reauth(clean_album_tables: sessionmaker[Session]) -> None:
     result = _service(clean_album_tables, fail_auth=True).ingest_saves()
     assert result.paused is True

@@ -26,10 +26,10 @@ export function Guide() {
 
 			<h2>Decide</h2>
 			<p>
-				Your triage queue. An album shows up here when it's worth a verdict —
-				either because it's been <strong>forgotten</strong> (saved a while ago
-				and barely played) or because you've actually <strong>listened</strong>{" "}
-				to it a few times. For each one:
+				Your triage queue for saved albums. It opens on releases from this year;
+				choose <strong>All albums</strong> to see the full backlog, including
+				albums whose release year is unknown. Years come from Spotify and can
+				refer to a reissue. For each album:
 			</p>
 			<ul>
 				<li>

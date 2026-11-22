@@ -154,6 +154,7 @@ class HttpxSpotifyApiClient:
             added_at=added_at,
             art_url=self._best_image(album.get("images", [])),
             album_type=album.get("album_type"),
+            release_year=_release_year(album.get("release_date")),
         )
 
     def _best_image(self, images: list[dict[str, Any]]) -> str | None:
@@ -162,6 +163,13 @@ class HttpxSpotifyApiClient:
             return images[0]["url"] if images else None
         best = min(sized, key=lambda i: abs(int(i["width"]) - self._art_target_px))
         return str(best["url"])
+
+
+def _release_year(value: str | None) -> int | None:
+    if not value or len(value) < 4 or not value[:4].isdigit():
+        return None
+    year = int(value[:4])
+    return year if 1000 <= year <= 9999 else None
 
 
 def _parse_dt(value: str | None) -> datetime | None:

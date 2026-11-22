@@ -44,8 +44,11 @@ class IngestService:
             return IngestResult(added=0, skipped=0, paused=True)
 
         existing = self._repo.existing_spotify_ids()  # dedupe by spotify id (§4)
+        years: dict[str, int] = {}
         added = skipped = 0
         for album in self._api.saved_albums(token):
+            if album.release_year is not None:
+                years[album.spotify_id] = album.release_year
             if album.spotify_id in existing:
                 skipped += 1
                 continue
@@ -58,6 +61,7 @@ class IngestService:
                 added_at=album.added_at,
                 art_url=album.art_url,
                 album_type=album.album_type,
+                release_year=album.release_year,
             )
             existing.add(album.spotify_id)
             added += 1
@@ -66,6 +70,7 @@ class IngestService:
                 type="saved",
                 message=f"New saved album: '{album.artist} — {album.title}'",
             )
+        self._repo.backfill_release_years(years)
         return IngestResult(added=added, skipped=skipped, paused=False)
 
     def backfill_owned_art(self) -> int:
