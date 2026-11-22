@@ -79,6 +79,7 @@ class ArtistWatchService:
                         title=album.title,
                         art_url=album.art_url,
                         album_type=album.album_type,
+                        release_year=album.release_year,
                     )
                     added += 1
                     self._events.emit(

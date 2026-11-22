@@ -249,6 +249,18 @@ button {
 button:hover {
 	background: var(--surface);
 }
+
+.decide-scope {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin: 1rem 0;
+}
+
+.decide-scope button[aria-pressed="true"] {
+	border-color: var(--accent);
+	color: var(--accent);
+}
 button:disabled {
 	color: var(--muted);
 	cursor: default;

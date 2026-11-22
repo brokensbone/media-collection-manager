@@ -16,6 +16,7 @@ class DecideItem:
     has_art: bool
     spotify_id: str | None
     album_type: str | None
+    release_year: int | None = None
 
 
 class DecideService:
@@ -59,6 +60,7 @@ class DecideService:
                     cand.has_art,
                     cand.spotify_id,
                     cand.album_type,
+                    cand.release_year,
                 )
             )
         return items

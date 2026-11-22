@@ -10,6 +10,7 @@ type Item = {
 	has_art: boolean;
 	spotify_id: string | null;
 	album_type: string | null;
+	release_year: number | null;
 };
 type Action = "keep" | "drop" | "snooze";
 
@@ -22,6 +23,8 @@ export function Decide({
 }) {
 	const [items, setItems] = useState<Item[] | null>(null);
 	const [sel, setSel] = useState(0);
+	const [scope, setScope] = useState<"year" | "all">("year");
+	const year = new Date().getFullYear();
 	const selRef = useRef<HTMLTableRowElement | null>(null);
 
 	useEffect(() => {
@@ -53,8 +56,10 @@ export function Decide({
 					el.isContentEditable)
 			)
 				return;
-			const shown = (items ?? []).filter((it) =>
-				matchesQuery(`${it.artist} ${it.title}`, query),
+			const shown = (items ?? []).filter(
+				(it) =>
+					(scope === "all" || it.release_year === year) &&
+					matchesQuery(`${it.artist} ${it.title}`, query),
 			);
 			if (shown.length === 0) return;
 			const k = e.key.toLowerCase();
@@ -70,7 +75,7 @@ export function Decide({
 		}
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [items, sel, query, act]);
+	}, [items, sel, query, act, scope, year]);
 
 	// Keep the selected row in view as it moves (holding ↓ shouldn't run off-screen).
 	// biome-ignore lint/correctness/useExhaustiveDependencies: sel is the trigger, not read in the body
@@ -81,57 +86,99 @@ export function Decide({
 	if (!items) return <p>Loading…</p>;
 	if (items.length === 0) return <p>Nothing to judge.</p>;
 
-	const shown = items.filter((it) =>
-		matchesQuery(`${it.artist} ${it.title}`, query),
+	const shown = items.filter(
+		(it) =>
+			(scope === "all" || it.release_year === year) &&
+			matchesQuery(`${it.artist} ${it.title}`, query),
 	);
 	const cur = Math.min(sel, shown.length - 1);
 
 	return (
-		<table className="mobile-card-table">
-			<colgroup>
-				<col className="c-cover" />
-				<col className="c-artist" />
-				<col />
-				<col className="c-why" />
-				<col className="c-actions3" />
-			</colgroup>
-			<thead>
-				<tr>
-					<th className="cover-cell" />
-					<th>artist</th>
-					<th>title</th>
-					<th>why</th>
-					<th />
-				</tr>
-			</thead>
-			<tbody>
-				{shown.map((it, i) => (
-					<tr
-						key={it.id}
-						ref={i === cur ? selRef : undefined}
-						className={i === cur ? "sel" : undefined}
-					>
-						<Cover id={it.id} hasArt={it.has_art} spotifyId={it.spotify_id} />
-						<td>{it.artist}</td>
-						<td>
-							{it.title}
-							{it.album_type && <span className="badge">{it.album_type}</span>}
-						</td>
-						<td className="nowrap">{it.reason}</td>
-						<td className="nowrap row-actions">
-							<button type="button" onClick={() => act(it.id, "keep")}>
-								Keep
-							</button>
-							<button type="button" onClick={() => act(it.id, "drop")}>
-								Drop
-							</button>
-							<button type="button" onClick={() => act(it.id, "snooze")}>
-								Snooze
-							</button>
-						</td>
-					</tr>
-				))}
-			</tbody>
-		</table>
+		<>
+			<nav className="decide-scope" aria-label="Filter albums by release year">
+				<button
+					type="button"
+					aria-pressed={scope === "year"}
+					onClick={() => {
+						setScope("year");
+						setSel(0);
+					}}
+				>
+					This year ({items.filter((it) => it.release_year === year).length})
+				</button>{" "}
+				<button
+					type="button"
+					aria-pressed={scope === "all"}
+					onClick={() => {
+						setScope("all");
+						setSel(0);
+					}}
+				>
+					All albums ({items.length})
+				</button>
+			</nav>
+			{shown.length === 0 ? (
+				<p className="muted">
+					No albums match this view. Albums with unknown release years are in
+					All albums; Spotify release years fill in as saved albums sync.
+				</p>
+			) : (
+				<table className="mobile-card-table">
+					<colgroup>
+						<col className="c-cover" />
+						<col className="c-artist" />
+						<col />
+						<col className="c-why" />
+						<col className="c-actions3" />
+					</colgroup>
+					<thead>
+						<tr>
+							<th className="cover-cell" />
+							<th>artist</th>
+							<th>title</th>
+							<th>why</th>
+							<th />
+						</tr>
+					</thead>
+					<tbody>
+						{shown.map((it, i) => (
+							<tr
+								key={it.id}
+								ref={i === cur ? selRef : undefined}
+								className={i === cur ? "sel" : undefined}
+							>
+								<Cover
+									id={it.id}
+									hasArt={it.has_art}
+									spotifyId={it.spotify_id}
+								/>
+								<td>{it.artist}</td>
+								<td>
+									{it.title}
+									{it.release_year != null && (
+										<span className="badge">{it.release_year}</span>
+									)}
+									{it.album_type && (
+										<span className="badge">{it.album_type}</span>
+									)}
+								</td>
+								<td className="nowrap">{it.reason}</td>
+								<td className="nowrap row-actions">
+									<button type="button" onClick={() => act(it.id, "keep")}>
+										Keep
+									</button>
+									<button type="button" onClick={() => act(it.id, "drop")}>
+										Drop
+									</button>
+									<button type="button" onClick={() => act(it.id, "snooze")}>
+										Snooze
+									</button>
+								</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			)}
+		</>
 	);
 }

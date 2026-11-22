@@ -14,6 +14,7 @@ class SavedAlbum:
     added_at: datetime | None
     art_url: str | None
     album_type: str | None = None
+    release_year: int | None = None
 
 
 @dataclass

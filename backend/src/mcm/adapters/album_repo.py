@@ -67,6 +67,7 @@ class SavedCandidate:
     saved_at: datetime | None
     has_art: bool
     album_type: str | None
+    release_year: int | None
 
 
 @dataclass
@@ -181,6 +182,7 @@ class AlbumRepo:
         added_at: datetime | None,
         art_url: str | None,
         album_type: str | None = None,
+        release_year: int | None = None,
     ) -> None:
         with self._sf() as session:
             session.add(
@@ -192,11 +194,32 @@ class AlbumRepo:
                     upc=upc,
                     art_url=art_url,
                     album_type=album_type,
+                    release_year=release_year,
                     saved_at=added_at,
                     state=AlbumState.saved,
                     provenance=Provenance.spotify_save,
                 )
             )
+            session.commit()
+
+    def backfill_release_years(self, years: dict[str, int]) -> None:
+        """Fill missing years for existing Spotify albums without altering verdicts."""
+        if not years:
+            return
+        with self._sf() as session:
+            missing = session.scalars(
+                select(Album.spotify_id).where(
+                    Album.spotify_id.in_(years), Album.release_year.is_(None)
+                )
+            )
+            for spotify_id in missing:
+                if spotify_id is None:
+                    continue
+                session.execute(
+                    update(Album)
+                    .where(Album.spotify_id == spotify_id, Album.release_year.is_(None))
+                    .values(release_year=years[spotify_id])
+                )
             session.commit()
 
     def add_suggested_album(
@@ -208,6 +231,7 @@ class AlbumRepo:
         title: str,
         art_url: str | None,
         album_type: str | None = None,
+        release_year: int | None = None,
     ) -> None:
         with self._sf() as session:
             session.add(
@@ -218,6 +242,7 @@ class AlbumRepo:
                     title=title,
                     art_url=art_url,
                     album_type=album_type,
+                    release_year=release_year,
                     state=AlbumState.suggested,
                     provenance=Provenance.artist_watch,
                 )
@@ -388,6 +413,7 @@ class AlbumRepo:
                     Album.saved_at,
                     has_art,
                     Album.album_type,
+                    Album.release_year,
                 )
                 .where(
                     Album.state == AlbumState.saved,
@@ -395,7 +421,7 @@ class AlbumRepo:
                 )
                 .order_by(Album.saved_at)
             )
-            return [SavedCandidate(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]
+            return [SavedCandidate(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]) for r in rows]
 
     def play_stats_by_album(self) -> dict[str, PlayStat]:
         """Per-Spotify-album play stats from the accumulated play history (§4a)."""
