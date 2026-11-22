@@ -231,6 +231,7 @@ class AlbumRepo:
         title: str,
         art_url: str | None,
         album_type: str | None = None,
+        release_year: int | None = None,
     ) -> None:
         with self._sf() as session:
             session.add(
@@ -241,6 +242,7 @@ class AlbumRepo:
                     title=title,
                     art_url=art_url,
                     album_type=album_type,
+                    release_year=release_year,
                     state=AlbumState.suggested,
                     provenance=Provenance.artist_watch,
                 )
