@@ -46,7 +46,9 @@ describe("Tasks", () => {
 		mockApi([item({ id: 42, name: "Linked", state: "importing" })]);
 		render(<Tasks />);
 		await screen.findByText("Linked");
-		expect(document.getElementById("task-42")?.className).toBe("linked");
+		expect(
+			document.getElementById("task-42")?.classList.contains("linked"),
+		).toBe(true);
 	});
 
 	it("groups rows by status", async () => {

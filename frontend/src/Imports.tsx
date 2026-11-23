@@ -11,11 +11,14 @@ import { matchesQuery } from "./filter";
 import { useHashParam } from "./hashState";
 import { dayLabel, type ImportItem } from "./importItem";
 import { ImportReclassify } from "./importReclassify";
+import { useRowKeys } from "./keys";
 import {
 	EmptyState,
 	ErrorState,
 	FilterBox,
 	GroupHead,
+	Kbd,
+	ListHints,
 	Loading,
 	NoMatches,
 	PageHeader,
@@ -151,11 +154,29 @@ export function Imports({
 		typeFilter === "all"
 			? queryFiltered
 			: queryFiltered.filter((it) => itemType(it) === typeFilter);
+	// The order rows appear on screen (newest day first), which is the cursor's order.
+	const cursorRows = newestFirst(shown);
 	useAnnounceCount(
 		shown.length,
 		items?.length ?? 0,
 		limit == null && items != null && (query !== "" || typeFilter !== "all"),
 	);
+
+	const { rowProps, setSel } = useRowKeys({
+		count: limit == null ? cursorRows.length : 0,
+		enabled: limit == null,
+		actions: {
+			i: (i) => {
+				const it = cursorRows[i];
+				if (it && !it.missing && it.import_target !== "review")
+					act(it.id, "POST");
+			},
+		},
+	});
+	const linkedIndex = cursorRows.findIndex((it) => it.id === linkedId);
+	useEffect(() => {
+		if (linkedIndex >= 0) setSel(linkedIndex);
+	}, [linkedIndex, setSel]);
 
 	if (limit != null) {
 		if (!items)
@@ -209,6 +230,11 @@ export function Imports({
 		else groups.push({ key, label: dayLabel(it.created_at), rows: [it] });
 	}
 
+	const indexOf = new Map(cursorRows.map((it, i) => [it.id, i]));
+	const canImport = (it: ImportItem) =>
+		!it.missing && it.import_target !== "review";
+	const bulk = cursorRows.filter((it) => it.matched && canImport(it));
+
 	const typeLabel = TYPE_LABELS.find(([k]) => k === typeFilter)?.[1];
 	let content: ReactNode;
 	if (!items)
@@ -233,18 +259,35 @@ export function Imports({
 			/>
 		);
 	else
-		content = groups.map((g, i) => (
-			<section key={g.key} className="import-day">
-				<GroupHead title={g.label} count={g.rows.length} />
-				<ImportTable
-					rows={g.rows}
-					linkedId={linkedId}
-					act={act}
-					refresh={refresh}
-					head={i === 0}
+		content = (
+			<>
+				<ImportHead />
+				{groups.map((g) => (
+					<section key={g.key} className="import-day">
+						<GroupHead title={g.label} count={g.rows.length} />
+						<ImportTable
+							rows={g.rows}
+							linkedId={linkedId}
+							act={act}
+							refresh={refresh}
+							head={false}
+							rowProps={(it) =>
+								rowProps(
+									indexOf.get(it.id) ?? -1,
+									it.id === linkedId ? "linked" : undefined,
+								)
+							}
+						/>
+					</section>
+				))}
+				<ListHints
+					items={[
+						["j/k", "move"],
+						["i", "import"],
+					]}
 				/>
-			</section>
-		));
+			</>
+		);
 
 	return (
 		<>
@@ -274,6 +317,16 @@ export function Imports({
 						]}
 					/>
 				)}
+				{bulk.length > 1 && (
+					<button
+						type="button"
+						onClick={() => {
+							for (const it of bulk) act(it.id, "POST");
+						}}
+					>
+						Import all matched ({bulk.length})
+					</button>
+				)}
 				<button type="button" onClick={scan} disabled={scanning}>
 					{scanning ? "Scanning…" : "Scan watch folder"}
 				</button>
@@ -290,31 +343,58 @@ function newestFirst(list: ImportItem[]): ImportItem[] {
 	);
 }
 
+const COLS = (
+	<colgroup>
+		<col />
+		<col className="c-match" />
+		<col className="c-import-actions" />
+	</colgroup>
+);
+
+// Day groups each get their own table, so the visible column header sits once above them all;
+// each group's table keeps a screen-reader header.
+function ImportHead() {
+	return (
+		<table
+			className="rows tall no-cover import-table head-only"
+			aria-hidden="true"
+		>
+			{COLS}
+			<thead>
+				<tr>
+					<th>Name</th>
+					<th>Match</th>
+					<th>Type</th>
+				</tr>
+			</thead>
+		</table>
+	);
+}
+
+type RowProps = ReturnType<ReturnType<typeof useRowKeys>["rowProps"]>;
+
 function ImportTable({
 	rows,
 	linkedId,
 	act,
 	refresh,
 	head,
+	rowProps,
 }: {
 	rows: ImportItem[];
 	linkedId: number;
 	act: (id: number, method: "POST" | "DELETE") => void;
 	refresh: () => void;
 	head: boolean;
+	rowProps?: (it: ImportItem) => RowProps;
 }) {
 	return (
 		<table className="rows tall no-cover import-table">
-			<colgroup>
-				<col />
-				<col className="c-matched" />
-				<col className="c-import-actions" />
-			</colgroup>
-			{/* Day groups each get a table; only the first shows its header, the rest keep it for screen readers. */}
+			{COLS}
 			<thead className={head ? undefined : "sr-thead"}>
 				<tr>
 					<th scope="col">Name</th>
-					<th scope="col">Matched</th>
+					<th scope="col">Match</th>
 					<th scope="col">Type</th>
 				</tr>
 			</thead>
@@ -323,11 +403,20 @@ function ImportTable({
 					<tr
 						key={it.id}
 						id={`import-${it.id}`}
-						className={it.id === linkedId ? "linked" : undefined}
+						{...(rowProps?.(it) ?? {
+							className: it.id === linkedId ? "linked" : undefined,
+						})}
 					>
 						<td className="cell-primary">
-							{it.name}
+							{/* Lead with the human-readable match; the raw release name moves to the meta line. */}
+							{it.matched ?? it.name}
 							<span className="row-meta">
+								{it.matched && (
+									<>
+										<span className="raw-name">{it.name}</span>
+										{" · "}
+									</>
+								)}
 								<span className="src">{it.source}</span>
 								{it.classification_detail && <> · {it.classification_detail}</>}
 								{it.destination_path && (
@@ -339,7 +428,7 @@ function ImportTable({
 							</span>
 						</td>
 						<td className="cell-secondary">
-							{it.matched ?? <span className="muted">no match</span>}
+							{!it.matched && <span className="muted">no match</span>}
 							{it.matched_owned && <StatusBadge tone="ok">owned</StatusBadge>}
 							{it.missing && (
 								<div className="missing-line">
@@ -367,6 +456,7 @@ function ImportTable({
 												onClick={() => act(it.id, "POST")}
 											>
 												Import
+												{rowProps && <Kbd>i</Kbd>}
 											</button>
 										))}
 								</span>

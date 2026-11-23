@@ -54,7 +54,7 @@ describe("Imports", () => {
 		render(<Imports />);
 		const row = (await screen.findByText("Matched download")).closest("tr");
 		expect(row?.id).toBe("import-42");
-		expect(row?.className).toBe("linked");
+		expect(row?.classList.contains("linked")).toBe(true);
 	});
 
 	it("shows the source, matched want, a no-match label and destination", async () => {

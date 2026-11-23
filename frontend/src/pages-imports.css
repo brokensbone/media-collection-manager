@@ -1,6 +1,13 @@
 /* Import, Tasks and the completed archive. */
-.rows col.c-matched {
-	width: 27%;
+.rows col.c-match {
+	width: 150px;
+}
+/* The column header shared by every group's table (see ImportHead / TaskHead). */
+table.head-only {
+	margin-bottom: var(--s1);
+}
+table.head-only thead th {
+	border-bottom: 0;
 }
 .rows col.c-import-actions {
 	width: 310px;
@@ -9,7 +16,7 @@
 	width: 96px;
 }
 .rows.tasks-table col.c-task-actions {
-	width: 420px;
+	width: 456px;
 }
 /* Left-aligned with a fixed status slot, so selects and buttons line up down the column. */
 .import-table div.row-actions,
@@ -31,7 +38,7 @@
 .tasks-table .row-actions .status {
 	margin-left: 0;
 }
-.import-table .cell-secondary > .status {
+.import-table .cell-secondary > .status:not(:first-child) {
 	margin-left: 6px;
 }
 .missing-line {

@@ -17,13 +17,15 @@ import {
 	whenTitle,
 } from "./importItem";
 import { ImportReclassify } from "./importReclassify";
-import { shouldIgnoreKey } from "./keys";
+import { shouldIgnoreKey, useRowKeys } from "./keys";
 import {
 	EmptyState,
 	ErrorState,
 	FilterBox,
 	GroupHead,
 	IMPORT_STATE_TONE,
+	Kbd,
+	ListHints,
 	Loading,
 	NoMatches,
 	PageHeader,
@@ -156,6 +158,32 @@ export function Tasks({
 		limit == null && items != null && query !== "",
 	);
 
+	const grouped = archive
+		? [{ label: "", states: [], rows: shown }]
+		: GROUPS.map((g) => ({
+				...g,
+				rows: shown.filter((it) => g.states.includes(it.state)),
+			})).filter((g) => g.rows.length > 0);
+	const cursorRows = grouped.flatMap((g) => g.rows);
+	const indexOf = new Map(cursorRows.map((it, i) => [it.id, i]));
+	const full = limit == null;
+	const { rowProps, setSel } = useRowKeys({
+		count: full ? cursorRows.length : 0,
+		enabled: full,
+		actions: {
+			r: (i) =>
+				cursorRows[i]?.state === "failed" && act(cursorRows[i].id, "POST"),
+			l: (i) =>
+				cursorRows[i]?.state === "failed" &&
+				cursorRows[i].error_detail &&
+				toggleLog(cursorRows[i].id),
+		},
+	});
+	const linkedIndex = cursorRows.findIndex((it) => it.id === linkedId);
+	useEffect(() => {
+		if (linkedIndex >= 0) setSel(linkedIndex);
+	}, [linkedIndex, setSel]);
+
 	const table = (list: ImportItem[], head = true) => (
 		<TaskTable
 			rows={list}
@@ -165,6 +193,15 @@ export function Tasks({
 			toggleLog={toggleLog}
 			act={act}
 			refresh={refresh}
+			rowProps={
+				full
+					? (it) =>
+							rowProps(
+								indexOf.get(it.id) ?? -1,
+								it.id === linkedId ? "linked" : undefined,
+							)
+					: undefined
+			}
 		/>
 	);
 
@@ -196,11 +233,16 @@ export function Tasks({
 		return table(active, false);
 	}
 
+	// Match the nav: the live view counts work still to do; completed rows count in their group.
+	const isActive = (it: ImportItem) => archive || ACTIVE.includes(it.state);
+	const total = items?.filter(isActive).length ?? 0;
+	const shownTotal = shown.filter(isActive).length;
 	const count = items
-		? query
-			? `${shown.length} of ${items.length}`
-			: items.length
+		? shownTotal === total
+			? total
+			: `${shownTotal} of ${total}`
 		: undefined;
+	const failedRows = shown.filter((it) => it.state === "failed");
 	const header = archive ? (
 		<PageHeader
 			title="Completed archive"
@@ -233,19 +275,44 @@ export function Tasks({
 		content = (
 			<NoMatches query={query} what={archive ? "the archive" : "Tasks"} />
 		);
-	else if (archive) content = table(shown);
+	else if (archive)
+		content = (
+			<>
+				{table(shown)}
+				<ListHints items={[["j/k", "move"]]} />
+			</>
+		);
 	else
-		content = GROUPS.map((g) => ({
-			...g,
-			rows: shown.filter((it) => g.states.includes(it.state)),
-		}))
-			.filter((g) => g.rows.length > 0)
-			.map((g, i) => (
-				<section key={g.label} className="task-group">
-					<GroupHead title={g.label} count={g.rows.length} tone={g.tone} />
-					{table(g.rows, i === 0)}
-				</section>
-			));
+		content = (
+			<>
+				<TaskHead />
+				{grouped.map((g) => (
+					<section key={g.label} className="task-group">
+						<GroupHead title={g.label} count={g.rows.length} tone={g.tone}>
+							{g.label === "Failed" && failedRows.length > 1 && (
+								<button
+									type="button"
+									onClick={() => {
+										for (const it of failedRows) act(it.id, "POST");
+									}}
+								>
+									Retry all failed ({failedRows.length})
+								</button>
+							)}
+						</GroupHead>
+						{table(g.rows, false)}
+					</section>
+				))}
+				<ListHints
+					items={[
+						["j/k", "move"],
+						["r", "retry"],
+						["l", "log"],
+						["Esc", "close log"],
+					]}
+				/>
+			</>
+		);
 
 	return (
 		<>
@@ -256,6 +323,35 @@ export function Tasks({
 	);
 }
 
+const COLS = (
+	<colgroup>
+		<col />
+		<col className="c-when" />
+		<col className="c-task-actions" />
+	</colgroup>
+);
+
+// Status groups each get their own table, so the visible column header sits once above them all.
+function TaskHead() {
+	return (
+		<table
+			className="rows tall no-cover tasks-table head-only"
+			aria-hidden="true"
+		>
+			{COLS}
+			<thead>
+				<tr>
+					<th>Name</th>
+					<th>When</th>
+					<th>Status</th>
+				</tr>
+			</thead>
+		</table>
+	);
+}
+
+type RowProps = ReturnType<ReturnType<typeof useRowKeys>["rowProps"]>;
+
 function TaskTable({
 	rows,
 	head,
@@ -264,9 +360,11 @@ function TaskTable({
 	toggleLog,
 	act,
 	refresh,
+	rowProps,
 }: {
 	rows: ImportItem[];
 	head: boolean;
+	rowProps?: (it: ImportItem) => RowProps;
 	linkedId: number;
 	openLog: number | null;
 	toggleLog: (id: number) => void;
@@ -275,12 +373,7 @@ function TaskTable({
 }) {
 	return (
 		<table className="rows tall no-cover tasks-table">
-			<colgroup>
-				<col />
-				<col className="c-when" />
-				<col className="c-task-actions" />
-			</colgroup>
-			{/* Status groups each get a table; only the first shows its header, the rest keep it for screen readers. */}
+			{COLS}
 			<thead className={head ? undefined : "sr-thead"}>
 				<tr>
 					<th scope="col">Name</th>
@@ -293,14 +386,21 @@ function TaskTable({
 					<Fragment key={it.id}>
 						<tr
 							id={`task-${it.id}`}
-							className={it.id === linkedId ? "linked" : undefined}
+							{...(rowProps?.(it) ?? {
+								className: it.id === linkedId ? "linked" : undefined,
+							})}
 						>
 							<td className="cell-primary">
-								{it.name}
+								{it.matched ?? it.name}
 								<span className="row-meta">
+									{it.matched && (
+										<>
+											<span className="raw-name">{it.name}</span>
+											{" · "}
+										</>
+									)}
 									<span className="src">{it.source}</span>
 									{` · ${labelKind(it.media_kind)}`}
-									{it.matched ? ` · ${it.matched}` : ""}
 									{it.destination_path && (
 										<>
 											{" · "}
@@ -334,10 +434,12 @@ function TaskTable({
 											{it.error_detail && (
 												<button
 													type="button"
+													className="btn-quiet"
 													aria-expanded={openLog === it.id}
 													onClick={() => toggleLog(it.id)}
 												>
 													{openLog === it.id ? "Hide log" : "Log"}
+													{rowProps && <Kbd>l</Kbd>}
 												</button>
 											)}
 											<button
@@ -346,6 +448,7 @@ function TaskTable({
 												onClick={() => act(it.id, "POST")}
 											>
 												Retry
+												{rowProps && <Kbd>r</Kbd>}
 											</button>
 											<button
 												type="button"
