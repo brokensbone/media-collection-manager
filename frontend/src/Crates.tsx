@@ -10,10 +10,12 @@ import {
 import { fetchJson } from "./api";
 import { matchesQuery } from "./filter";
 import { setHashParams, useHashParam, useQuery } from "./hashState";
+import { useRowKeys } from "./keys";
 import {
 	EmptyState,
 	ErrorState,
 	FilterBox,
+	ListHints,
 	Loading,
 	NoMatches,
 	PageHeader,
@@ -85,6 +87,8 @@ export function Crates() {
 	// null = the split panel is closed; an array (possibly empty) = suggestions have been fetched.
 	const [splits, setSplits] = useState<SplitCandidate[] | null>(null);
 	const selectAll = useRef<HTMLInputElement>(null);
+	// The last record toggled, by beets id: a shift-click selects everything between it and the next.
+	const anchor = useRef<string | null>(null);
 
 	const load = useCallback(() => {
 		setFailed(false);
@@ -104,7 +108,7 @@ export function Crates() {
 
 	useEffect(load, [load]);
 
-	usePageTitle(view ? `${view.name} · Crates` : null);
+	usePageTitle(view && view.parent_id != null ? `${view.name} · Crates` : null);
 
 	const records = view?.records ?? [];
 	const shown = records.filter((r) =>
@@ -117,6 +121,43 @@ export function Crates() {
 	const allSelected = shown.length > 0 && ids.length === shown.length;
 
 	useAnnounceCount(shown.length, records.length, view != null && !!query);
+
+	const toggleAt = (i: number, range = false) => {
+		const target = shown[i];
+		if (!target) return;
+		const on = !selected.has(target.beets_id);
+		const from = range
+			? shown.findIndex((r) => r.beets_id === anchor.current)
+			: -1;
+		const span =
+			from === -1
+				? [target]
+				: shown.slice(Math.min(from, i), Math.max(from, i) + 1);
+		anchor.current = target.beets_id;
+		setSelected((prev) => {
+			const next = new Set(prev);
+			for (const r of span)
+				if (on) next.add(r.beets_id);
+				else next.delete(r.beets_id);
+			return next;
+		});
+	};
+
+	const { rowProps } = useRowKeys({
+		count: shown.length,
+		actions: {
+			" ": (i) => {
+				// Leave space to a focused control (checkbox, button) so it doesn't toggle twice.
+				if (
+					(document.activeElement as HTMLElement | null)?.closest?.(
+						"button, a, input, select",
+					)
+				)
+					return false;
+				toggleAt(i);
+			},
+		},
+	});
 
 	useEffect(() => {
 		if (selectAll.current)
@@ -156,15 +197,6 @@ export function Crates() {
 			</>
 		);
 
-	const toggle = (beetsId: string) => {
-		setSelected((prev) => {
-			const next = new Set(prev);
-			if (next.has(beetsId)) next.delete(beetsId);
-			else next.add(beetsId);
-			return next;
-		});
-	};
-
 	const toggleAll = () => {
 		setSelected((prev) => {
 			const next = new Set(prev);
@@ -176,9 +208,9 @@ export function Crates() {
 	};
 
 	// The checkbox is the keyboard path; a click anywhere else on the row is a shortcut to it.
-	const onRowClick = (e: MouseEvent, beetsId: string) => {
+	const onRowClick = (e: MouseEvent, i: number) => {
 		if ((e.target as HTMLElement).closest("input, a, button, label")) return;
-		toggle(beetsId);
+		toggleAt(i, e.shiftKey);
 	};
 
 	const createSub = async () => {
@@ -275,7 +307,7 @@ export function Crates() {
 		loose = <NoMatches query={query} what="this crate’s loose records" />;
 	else
 		loose = (
-			<table className="rows compact crate-table">
+			<table className="rows compact crate-table sticky-head">
 				<colgroup>
 					<col className="c-check" />
 					<col className="c-artist" />
@@ -299,21 +331,22 @@ export function Crates() {
 					</tr>
 				</thead>
 				<tbody>
-					{shown.map((r) => {
+					{shown.map((r, i) => {
 						const on = selected.has(r.beets_id);
 						return (
 							<tr
 								key={r.beets_id}
-								className={on ? "sel" : undefined}
+								{...rowProps(i, on ? "checked" : undefined)}
 								aria-selected={on || undefined}
-								onClick={(e) => onRowClick(e, r.beets_id)}
+								onClick={(e) => onRowClick(e, i)}
 							>
 								<td className="cell-check">
 									<input
 										type="checkbox"
 										aria-label={`Select ${r.artist} — ${r.title}`}
 										checked={on}
-										onChange={() => toggle(r.beets_id)}
+										readOnly
+										onClick={(e) => toggleAt(i, e.shiftKey)}
 									/>
 								</td>
 								<td className="cell-primary">{r.artist}</td>
@@ -329,9 +362,9 @@ export function Crates() {
 		);
 
 	return (
-		<section className="crates">
+		<section className={ids.length > 0 ? "crates has-selection" : "crates"}>
 			<PageHeader
-				title={view.name}
+				title={isRoot ? "Crates" : view.name}
 				count={view.total_count}
 				filter={<FilterBox />}
 				above={
@@ -350,7 +383,7 @@ export function Crates() {
 													c.id === view.breadcrumb[0].id ? null : c.id,
 												)}
 											>
-												{c.name}
+												{c.id === view.breadcrumb[0].id ? "Crates" : c.name}
 											</a>
 										)}
 									</li>
@@ -425,7 +458,7 @@ export function Crates() {
 					</button>
 				</div>
 				<button type="button" className="suggest-split" onClick={suggestSplit}>
-					✨ Suggest a split
+					Suggest a split
 				</button>
 			</div>
 
@@ -458,47 +491,65 @@ export function Crates() {
 				</span>
 			</h2>
 
-			{ids.length > 0 && (
-				<div className="move-bar">
-					<span className="move-count">{ids.length} selected</span>
-					<button type="button" onClick={kickUp} disabled={isRoot}>
-						Kick up
-					</button>
-					{view.children.length > 0 && (
-						<label className="move-to">
-							Move to{" "}
-							<select
-								value=""
-								onChange={(e) =>
-									e.target.value && fileInto(Number(e.target.value))
-								}
-							>
-								<option value="">a sub-box…</option>
-								{view.children.map((c) => (
-									<option key={c.id} value={c.id}>
-										{c.name}
-									</option>
-								))}
-							</select>
-						</label>
+			{/* Always rendered so selecting a record never pushes the rows down. */}
+			{shown.length > 0 && (
+				<div className={ids.length > 0 ? "move-bar active" : "move-bar"}>
+					{ids.length === 0 ? (
+						<span className="move-hint">
+							Select records to file them. Shift-click selects a range.
+						</span>
+					) : (
+						<>
+							<span className="move-count">{ids.length} selected</span>
+							<button type="button" onClick={kickUp} disabled={isRoot}>
+								Kick up
+							</button>
+							{view.children.length > 0 && (
+								<label className="move-to">
+									Move to{" "}
+									<select
+										value=""
+										onChange={(e) =>
+											e.target.value && fileInto(Number(e.target.value))
+										}
+									>
+										<option value="">a sub-box…</option>
+										{view.children.map((c) => (
+											<option key={c.id} value={c.id}>
+												{c.name}
+											</option>
+										))}
+									</select>
+								</label>
+							)}
+							<span className="move-new">
+								<input
+									type="text"
+									aria-label="New box name"
+									placeholder="or a new box…"
+									value={newTarget}
+									onChange={(e) => setNewTarget(e.target.value)}
+									onKeyDown={(e) => e.key === "Enter" && fileNew()}
+								/>
+								<button type="button" onClick={fileNew}>
+									Move
+								</button>
+							</span>
+						</>
 					)}
-					<span className="move-new">
-						<input
-							type="text"
-							aria-label="New box name"
-							placeholder="or a new box…"
-							value={newTarget}
-							onChange={(e) => setNewTarget(e.target.value)}
-							onKeyDown={(e) => e.key === "Enter" && fileNew()}
-						/>
-						<button type="button" onClick={fileNew}>
-							Move
-						</button>
-					</span>
 				</div>
 			)}
 
 			{loose}
+			{shown.length > 0 && (
+				<ListHints
+					items={[
+						["j/k", "move"],
+						["space", "select"],
+						["shift-click", "select a range"],
+					]}
+				/>
+			)}
 		</section>
 	);
 }

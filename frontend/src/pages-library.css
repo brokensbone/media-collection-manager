@@ -172,7 +172,7 @@ h2.crate-section {
 	min-height: var(--ctl);
 	padding: 0 10px;
 	border: 1px solid var(--border);
-	border-radius: 999px;
+	border-radius: var(--r);
 	background: var(--surface);
 	color: var(--text);
 }
@@ -231,17 +231,48 @@ h2.crate-section {
 	align-items: center;
 	flex-wrap: wrap;
 	gap: var(--s2) var(--s3);
+	min-height: 46px;
 	padding: var(--s2) var(--s3);
-	margin-bottom: var(--s2);
 	border: 1px solid var(--border);
 	border-radius: var(--r);
+	background: var(--bg);
+}
+.move-bar.active {
 	background: var(--accent-soft);
+}
+.move-hint {
+	font-size: var(--fs-meta);
+	color: var(--muted);
 }
 @media (min-width: 720px) {
 	.move-bar {
 		position: sticky;
 		top: var(--header-h);
 		z-index: 6;
+		height: 46px;
+	}
+	/* The column header sticks under the bar. */
+	table.rows.crate-table.sticky-head thead th {
+		top: calc(var(--header-h) + 46px);
+	}
+}
+/* On a phone the bar only appears with a selection, pinned to the bottom so it stays in reach. */
+@media (max-width: 719.98px) {
+	.move-bar:not(.active) {
+		display: none;
+	}
+	.move-bar.active {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 30;
+		border-width: 1px 0 0;
+		border-radius: 0;
+		padding: var(--s2) var(--s4) calc(var(--s2) + env(safe-area-inset-bottom));
+	}
+	.crates.has-selection {
+		padding-bottom: 140px;
 	}
 }
 .move-count {
@@ -295,4 +326,8 @@ h2.crate-section {
 		content: " — ";
 		color: var(--muted);
 	}
+}
+/* Checked rows carry the tint; the keyboard cursor there is only the bar, so the two stay distinct. */
+.crate-table tbody tr.sel:not(.checked):not(:hover) td {
+	background: none;
 }

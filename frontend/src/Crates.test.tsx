@@ -53,9 +53,7 @@ describe("Crates", () => {
 	it("shows the box, its sub-boxes with counts, and loose records", async () => {
 		mockCrates(boxView());
 		render(<Crates />);
-		expect(
-			await screen.findByRole("heading", { name: "Collection" }),
-		).toBeTruthy();
+		expect(await screen.findByRole("heading", { name: "Crates" })).toBeTruthy();
 		expect(screen.getByText("Electronic")).toBeTruthy();
 		expect(screen.getByText("12")).toBeTruthy(); // sub-box total count
 		expect(screen.getByText("Burial")).toBeTruthy();
@@ -74,10 +72,30 @@ describe("Crates", () => {
 		expect(kick.disabled).toBe(true); // root has no parent
 	});
 
+	it("selects a range with shift-click and toggles the cursor row with space", async () => {
+		const records = ["A", "B", "C", "D"].map((t, i) => ({
+			beets_id: `b${i}`,
+			artist: `Artist ${t}`,
+			title: t,
+			year: null,
+			media: null,
+		}));
+		mockCrates(boxView({ records }));
+		render(<Crates />);
+		await screen.findByText("Artist A");
+		fireEvent.click(screen.getByLabelText("Select Artist B — B"));
+		fireEvent.click(screen.getByLabelText("Select Artist D — D"), {
+			shiftKey: true,
+		});
+		expect(screen.getByText("3 selected")).toBeTruthy();
+		fireEvent.keyDown(document.body, { key: " " });
+		expect(screen.getByText("4 selected")).toBeTruthy();
+	});
+
 	it("creates a sub-box via POST /crates/box under the current box", async () => {
 		const fetchMock = mockCrates(boxView());
 		render(<Crates />);
-		await screen.findByRole("heading", { name: "Collection" });
+		await screen.findByRole("heading", { name: "Crates" });
 		fireEvent.change(screen.getByPlaceholderText("new sub-box…"), {
 			target: { value: "Jazz" },
 		});
@@ -123,8 +141,8 @@ describe("Crates", () => {
 		vi.stubGlobal("fetch", fetchMock);
 
 		render(<Crates />);
-		await screen.findByRole("heading", { name: "Collection" });
-		fireEvent.click(screen.getByRole("button", { name: "✨ Suggest a split" }));
+		await screen.findByRole("heading", { name: "Crates" });
+		fireEvent.click(screen.getByRole("button", { name: "Suggest a split" }));
 
 		expect(await screen.findByText(/2000s \(24\)/)).toBeTruthy();
 		expect(screen.getByText(/leaves 12/)).toBeTruthy();
@@ -149,8 +167,8 @@ describe("Crates", () => {
 		vi.stubGlobal("fetch", fetchMock);
 
 		render(<Crates />);
-		await screen.findByRole("heading", { name: "Collection" });
-		fireEvent.click(screen.getByRole("button", { name: "✨ Suggest a split" }));
+		await screen.findByRole("heading", { name: "Crates" });
+		fireEvent.click(screen.getByRole("button", { name: "Suggest a split" }));
 		expect(
 			await screen.findByText("No clean split found — file by hand."),
 		).toBeTruthy();
@@ -192,7 +210,7 @@ describe("Crates", () => {
 			await screen.findByRole("heading", { level: 1, name: "Electronic" }),
 		).toBeTruthy();
 		expect(
-			screen.getByRole("link", { name: "Collection" }).getAttribute("href"),
+			screen.getByRole("link", { name: "Crates" }).getAttribute("href"),
 		).toBe("#crates");
 		expect(
 			screen.getByRole("link", { name: /Ambient/ }).getAttribute("href"),
