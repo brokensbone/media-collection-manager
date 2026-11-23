@@ -242,7 +242,6 @@ export function Tasks({
 			? total
 			: `${shownTotal} of ${total}`
 		: undefined;
-	const failedRows = shown.filter((it) => it.state === "failed");
 	const header = archive ? (
 		<PageHeader
 			title="Completed archive"
@@ -288,18 +287,7 @@ export function Tasks({
 				<TaskHead />
 				{grouped.map((g) => (
 					<section key={g.label} className="task-group">
-						<GroupHead title={g.label} count={g.rows.length} tone={g.tone}>
-							{g.label === "Failed" && failedRows.length > 1 && (
-								<button
-									type="button"
-									onClick={() => {
-										for (const it of failedRows) act(it.id, "POST");
-									}}
-								>
-									Retry all failed ({failedRows.length})
-								</button>
-							)}
-						</GroupHead>
+						<GroupHead title={g.label} count={g.rows.length} tone={g.tone} />
 						{table(g.rows, false)}
 					</section>
 				))}

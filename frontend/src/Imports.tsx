@@ -231,9 +231,6 @@ export function Imports({
 	}
 
 	const indexOf = new Map(cursorRows.map((it, i) => [it.id, i]));
-	const canImport = (it: ImportItem) =>
-		!it.missing && it.import_target !== "review";
-	const bulk = cursorRows.filter((it) => it.matched && canImport(it));
 
 	const typeLabel = TYPE_LABELS.find(([k]) => k === typeFilter)?.[1];
 	let content: ReactNode;
@@ -316,16 +313,6 @@ export function Imports({
 							})),
 						]}
 					/>
-				)}
-				{bulk.length > 1 && (
-					<button
-						type="button"
-						onClick={() => {
-							for (const it of bulk) act(it.id, "POST");
-						}}
-					>
-						Import all matched ({bulk.length})
-					</button>
 				)}
 				<button type="button" onClick={scan} disabled={scanning}>
 					{scanning ? "Scanning…" : "Scan watch folder"}
