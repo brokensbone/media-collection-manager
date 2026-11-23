@@ -1,7 +1,7 @@
 /* Design tokens and shared primitives. Pages add only layout specific to them. */
 :root {
 	color-scheme: light dark;
-	--font-sans: "Inter Variable", Inter, system-ui, sans-serif;
+	--font-sans: "Geist Variable", system-ui, sans-serif;
 	--font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
 	--fs-title: 20px;
@@ -172,7 +172,7 @@ button:disabled:hover {
 	background: var(--accent);
 	border-color: var(--accent);
 	color: var(--on-accent);
-	font-weight: 600;
+	font-weight: 500;
 }
 .btn-primary:hover {
 	background: var(--accent);
@@ -354,7 +354,7 @@ input[type="file"]::file-selector-button:hover {
 }
 .nav-link[aria-current="page"] {
 	color: var(--text);
-	font-weight: 600;
+	font-weight: 500;
 }
 .nav-link[aria-current="page"]::after {
 	content: "";
@@ -375,7 +375,7 @@ input[type="file"]::file-selector-button:hover {
 }
 .nav-funnel .nav-count {
 	color: var(--text);
-	font-weight: 600;
+	font-weight: 500;
 }
 .header-status {
 	display: flex;
@@ -495,7 +495,7 @@ input[type="file"]::file-selector-button:hover {
 }
 .group-count {
 	font-size: var(--fs-section);
-	font-weight: 600;
+	font-weight: 500;
 	color: var(--muted);
 	font-variant-numeric: tabular-nums;
 }
@@ -534,7 +534,7 @@ th {
 	text-align: left;
 	font-size: var(--fs-section);
 	line-height: 16px;
-	font-weight: 600;
+	font-weight: 500;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	color: var(--muted);
@@ -627,7 +627,7 @@ table.rows.compact td {
 	opacity: 0.8;
 }
 .cell-primary {
-	font-weight: 600;
+	font-weight: 500;
 }
 .cell-meta {
 	font-size: var(--fs-meta);
@@ -798,7 +798,7 @@ div.row-actions {
 .seg-item[aria-current] {
 	background: var(--bg);
 	color: var(--text);
-	font-weight: 600;
+	font-weight: 500;
 	box-shadow: 0 0 0 1px var(--border);
 }
 .seg-count {
@@ -829,7 +829,7 @@ div.row-actions {
 	color: var(--muted);
 }
 .status {
-	font-weight: 600;
+	font-weight: 500;
 	color: var(--muted);
 	background: var(--surface-2);
 }
@@ -931,7 +931,7 @@ tr.sel .row-actions .kbd {
 }
 .state-title {
 	margin: 0;
-	font-weight: 600;
+	font-weight: 500;
 	color: var(--text);
 }
 .state-error .state-title {

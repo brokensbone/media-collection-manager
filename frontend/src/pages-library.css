@@ -34,7 +34,7 @@
 	background: var(--bg);
 	color: var(--muted);
 	font-size: 10px;
-	font-weight: 700;
+	font-weight: 600;
 	line-height: 1;
 	letter-spacing: 0.02em;
 }
@@ -182,7 +182,7 @@ h2.crate-section {
 	color: var(--accent);
 }
 .chip-name {
-	font-weight: 600;
+	font-weight: 500;
 }
 .chip-count {
 	font-size: var(--fs-meta);
@@ -276,7 +276,7 @@ h2.crate-section {
 	}
 }
 .move-count {
-	font-weight: 600;
+	font-weight: 500;
 	font-variant-numeric: tabular-nums;
 }
 .move-to,
