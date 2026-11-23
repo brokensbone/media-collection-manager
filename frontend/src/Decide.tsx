@@ -17,9 +17,11 @@ type Action = "keep" | "drop" | "snooze";
 export function Decide({
 	onChange,
 	query = "",
+	limit,
 }: {
 	onChange?: () => void;
 	query?: string;
+	limit?: number;
 }) {
 	const [items, setItems] = useState<Item[] | null>(null);
 	const [sel, setSel] = useState(0);
@@ -86,11 +88,13 @@ export function Decide({
 	if (!items) return <p>Loading…</p>;
 	if (items.length === 0) return <p>Nothing to judge.</p>;
 
-	const shown = items.filter(
-		(it) =>
-			(scope === "all" || it.release_year === year) &&
-			matchesQuery(`${it.artist} ${it.title}`, query),
-	);
+	const shown = items
+		.filter(
+			(it) =>
+				(scope === "all" || it.release_year === year) &&
+				matchesQuery(`${it.artist} ${it.title}`, query),
+		)
+		.slice(0, limit);
 	const cur = Math.min(sel, shown.length - 1);
 
 	return (

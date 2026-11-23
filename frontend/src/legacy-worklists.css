@@ -1,0 +1,110 @@
+/* Legacy rules for Releases, Decide, Acquire, Cover and Modal, moved verbatim from styles.css. Group 1 deletes this file. */
+.cover-cell {
+	width: 44px;
+	padding: 4px 8px 4px 0;
+}
+.cover {
+	width: 44px;
+	height: 44px;
+	object-fit: cover;
+	display: block;
+}
+.cover-empty {
+	background: var(--surface);
+	border: 1px solid var(--border);
+}
+.decide-scope {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin: 1rem 0;
+}
+
+.decide-scope button[aria-pressed="true"] {
+	border-color: var(--accent);
+	color: var(--accent);
+}
+.acquire-links {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+}
+.acquire-trackers {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+.acquire-actions {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 6px;
+}
+.acquire-actions button {
+	width: 100%;
+	margin-right: 0;
+}
+@media (max-width: 1280px) {
+	col.acquire-artist-col {
+		width: 168px;
+	}
+	col.acquire-link-col {
+		width: 86px;
+	}
+	col.acquire-actions-col {
+		width: 124px;
+	}
+}
+.candidates {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 4px;
+	margin-top: 6px;
+	max-height: 320px;
+	overflow-y: auto;
+}
+.candidates button {
+	text-align: left;
+}
+.modal-backdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.5);
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	padding: 10vh 16px;
+	z-index: 10;
+}
+.modal {
+	position: static;
+	margin: 0;
+	inset: auto;
+	color: var(--text);
+	background: var(--bg);
+	border: 1px solid var(--border);
+	padding: 14px;
+	width: 100%;
+	max-width: 520px;
+}
+.modal-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	margin-bottom: 10px;
+}
+.modal-actions {
+	margin-top: 12px;
+	border-top: 1px solid var(--border);
+	padding-top: 10px;
+}
+/* Linked cover (opens the album on Spotify) */
+.cover-cell a {
+	display: inline-block;
+	cursor: pointer;
+}
+.cover-cell a:hover .cover {
+	opacity: 0.8;
+}

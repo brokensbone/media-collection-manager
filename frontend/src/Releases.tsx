@@ -15,9 +15,11 @@ type Action = "save" | "want" | "dismiss";
 export function Releases({
 	onChange,
 	query = "",
+	limit,
 }: {
 	onChange?: () => void;
 	query?: string;
+	limit?: number;
 }) {
 	const [items, setItems] = useState<Item[] | null>(null);
 
@@ -44,9 +46,9 @@ export function Releases({
 	if (!items) return <p>Loading…</p>;
 	if (items.length === 0) return <p>No new releases.</p>;
 
-	const shown = items.filter((it) =>
-		matchesQuery(`${it.artist} ${it.title}`, query),
-	);
+	const shown = items
+		.filter((it) => matchesQuery(`${it.artist} ${it.title}`, query))
+		.slice(0, limit);
 
 	return (
 		<table className="mobile-card-table">

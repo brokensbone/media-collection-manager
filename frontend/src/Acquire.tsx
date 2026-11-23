@@ -53,9 +53,11 @@ const ORPHEUS_PARAMS = {
 export function Acquire({
 	onChange,
 	query = "",
+	limit,
 }: {
 	onChange?: () => void;
 	query?: string;
+	limit?: number;
 }) {
 	const [items, setItems] = useState<Item[] | null>(null);
 	const [owning, setOwning] = useState<Item | null>(null); // the album being marked owned
@@ -124,9 +126,9 @@ export function Acquire({
 	if (!items) return <p>Loading…</p>;
 	if (items.length === 0) return <p>Nothing to acquire.</p>;
 
-	const shown = items.filter((it) =>
-		matchesQuery(`${it.artist} ${it.title}`, query),
-	);
+	const shown = items
+		.filter((it) => matchesQuery(`${it.artist} ${it.title}`, query))
+		.slice(0, limit);
 
 	return (
 		<>

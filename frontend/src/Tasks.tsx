@@ -29,10 +29,12 @@ export function Tasks({
 	onChange,
 	query = "",
 	archive = false,
+	limit,
 }: {
 	onChange?: () => void;
 	query?: string;
 	archive?: boolean;
+	limit?: number;
 }) {
 	const [items, setItems] = useState<ImportItem[] | null>(null);
 	// The expanded failure log is mirrored in the URL (#tasks?log=42) so a specific failure is
@@ -123,13 +125,15 @@ export function Tasks({
 
 	if (!items) return <p>Loading…</p>;
 
-	const shown = query
-		? items.filter((it) =>
-				`${it.name} ${it.matched ?? ""}`
-					.toLowerCase()
-					.includes(query.toLowerCase()),
-			)
-		: items;
+	const shown = (
+		query
+			? items.filter((it) =>
+					`${it.name} ${it.matched ?? ""}`
+						.toLowerCase()
+						.includes(query.toLowerCase()),
+				)
+			: items
+	).slice(0, limit);
 
 	const rows = (list: ImportItem[]) => (
 		<table className="mobile-card-table tasks-table">

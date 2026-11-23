@@ -26,9 +26,11 @@ function itemType(it: ImportItem): ItemType {
 export function Imports({
 	onChange,
 	query = "",
+	limit,
 }: {
 	onChange?: () => void;
 	query?: string;
+	limit?: number;
 }) {
 	const [items, setItems] = useState<ImportItem[] | null>(null);
 	const [scanning, setScanning] = useState(false);
@@ -138,9 +140,9 @@ export function Imports({
 
 	// Partition into discovery-day groups, newest first, so freshly-added drops are easy to find
 	// instead of scattering alphabetically. created_at is immutable, so this order never reshuffles.
-	const sorted = [...shown].sort((a, b) =>
-		(b.created_at ?? "").localeCompare(a.created_at ?? ""),
-	);
+	const sorted = [...shown]
+		.sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))
+		.slice(0, limit);
 	const groups: { key: string; label: string; rows: ImportItem[] }[] = [];
 	for (const it of sorted) {
 		const key = it.created_at

@@ -1,238 +1,174 @@
 import "./styles.css";
+import "./legacy-worklists.css";
+import "./legacy-imports.css";
+import "./legacy-library.css";
+import "./legacy-tools.css";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { Acquire } from "./Acquire";
 import { Activity } from "./Activity";
 import { Crates } from "./Crates";
-import { Dashboard, type Section } from "./Dashboard";
+import { type Dash, useDashboard } from "./Dashboard";
 import { Decide } from "./Decide";
 import { Guide } from "./Guide";
+import { parseHash, setHashPath, useHash, useQuery } from "./hashState";
 import { Imports } from "./Imports";
+import { shouldIgnoreKey } from "./keys";
 import { Library } from "./Library";
+import { NAV_LABELS, Nav, type NavKey } from "./Nav";
+import { Overview } from "./Overview";
 import { Owned } from "./Owned";
 import { Radio } from "./Radio";
 import { Releases } from "./Releases";
-import { SpotifyStatus } from "./SpotifyStatus";
 import { Tasks } from "./Tasks";
 import { Transmission } from "./Transmission";
+import { FilterBox, LiveRegion, PageHeader, usePageTitleOverride } from "./ui";
 
-// 'archive' is the completed-imports archive — reached only from a link inside the Tasks view,
-// not the tile row or the top nav.
-type View =
-	| "app"
-	| "guide"
-	| "transmission"
-	| "activity"
-	| "archive"
-	| "crates"
-	| "radio";
+type View = NavKey | "archive";
 
-const SECTIONS: Section[] = [
-	"all",
+// Views whose component renders its own PageHeader. A page group adds its views here when it
+// migrates; every other view gets the temporary header below.
+const MIGRATED = new Set<View>(["all"]);
+
+// Temporary headers for views that have not migrated yet. null = the view already renders its
+// own h1 (Guide, Radio), so a second one would only duplicate it.
+const TEMP_HEADER: Record<View, { title: string; filter: boolean } | null> = {
+	all: { title: "Overview", filter: true },
+	releases: { title: "Releases", filter: true },
+	decide: { title: "Decide", filter: true },
+	acquire: { title: "Acquire", filter: true },
+	import: { title: "Import", filter: true },
+	tasks: { title: "Tasks", filter: true },
+	archive: { title: "Completed archive", filter: true },
+	owned: { title: "Owned", filter: true },
+	dismissed: { title: "Dismissed", filter: true },
+	crates: { title: "Crates", filter: false },
+	radio: null,
+	transmission: { title: "Transmission", filter: false },
+	activity: { title: "Activity", filter: false },
+	guide: null,
+};
+
+const VIEWS = new Set<string>(Object.keys(TEMP_HEADER));
+const WORKLISTS = new Set<View>([
 	"releases",
 	"decide",
 	"acquire",
 	"import",
 	"tasks",
-	"owned",
-	"dismissed",
-];
+]);
 
-// The active tab lives in the URL hash (#guide, #transmission, #acquire, …) so a refresh or
-// a shared link restores the same view. A view may carry a query (e.g. #tasks?log=42 deep-links
-// a failure log), so match on the path part before '?'.
-function readHash(): {
-	view: View;
-	section: Section;
-	radioDate: string | null;
-} {
-	const h = window.location.hash.replace(/^#/, "").split("?")[0];
-	if (h === "guide") return { view: "guide", section: "all", radioDate: null };
-	if (h === "transmission")
-		return { view: "transmission", section: "all", radioDate: null };
-	if (h === "activity")
-		return { view: "activity", section: "all", radioDate: null };
-	if (h === "archive")
-		return { view: "archive", section: "all", radioDate: null };
-	if (h === "crates")
-		return { view: "crates", section: "all", radioDate: null };
-	if (h === "radio") return { view: "radio", section: "all", radioDate: null };
-	const radioDate = h.match(/^radio\/(\d{4}-\d{2}-\d{2})$/)?.[1];
-	if (radioDate) return { view: "radio", section: "all", radioDate };
-	if ((SECTIONS as string[]).includes(h))
-		return { view: "app", section: h as Section, radioDate: null };
-	return { view: "app", section: "all", radioDate: null };
+// Unknown paths (and the empty hash) fall back to the Overview.
+function route(path: string): { view: View; radioDate: string | null } {
+	const radioDate = path.match(/^radio\/(\d{4}-\d{2}-\d{2})$/)?.[1];
+	if (radioDate) return { view: "radio", radioDate };
+	if (VIEWS.has(path)) return { view: path as View, radioDate: null };
+	return { view: "all", radioDate: null };
+}
+
+function formatDay(date: string): string {
+	return new Date(`${date}T00:00:00`).toLocaleDateString("en-GB", {
+		weekday: "short",
+		day: "numeric",
+		month: "short",
+	});
+}
+
+function pageTitle(
+	view: View,
+	radioDate: string | null,
+	counts: Dash | null,
+): string {
+	if (view === "archive") return "Completed archive · Tasks";
+	const label = NAV_LABELS[view];
+	if (view === "radio" && radioDate) return `${label} ${formatDay(radioDate)}`;
+	const n = WORKLISTS.has(view) ? counts?.[view as keyof Dash] : undefined;
+	return n ? `${label} (${n})` : label;
 }
 
 export default function App() {
-	const [view, setView] = useState<View>(() => readHash().view);
-	const [section, setSection] = useState<Section>(() => readHash().section);
-	const [radioDate, setRadioDate] = useState<string | null>(
-		() => readHash().radioDate,
-	);
-	const [query, setQuery] = useState("");
-
-	useEffect(() => {
-		const target =
-			view === "app"
-				? section
-				: view === "radio" && radioDate
-					? `radio/${radioDate}`
-					: view;
-		// Compare only the path part: a view is free to keep its own query (e.g. #tasks?log=42), and
-		// rewriting it here would clobber that. Only write when the actual view/section changed.
-		if (window.location.hash.replace(/^#/, "").split("?")[0] !== target) {
-			window.location.hash = target;
-		}
-	}, [view, section, radioDate]);
-
-	useEffect(() => {
-		function onHash() {
-			const r = readHash();
-			setView(r.view);
-			setSection(r.section);
-			setRadioDate(r.radioDate);
-			if (
-				(r.section === "import" || r.section === "tasks") &&
-				window.location.hash.includes("?item=")
-			)
-				setQuery("");
-		}
-		window.addEventListener("hashchange", onHash);
-		return () => window.removeEventListener("hashchange", onHash);
-	}, []);
+	const path = parseHash(useHash()).path;
+	const { view, radioDate } = route(path);
+	const query = useQuery();
 	// Any worklist action bumps this; the count/browse views refetch when it changes.
 	const [refresh, setRefresh] = useState(0);
 	const bump = useCallback(() => setRefresh((n) => n + 1), []);
+	const counts = useDashboard(refresh);
+	const titleOverride = usePageTitleOverride();
 
-	const sections: { key: Section; heading: string; node: ReactNode }[] = [
-		{
-			key: "releases",
-			heading: "Releases",
-			node: <Releases onChange={bump} query={query} />,
-		},
-		{
-			key: "decide",
-			heading: "Decide",
-			node: <Decide onChange={bump} query={query} />,
-		},
-		{
-			key: "acquire",
-			heading: "Acquire",
-			node: <Acquire onChange={bump} query={query} />,
-		},
-		{
-			key: "import",
-			heading: "Import",
-			node: <Imports onChange={bump} query={query} />,
-		},
-		{
-			key: "tasks",
-			heading: "Tasks",
-			node: <Tasks onChange={bump} query={query} />,
-		},
-		{
-			key: "owned",
-			heading: "Owned",
-			node: <Owned refreshKey={refresh} query={query} />,
-		},
-		{
-			key: "dismissed",
-			heading: "Dismissed",
-			node: <Library state="dismissed" refreshKey={refresh} query={query} />,
-		},
-	];
+	const known = view !== "all" || path === "all";
+	useEffect(() => {
+		if (!known) setHashPath("all", { replace: true });
+	}, [known]);
+
+	useEffect(() => {
+		document.title = `${titleOverride ?? pageTitle(view, radioDate, counts)} · mcm`;
+	}, [view, radioDate, counts, titleOverride]);
+
+	useEffect(() => {
+		function onKey(e: KeyboardEvent) {
+			if (e.key !== "/" || shouldIgnoreKey(e)) return;
+			const input =
+				document.querySelector<HTMLInputElement>("input.filter-input");
+			if (!input) return;
+			e.preventDefault();
+			input.focus();
+			input.select();
+		}
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, []);
+
+	const pages: Record<View, () => ReactNode> = {
+		all: () => <Overview counts={counts} query={query} onChange={bump} />,
+		releases: () => <Releases onChange={bump} query={query} />,
+		decide: () => <Decide onChange={bump} query={query} />,
+		acquire: () => <Acquire onChange={bump} query={query} />,
+		import: () => <Imports onChange={bump} query={query} />,
+		tasks: () => <Tasks onChange={bump} query={query} />,
+		archive: () => <Tasks onChange={bump} query={query} archive />,
+		owned: () => <Owned refreshKey={refresh} query={query} />,
+		dismissed: () => (
+			<Library state="dismissed" refreshKey={refresh} query={query} />
+		),
+		crates: () => <Crates />,
+		radio: () => (
+			<Radio
+				selectedDate={radioDate}
+				onSelectDate={(d) => setHashPath(`radio/${d}`)}
+			/>
+		),
+		transmission: () => <Transmission />,
+		activity: () => <Activity />,
+		guide: () => <Guide />,
+	};
+
+	const temp = MIGRATED.has(view) ? null : TEMP_HEADER[view];
 
 	return (
-		<div className="app">
-			<header className="topbar">
-				<span className="brand">mcm</span>
-				<div className="topbar-right">
-					<button
-						type="button"
-						className="linklike"
-						onClick={() => {
-							if (view === "radio") {
-								setView("app");
-							} else {
-								setRadioDate(null);
-								setView("radio");
-							}
-						}}
-					>
-						{view === "radio" ? "Dashboard" : "Radio"}
-					</button>
-					<button
-						type="button"
-						className="linklike"
-						onClick={() => setView(view === "guide" ? "app" : "guide")}
-					>
-						{view === "guide" ? "Dashboard" : "Guide"}
-					</button>
-					<button
-						type="button"
-						className="linklike"
-						onClick={() =>
-							setView(view === "transmission" ? "app" : "transmission")
-						}
-					>
-						{view === "transmission" ? "Dashboard" : "Transmission"}
-					</button>
-					<button
-						type="button"
-						className="linklike"
-						onClick={() => setView(view === "activity" ? "app" : "activity")}
-					>
-						{view === "activity" ? "Dashboard" : "Activity"}
-					</button>
-					<button
-						type="button"
-						className="linklike"
-						onClick={() => setView(view === "crates" ? "app" : "crates")}
-					>
-						{view === "crates" ? "Dashboard" : "Crates"}
-					</button>
-					<SpotifyStatus />
-				</div>
-			</header>
-			{view === "guide" ? (
-				<Guide />
-			) : view === "transmission" ? (
-				<Transmission />
-			) : view === "activity" ? (
-				<Activity />
-			) : view === "crates" ? (
-				<Crates />
-			) : view === "radio" ? (
-				<Radio selectedDate={radioDate} onSelectDate={setRadioDate} />
-			) : view === "archive" ? (
-				<section>
-					<h2>Completed archive</h2>
-					<Tasks onChange={bump} archive />
-				</section>
-			) : (
-				<>
-					<Dashboard
-						refreshKey={refresh}
-						active={section}
-						onSelect={setSection}
+		<>
+			{/* biome-ignore lint/a11y/useValidAnchor: a plain #main href would replace the route in the hash */}
+			<a
+				className="skip-link"
+				href="#main"
+				onClick={(e) => {
+					// A plain #main link would replace the route in the hash.
+					e.preventDefault();
+					document.getElementById("main")?.focus();
+				}}
+			>
+				Skip to content
+			</a>
+			<Nav counts={counts} current={view === "archive" ? "tasks" : view} />
+			<main id="main" className="app" tabIndex={-1}>
+				{temp && (
+					<PageHeader
+						title={temp.title}
+						filter={temp.filter ? <FilterBox /> : undefined}
 					/>
-					<input
-						type="search"
-						className="filter"
-						placeholder="filter by artist or title…"
-						value={query}
-						onChange={(e) => setQuery(e.target.value)}
-					/>
-					{sections
-						.filter((s) => section === "all" || s.key === section)
-						.map((s) => (
-							<section key={s.key}>
-								<h2>{s.heading}</h2>
-								{s.node}
-							</section>
-						))}
-				</>
-			)}
-		</div>
+				)}
+				{pages[view]()}
+			</main>
+			<LiveRegion />
+		</>
 	);
 }
