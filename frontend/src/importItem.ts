@@ -34,11 +34,34 @@ export function labelKind(kind: ImportItem["media_kind"]): string {
 	return "Unknown";
 }
 
-export function whenLabel(iso: string | null): string {
+// Short and fixed-width enough to scan down a column: "14:05" today, "Sun 14:05" this week,
+// "20 Nov" before that. 24-hour, no seconds; whenTitle gives the full timestamp for a tooltip.
+export function whenLabel(iso: string | null, now: Date = new Date()): string {
 	if (!iso) return "";
 	const d = new Date(iso);
-	const today = new Date().toDateString() === d.toDateString();
-	return today ? d.toLocaleTimeString() : d.toLocaleString();
+	const time = d.toLocaleTimeString("en-GB", {
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+	if (d.toDateString() === now.toDateString()) return time;
+	const weekAgo = new Date(now);
+	weekAgo.setHours(0, 0, 0, 0);
+	weekAgo.setDate(weekAgo.getDate() - 6);
+	if (d >= weekAgo && d <= now)
+		return `${d.toLocaleDateString("en-GB", { weekday: "short" })} ${time}`;
+	return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+export function whenTitle(iso: string | null): string | undefined {
+	if (!iso) return undefined;
+	return new Date(iso).toLocaleString("en-GB", {
+		weekday: "short",
+		day: "numeric",
+		month: "short",
+		year: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
 }
 
 // A discovery-day heading for grouping the Import list: "Today" / "Yesterday" / a plain date.

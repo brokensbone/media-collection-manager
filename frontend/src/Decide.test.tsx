@@ -31,6 +31,7 @@ function mockApi(items: unknown) {
 afterEach(() => {
 	cleanup();
 	vi.unstubAllGlobals();
+	window.history.replaceState(null, "", "/");
 });
 
 describe("Decide", () => {
@@ -116,5 +117,78 @@ describe("Decide", () => {
 			false,
 		);
 		input.remove();
+	});
+
+	it("keeps the scope in the URL", async () => {
+		const year = new Date().getFullYear();
+		mockApi([
+			{ id: 1, artist: "A", title: "Old", reason: "", release_year: year - 1 },
+		]);
+		window.history.replaceState(null, "", "/#decide?scope=all");
+		render(<Decide />);
+		expect(await screen.findByText("Old")).toBeTruthy();
+		const all = screen.getByRole("button", { name: /^All albums/ });
+		expect(all.getAttribute("aria-pressed")).toBe("true");
+		fireEvent.click(screen.getByRole("button", { name: /^This year/ }));
+		expect(window.location.hash).toBe("#decide");
+		fireEvent.click(all);
+		expect(window.location.hash).toBe("#decide?scope=all");
+	});
+
+	it("explains an empty year only without a query; with one, shows no matches", async () => {
+		const year = new Date().getFullYear();
+		mockApi([
+			{ id: 1, artist: "A", title: "Old", reason: "", release_year: year - 1 },
+		]);
+		const { rerender } = render(<Decide />);
+		expect(await screen.findByText("No albums match this view.")).toBeTruthy();
+		rerender(<Decide query="zzz" />);
+		expect(screen.getByText("No matches for “zzz”")).toBeTruthy();
+		expect(screen.queryByText("No albums match this view.")).toBeNull();
+	});
+
+	it("marks the selected row and shows key hints only in it", async () => {
+		mockApi([
+			{ id: 1, artist: "A", title: "First", reason: "" },
+			{ id: 2, artist: "B", title: "Second", reason: "" },
+		]);
+		render(<Decide />);
+		await screen.findByText("First");
+		const first = screen.getByText("First").closest("tr");
+		expect(first?.getAttribute("aria-selected")).toBe("true");
+		expect(first?.className).toBe("sel");
+		fireEvent.keyDown(document.body, { key: "ArrowDown" });
+		expect(first?.hasAttribute("aria-selected")).toBe(false);
+		expect(
+			screen.getByText("Second").closest("tr")?.getAttribute("aria-selected"),
+		).toBe("true");
+		expect(screen.getAllByRole("button", { name: "Keep" })).toHaveLength(2);
+	});
+
+	it("with a limit: no scope control, no keyboard, no selection", async () => {
+		const year = new Date().getFullYear();
+		const fetchMock = mockApi([
+			{ id: 1, artist: "A", title: "Old", reason: "", release_year: year - 1 },
+		]);
+		render(<Decide limit={5} />);
+		expect(await screen.findByText("Old")).toBeTruthy();
+		expect(screen.queryByRole("button", { name: /All albums/ })).toBeNull();
+		expect(document.querySelector("[aria-selected]")).toBeNull();
+		fireEvent.keyDown(document.body, { key: "y" });
+		expect(fetchMock.mock.calls.some((c) => c[1]?.method === "POST")).toBe(
+			false,
+		);
+	});
+
+	it("shows an error with Retry when the load fails", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => Promise.resolve({ ok: false, status: 500 })),
+		);
+		render(<Decide />);
+		expect(await screen.findByRole("alert")).toBeTruthy();
+		expect(screen.getByText("Couldn’t load albums to judge.")).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+		expect(screen.queryByText(/Nothing to judge/)).toBeNull();
 	});
 });

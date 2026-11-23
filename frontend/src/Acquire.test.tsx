@@ -82,9 +82,10 @@ describe("Acquire", () => {
 	it("flags a possibly-owned want with its hint", async () => {
 		mockApi([item({ possibly_owned: true, owned_hint: "A — T1 (Deluxe)" })]);
 		render(<Acquire />);
-		expect(
-			await screen.findByText(/possibly owned: A — T1 \(Deluxe\)/),
-		).toBeTruthy();
+		const badge = await screen.findByText("possibly owned");
+		expect(badge.parentElement?.textContent).toBe(
+			"possibly owned: A — T1 (Deluxe)",
+		);
 	});
 
 	it("links a matched pending download to its Import row", async () => {
@@ -193,5 +194,50 @@ describe("Acquire", () => {
 			(c) => c[0] === "/albums/9/return-to-saved",
 		);
 		expect(posted?.[1]).toEqual({ method: "POST" });
+	});
+
+	it("shows an error with Retry when the first load fails", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => Promise.reject(new Error("down"))),
+		);
+		render(<Acquire />);
+		expect(
+			await screen.findByText("Couldn’t load the acquire list."),
+		).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+		expect(screen.queryByText(/Nothing to acquire/)).toBeNull();
+	});
+
+	it("tones a failed import as danger inside its link", async () => {
+		mockApi([
+			item({
+				pending_imports: [
+					{ id: 42, name: "A - T1 FLAC", matched_album_id: 1, state: "failed" },
+				],
+			}),
+		]);
+		render(<Acquire />);
+		const link = await screen.findByRole("link", {
+			name: "Import failed: A - T1 FLAC",
+		});
+		expect(link.getAttribute("href")).toBe("#tasks?item=42");
+		expect(link.querySelector(".status-danger")?.textContent).toBe(
+			"Import failed",
+		);
+	});
+
+	it("labels the dialog by its title and closes it with the close button", async () => {
+		mockApi([item({ id: 9, title: "Only" })]);
+		render(<Acquire />);
+		await screen.findByText("Only");
+		fireEvent.click(screen.getByRole("button", { name: "Mark owned…" }));
+		const dialog = await screen.findByRole("dialog", {
+			name: "Mark owned: A — Only",
+		});
+		expect(dialog).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "Close" }));
+		expect(screen.queryByRole("dialog")).toBeNull();
+		expect(screen.getByText("Only")).toBeTruthy();
 	});
 });

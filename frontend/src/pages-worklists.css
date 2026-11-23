@@ -1,0 +1,140 @@
+/* Releases, Decide and Acquire (including its mark-owned dialog). */
+
+/* ---------- Worklist rows ---------- */
+.worklist col.c-wl-actions {
+	width: 272px;
+}
+.worklist col.c-find {
+	width: 270px;
+}
+.acquire-table col.c-artist {
+	width: 17%;
+}
+.worklist col.c-acquire-actions {
+	width: 268px;
+}
+.worklist .cell-secondary .badge:first-of-type {
+	margin-left: 8px;
+}
+
+/* ---------- Acquire ---------- */
+/* Finding the album is the usual next step, so the find links are the row's main buttons. */
+.find-links {
+	display: flex;
+	gap: 4px;
+}
+.find-links svg {
+	opacity: 0.7;
+}
+.find-links .kbd {
+	visibility: hidden;
+	margin-left: 2px;
+}
+tr.sel .find-links .kbd {
+	visibility: visible;
+}
+.acquire-table .row-meta {
+	margin-top: 2px;
+}
+a.pending {
+	color: inherit;
+	text-decoration: none;
+}
+a.pending:hover {
+	color: var(--text);
+	text-decoration: underline;
+}
+a.pending .status {
+	margin: 0 2px 0 0;
+}
+.acquire-table .row-meta > .status:first-child {
+	margin-left: 0;
+}
+
+/* ---------- Mark-owned dialog ---------- */
+.modal-search {
+	width: 100%;
+}
+.candidates {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	max-height: min(320px, 50vh);
+	overflow-y: auto;
+	margin: 0 calc(-1 * var(--s1));
+	padding: 0 var(--s1);
+}
+.candidates button.candidate {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--s2);
+	width: 100%;
+	height: auto;
+	padding: 6px 8px;
+	border-color: transparent;
+	text-align: left;
+	overflow-wrap: anywhere;
+}
+.candidates button.candidate:hover {
+	border-color: var(--border);
+}
+.candidates-note {
+	margin: var(--s2) 0;
+	color: var(--muted);
+	font-size: var(--fs-meta);
+}
+.modal-actions {
+	padding-top: var(--s3);
+	border-top: 1px solid var(--border);
+}
+
+@media (max-width: 719.98px) {
+	.find-links .kbd {
+		display: none;
+	}
+	table.worklist tr {
+		grid-template-areas:
+			"cover primary"
+			"cover secondary"
+			"cover meta"
+			"actions actions";
+	}
+	.worklist .cell-cover {
+		align-self: start;
+	}
+	.worklist .cell-meta:not(:empty) {
+		margin-top: 2px;
+	}
+}
+
+/* Between phone and wide desktop the fixed action columns would crush artist and title, so they
+   narrow and their buttons wrap instead. */
+@media (min-width: 720px) and (max-width: 1099.98px) {
+	.worklist .row-actions .kbd,
+	.worklist .find-links .kbd {
+		display: none;
+	}
+	.worklist col.c-wl-actions {
+		width: 196px;
+	}
+	.worklist col.c-meta {
+		width: 96px;
+	}
+	.acquire-table col.c-artist {
+		width: 24%;
+	}
+	.worklist col.c-find {
+		width: 150px;
+	}
+	.find-links {
+		flex-wrap: wrap;
+	}
+	.worklist col.c-acquire-actions {
+		width: 132px;
+	}
+	.acquire-table .row-actions {
+		flex-direction: column;
+		align-items: stretch;
+	}
+}

@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { whenLabel } from "./importItem";
 import { Tasks } from "./Tasks";
 
 function mockApi(items: unknown) {
@@ -45,7 +46,9 @@ describe("Tasks", () => {
 		mockApi([item({ id: 42, name: "Linked", state: "importing" })]);
 		render(<Tasks />);
 		await screen.findByText("Linked");
-		expect(document.getElementById("task-42")?.className).toBe("linked");
+		expect(
+			document.getElementById("task-42")?.classList.contains("linked"),
+		).toBe(true);
 	});
 
 	it("groups rows by status", async () => {
@@ -72,7 +75,7 @@ describe("Tasks", () => {
 		await screen.findByText("Done");
 		expect(fetchMock.mock.calls[0][0]).toBe("/imports/tasks");
 		expect(
-			screen.getByRole("button", { name: /View completed archive/ }),
+			screen.getByRole("link", { name: /View completed archive/ }),
 		).toBeTruthy();
 	});
 
@@ -174,8 +177,87 @@ describe("Tasks", () => {
 		render(<Tasks archive />);
 		await screen.findByText("Old");
 		expect(fetchMock.mock.calls[0][0]).toBe("/imports/archive");
-		expect(screen.getByRole("button", { name: /Back to tasks/ })).toBeTruthy();
+		expect(screen.getByRole("link", { name: /Back to tasks/ })).toBeTruthy();
 		// no status grouping in the flat archive
 		expect(screen.queryByText("In progress")).toBeNull();
+	});
+
+	it("closes an open log with Escape and keeps the filter in the URL", async () => {
+		window.location.hash = "#tasks?q=bad";
+		mockApi([
+			item({ id: 5, name: "Bad.mkv", state: "failed", error_detail: "why" }),
+		]);
+		render(<Tasks query="bad" />);
+		await screen.findByText("failed");
+		fireEvent.click(screen.getByRole("button", { name: "Log" }));
+		expect(window.location.hash).toBe("#tasks?q=bad&log=5");
+		expect(screen.getByText("why")).toBeTruthy();
+		fireEvent.keyDown(window, { key: "Escape" });
+		expect(window.location.hash).toBe("#tasks?q=bad");
+		expect(screen.queryByText("why")).toBeNull();
+	});
+
+	it("tells a filter with no matches apart from an empty list", async () => {
+		mockApi([item({ id: 1, name: "Done", state: "imported" })]);
+		render(<Tasks query="zzz" />);
+		expect(await screen.findByText("No matches for “zzz”")).toBeTruthy();
+		expect(screen.queryByText("No import tasks.")).toBeNull();
+	});
+
+	it("shows an error with Retry when the list fails to load", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => Promise.reject(new Error("down"))),
+		);
+		render(<Tasks />);
+		expect(await screen.findByText("Couldn’t load import tasks.")).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+		expect(screen.queryByText("No import tasks.")).toBeNull();
+	});
+
+	it("marks the Failed group count in the danger tone", async () => {
+		mockApi([item({ id: 3, name: "Broke", state: "failed" })]);
+		render(<Tasks />);
+		await screen.findByText("Broke");
+		const head = screen.getByText("Failed").parentElement;
+		expect(head?.querySelector(".group-count.tone-danger")?.textContent).toBe(
+			"1",
+		);
+	});
+
+	it("with a limit shows only active tasks and no page controls", async () => {
+		mockApi([
+			item({ id: 1, name: "Running", state: "importing" }),
+			item({ id: 2, name: "Broke", state: "failed" }),
+			item({ id: 3, name: "Done", state: "imported" }),
+		]);
+		render(<Tasks limit={5} />);
+		await screen.findByText("Running");
+		expect(screen.getByText("Broke")).toBeTruthy();
+		expect(screen.queryByText("Done")).toBeNull();
+		expect(screen.queryByRole("heading")).toBeNull();
+		expect(screen.queryByRole("link", { name: /archive/ })).toBeNull();
+	});
+});
+
+describe("whenLabel", () => {
+	const now = new Date(2026, 10, 23, 15, 0);
+	it("shows only the time for today, 24-hour without seconds", () => {
+		expect(whenLabel(new Date(2026, 10, 23, 9, 5, 42).toISOString(), now)).toBe(
+			"09:05",
+		);
+	});
+	it("adds the weekday within the last week", () => {
+		expect(whenLabel(new Date(2026, 10, 18, 17, 30).toISOString(), now)).toBe(
+			"Wed 17:30",
+		);
+	});
+	it("shows day and month for older times", () => {
+		expect(whenLabel(new Date(2026, 10, 2, 8, 0).toISOString(), now)).toBe(
+			"2 Nov",
+		);
+	});
+	it("is empty without a timestamp", () => {
+		expect(whenLabel(null, now)).toBe("");
 	});
 });

@@ -1,4 +1,27 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import "./pages-library.css";
+import {
+	type MouseEvent,
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
+import { fetchJson } from "./api";
+import { matchesQuery } from "./filter";
+import { setHashParams, useHashParam, useQuery } from "./hashState";
+import { useRowKeys } from "./keys";
+import {
+	EmptyState,
+	ErrorState,
+	FilterBox,
+	ListHints,
+	Loading,
+	NoMatches,
+	PageHeader,
+	useAnnounceCount,
+	usePageTitle,
+} from "./ui";
 
 // A crate view: the box the operator is looking at, its ancestors, its sub-boxes, and the
 // records loose directly here. Mirrors the backend's BoxView (crates §2).
@@ -43,45 +66,103 @@ type SplitCandidate = {
 
 // The box being viewed lives in the URL (#crates?box=<id>) so descending, breadcrumbs and the
 // browser back button all work. No box param = the root Collection.
-function boxIdFromHash(): number | null {
-	const query = window.location.hash.split("?")[1] ?? "";
-	const raw = new URLSearchParams(query).get("box");
-	return raw ? Number(raw) : null;
+function boxHref(id: number | null): string {
+	return id == null ? "#crates" : `#crates?box=${id}`;
 }
 
 function gotoBox(id: number | null) {
-	window.location.hash = id == null ? "crates" : `crates?box=${id}`;
+	setHashParams({ box: id, q: null });
 }
 
 export function Crates() {
-	const [boxId, setBoxId] = useState<number | null>(() => boxIdFromHash());
+	const [boxParam] = useHashParam("box");
+	const boxId = boxParam ? Number(boxParam) : null;
+	const query = useQuery();
 	const [view, setView] = useState<BoxView | null>(null);
+	const [failed, setFailed] = useState(false);
 	const [selected, setSelected] = useState<Set<string>>(new Set());
 	const [error, setError] = useState<string | null>(null);
 	const [newSub, setNewSub] = useState("");
 	const [newTarget, setNewTarget] = useState("");
 	// null = the split panel is closed; an array (possibly empty) = suggestions have been fetched.
 	const [splits, setSplits] = useState<SplitCandidate[] | null>(null);
-
-	useEffect(() => {
-		const onHash = () => setBoxId(boxIdFromHash());
-		window.addEventListener("hashchange", onHash);
-		return () => window.removeEventListener("hashchange", onHash);
-	}, []);
+	const selectAll = useRef<HTMLInputElement>(null);
+	// The last record toggled, by beets id: a shift-click selects everything between it and the next.
+	const anchor = useRef<string | null>(null);
 
 	const load = useCallback(() => {
+		setFailed(false);
 		const url = boxId == null ? "/crates/box" : `/crates/box/${boxId}`;
-		fetch(url)
-			.then((r) => r.json())
-			.then((v: BoxView) => {
+		fetchJson<BoxView>(url).then(
+			(v) => {
 				setView(v);
 				setSelected(new Set());
 				setSplits(null); // stale after any reload — the loose set it was computed from has changed
-			})
-			.catch(() => setView(null));
+			},
+			() => {
+				setView(null);
+				setFailed(true);
+			},
+		);
 	}, [boxId]);
 
 	useEffect(load, [load]);
+
+	usePageTitle(view && view.parent_id != null ? `${view.name} · Crates` : null);
+
+	const records = view?.records ?? [];
+	const shown = records.filter((r) =>
+		matchesQuery(`${r.artist} ${r.title}`, query),
+	);
+	// Actions only touch selected records the filter still shows, so nothing hidden moves.
+	const ids = shown
+		.filter((r) => selected.has(r.beets_id))
+		.map((r) => r.beets_id);
+	const allSelected = shown.length > 0 && ids.length === shown.length;
+
+	useAnnounceCount(shown.length, records.length, view != null && !!query);
+
+	const toggleAt = (i: number, range = false) => {
+		const target = shown[i];
+		if (!target) return;
+		const on = !selected.has(target.beets_id);
+		const from = range
+			? shown.findIndex((r) => r.beets_id === anchor.current)
+			: -1;
+		const span =
+			from === -1
+				? [target]
+				: shown.slice(Math.min(from, i), Math.max(from, i) + 1);
+		anchor.current = target.beets_id;
+		setSelected((prev) => {
+			const next = new Set(prev);
+			for (const r of span)
+				if (on) next.add(r.beets_id);
+				else next.delete(r.beets_id);
+			return next;
+		});
+	};
+
+	const { rowProps } = useRowKeys({
+		count: shown.length,
+		actions: {
+			" ": (i) => {
+				// Leave space to a focused control (checkbox, button) so it doesn't toggle twice.
+				if (
+					(document.activeElement as HTMLElement | null)?.closest?.(
+						"button, a, input, select",
+					)
+				)
+					return false;
+				toggleAt(i);
+			},
+		},
+	});
+
+	useEffect(() => {
+		if (selectAll.current)
+			selectAll.current.indeterminate = ids.length > 0 && !allSelected;
+	});
 
 	// Post a mutation, surface any rejection (e.g. a blocked delete), then reload the view.
 	const act = useCallback(
@@ -104,17 +185,32 @@ export function Crates() {
 		[],
 	);
 
-	const ids = useMemo(() => Array.from(selected), [selected]);
+	if (!view)
+		return (
+			<>
+				<PageHeader title="Crates" filter={<FilterBox />} />
+				{failed ? (
+					<ErrorState what="this crate" onRetry={load} />
+				) : (
+					<Loading rows={8} compact />
+				)}
+			</>
+		);
 
-	if (!view) return <p>Loading…</p>;
-
-	const toggle = (beetsId: string) => {
+	const toggleAll = () => {
 		setSelected((prev) => {
 			const next = new Set(prev);
-			if (next.has(beetsId)) next.delete(beetsId);
-			else next.add(beetsId);
+			for (const r of shown)
+				if (allSelected) next.delete(r.beets_id);
+				else next.add(r.beets_id);
 			return next;
 		});
+	};
+
+	// The checkbox is the keyboard path; a click anywhere else on the row is a shortcut to it.
+	const onRowClick = (e: MouseEvent, i: number) => {
+		if ((e.target as HTMLElement).closest("input, a, button, label")) return;
+		toggleAt(i, e.shiftKey);
 	};
 
 	const createSub = async () => {
@@ -205,43 +301,120 @@ export function Crates() {
 		Math.round((view.loose_count / Math.max(1, view.soft_cap)) * 100),
 	);
 
-	return (
-		<section className="crates">
-			<nav className="crumbs" aria-label="Breadcrumb">
-				{view.breadcrumb.map((c, i) => (
-					<span key={c.id}>
-						{i > 0 && <span className="crumb-sep"> › </span>}
-						{c.id === view.id ? (
-							<span className="crumb-here">{c.name}</span>
-						) : (
-							<button
-								type="button"
-								className="linklike"
-								onClick={() => gotoBox(c.id)}
+	let loose: ReactNode;
+	if (records.length === 0) loose = <EmptyState title="Nothing loose here." />;
+	else if (shown.length === 0)
+		loose = <NoMatches query={query} what="this crate’s loose records" />;
+	else
+		loose = (
+			<table className="rows compact crate-table sticky-head">
+				<colgroup>
+					<col className="c-check" />
+					<col className="c-artist" />
+					<col />
+					<col className="c-meta" />
+				</colgroup>
+				<thead>
+					<tr>
+						<th scope="col">
+							<input
+								ref={selectAll}
+								type="checkbox"
+								aria-label="Select all loose records"
+								checked={allSelected}
+								onChange={toggleAll}
+							/>
+						</th>
+						<th scope="col">Artist</th>
+						<th scope="col">Title</th>
+						<th scope="col">Year · media</th>
+					</tr>
+				</thead>
+				<tbody>
+					{shown.map((r, i) => {
+						const on = selected.has(r.beets_id);
+						return (
+							<tr
+								key={r.beets_id}
+								{...rowProps(i, on ? "checked" : undefined)}
+								aria-selected={on || undefined}
+								onClick={(e) => onRowClick(e, i)}
 							>
-								{c.name}
-							</button>
-						)}
-					</span>
-				))}
-			</nav>
+								<td className="cell-check">
+									<input
+										type="checkbox"
+										aria-label={`Select ${r.artist} — ${r.title}`}
+										checked={on}
+										readOnly
+										onClick={(e) => toggleAt(i, e.shiftKey)}
+									/>
+								</td>
+								<td className="cell-primary">{r.artist}</td>
+								<td className="cell-secondary">{r.title}</td>
+								<td className="cell-meta">
+									{[r.year, r.media].filter(Boolean).join(" · ")}
+								</td>
+							</tr>
+						);
+					})}
+				</tbody>
+			</table>
+		);
 
-			<div className="crate-head">
-				<h2>{view.name}</h2>
+	return (
+		<section className={ids.length > 0 ? "crates has-selection" : "crates"}>
+			<PageHeader
+				title={isRoot ? "Crates" : view.name}
+				count={view.total_count}
+				filter={<FilterBox />}
+				above={
+					isRoot ? undefined : (
+						<nav className="crumbs" aria-label="Breadcrumb">
+							<ol>
+								{view.breadcrumb.map((c) => (
+									<li key={c.id}>
+										{c.id === view.id ? (
+											<span className="crumb-here" aria-current="page">
+												{c.name}
+											</span>
+										) : (
+											<a
+												href={boxHref(
+													c.id === view.breadcrumb[0].id ? null : c.id,
+												)}
+											>
+												{c.id === view.breadcrumb[0].id ? "Crates" : c.name}
+											</a>
+										)}
+									</li>
+								))}
+							</ol>
+						</nav>
+					)
+				}
+			>
 				{!isRoot && (
-					<div className="crate-tools">
-						<button type="button" className="linklike" onClick={rename}>
+					<>
+						<button type="button" className="btn-quiet" onClick={rename}>
 							Rename
 						</button>
-						<button type="button" className="linklike" onClick={remove}>
+						<button type="button" className="btn-quiet" onClick={remove}>
 							Delete
 						</button>
-					</div>
+					</>
 				)}
-			</div>
+			</PageHeader>
 
 			<div className={`cap-meter${view.over_cap ? " over" : ""}`}>
-				<div className="cap-bar">
+				{/* biome-ignore lint/a11y/useSemanticElements: native <meter> styling differs per browser and cannot take the warn tone reliably */}
+				<div
+					className="cap-bar"
+					role="meter"
+					aria-label="Loose records"
+					aria-valuemin={0}
+					aria-valuemax={view.soft_cap}
+					aria-valuenow={view.loose_count}
+				>
 					<div className="cap-fill" style={{ width: `${capPct}%` }} />
 				</div>
 				<span className="cap-label">
@@ -251,23 +424,30 @@ export function Crates() {
 				</span>
 			</div>
 
-			{error && <p className="crate-error">{error}</p>}
+			{error && (
+				<p className="crate-error" role="alert">
+					{error}
+				</p>
+			)}
 
-			<div className="tiles">
-				{view.children.map((c) => (
-					<button
-						type="button"
-						key={c.id}
-						className="tile"
-						onClick={() => gotoBox(c.id)}
-					>
-						<span className="tile-name">{c.name}</span>
-						<span className="tile-count">{c.total_count}</span>
-					</button>
-				))}
-				<div className="tile tile-new">
+			<h2 className="crate-section">Sub-boxes</h2>
+			<div className="subbox-bar">
+				{view.children.length > 0 && (
+					<ul className="chips">
+						{view.children.map((c) => (
+							<li key={c.id}>
+								<a className="chip-link" href={boxHref(c.id)}>
+									<span className="chip-name">{c.name}</span>
+									<span className="chip-count">{c.total_count}</span>
+								</a>
+							</li>
+						))}
+					</ul>
+				)}
+				<div className="subbox-add">
 					<input
 						type="text"
+						aria-label="New sub-box name"
 						placeholder="new sub-box…"
 						value={newSub}
 						onChange={(e) => setNewSub(e.target.value)}
@@ -277,22 +457,18 @@ export function Crates() {
 						Add
 					</button>
 				</div>
-				<button
-					type="button"
-					className="tile suggest-split"
-					onClick={suggestSplit}
-				>
-					✨ Suggest a split
+				<button type="button" className="suggest-split" onClick={suggestSplit}>
+					Suggest a split
 				</button>
 			</div>
 
 			{splits !== null &&
 				(splits.length === 0 ? (
-					<p className="muted">No clean split found — file by hand.</p>
+					<p className="state-inline">No clean split found — file by hand.</p>
 				) : (
-					<div className="splits">
+					<ul className="splits">
 						{splits.map((s) => (
-							<div key={s.key} className="split">
+							<li key={s.key} className="split">
 								<span className="split-desc">
 									<strong>{s.label}</strong> —{" "}
 									{s.groups.map((g) => `${g.name} (${g.count})`).join(" · ")} —
@@ -301,77 +477,78 @@ export function Crates() {
 								<button type="button" onClick={() => applySplit(s.key)}>
 									Apply
 								</button>
-							</div>
+							</li>
 						))}
-					</div>
+					</ul>
 				))}
 
-			{ids.length > 0 && (
-				<div className="move-bar">
-					<span className="muted">{ids.length} selected</span>
-					<button type="button" onClick={kickUp} disabled={isRoot}>
-						Kick up
-					</button>
-					{view.children.length > 0 && (
-						<label>
-							Move to{" "}
-							<select
-								value=""
-								onChange={(e) =>
-									e.target.value && fileInto(Number(e.target.value))
-								}
-							>
-								<option value="">a sub-box…</option>
-								{view.children.map((c) => (
-									<option key={c.id} value={c.id}>
-										{c.name}
-									</option>
-								))}
-							</select>
-						</label>
+			<h2 className="crate-section">
+				Loose records{" "}
+				<span className="crate-section-count">
+					{query && records.length > 0
+						? `${shown.length} of ${records.length}`
+						: records.length}
+				</span>
+			</h2>
+
+			{/* Always rendered so selecting a record never pushes the rows down. */}
+			{shown.length > 0 && (
+				<div className={ids.length > 0 ? "move-bar active" : "move-bar"}>
+					{ids.length === 0 ? (
+						<span className="move-hint">
+							Select records to file them. Shift-click selects a range.
+						</span>
+					) : (
+						<>
+							<span className="move-count">{ids.length} selected</span>
+							<button type="button" onClick={kickUp} disabled={isRoot}>
+								Kick up
+							</button>
+							{view.children.length > 0 && (
+								<label className="move-to">
+									Move to{" "}
+									<select
+										value=""
+										onChange={(e) =>
+											e.target.value && fileInto(Number(e.target.value))
+										}
+									>
+										<option value="">a sub-box…</option>
+										{view.children.map((c) => (
+											<option key={c.id} value={c.id}>
+												{c.name}
+											</option>
+										))}
+									</select>
+								</label>
+							)}
+							<span className="move-new">
+								<input
+									type="text"
+									aria-label="New box name"
+									placeholder="or a new box…"
+									value={newTarget}
+									onChange={(e) => setNewTarget(e.target.value)}
+									onKeyDown={(e) => e.key === "Enter" && fileNew()}
+								/>
+								<button type="button" onClick={fileNew}>
+									Move
+								</button>
+							</span>
+						</>
 					)}
-					<span className="move-new">
-						<input
-							type="text"
-							placeholder="or a new box…"
-							value={newTarget}
-							onChange={(e) => setNewTarget(e.target.value)}
-							onKeyDown={(e) => e.key === "Enter" && fileNew()}
-						/>
-						<button type="button" onClick={fileNew}>
-							Move
-						</button>
-					</span>
 				</div>
 			)}
 
-			{view.records.length === 0 ? (
-				<p className="muted">Nothing loose here.</p>
-			) : (
-				<table className="loose">
-					<tbody>
-						{view.records.map((r) => (
-							<tr
-								key={r.beets_id}
-								className={selected.has(r.beets_id) ? "sel" : undefined}
-							>
-								<td className="c-check">
-									<input
-										type="checkbox"
-										aria-label={`Select ${r.artist} — ${r.title}`}
-										checked={selected.has(r.beets_id)}
-										onChange={() => toggle(r.beets_id)}
-									/>
-								</td>
-								<td>{r.artist}</td>
-								<td>{r.title}</td>
-								<td className="muted">
-									{[r.year, r.media].filter(Boolean).join(" · ")}
-								</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
+			{loose}
+			{shown.length > 0 && (
+				<ListHints
+					items={[
+						["j/k", "move"],
+						["space", "select"],
+						["shift-click", "select a range"],
+					]}
+				/>
 			)}
 		</section>
 	);

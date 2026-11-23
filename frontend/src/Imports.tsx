@@ -1,7 +1,32 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import "./pages-imports.css";
+import {
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
+import { fetchJson } from "./api";
 import { matchesQuery } from "./filter";
-import { dayLabel, type ImportItem, labelKind } from "./importItem";
+import { useHashParam } from "./hashState";
+import { dayLabel, type ImportItem } from "./importItem";
 import { ImportReclassify } from "./importReclassify";
+import { useRowKeys } from "./keys";
+import {
+	EmptyState,
+	ErrorState,
+	FilterBox,
+	GroupHead,
+	Kbd,
+	ListHints,
+	Loading,
+	NoMatches,
+	PageHeader,
+	PollWarning,
+	Segmented,
+	StatusBadge,
+	useAnnounceCount,
+} from "./ui";
 
 // The type a row belongs to for the filter bar. Keyed off import_target so the buckets are
 // mutually exclusive and match where the file actually goes: a mixed-season TV pack routed to
@@ -26,16 +51,22 @@ function itemType(it: ImportItem): ItemType {
 export function Imports({
 	onChange,
 	query = "",
+	limit,
 }: {
 	onChange?: () => void;
 	query?: string;
+	limit?: number;
 }) {
 	const [items, setItems] = useState<ImportItem[] | null>(null);
+	const [failed, setFailed] = useState(false);
 	const [scanning, setScanning] = useState(false);
-	const [typeFilter, setTypeFilter] = useState<"all" | ItemType>("all");
-	const linkedId = Number(
-		new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("item"),
-	);
+	const [kindParam, setKindParam] = useHashParam("kind");
+	const [itemParam] = useHashParam("item");
+	const typeFilter: "all" | ItemType =
+		limit == null && TYPE_LABELS.some(([k]) => k === kindParam)
+			? (kindParam as ItemType)
+			: "all";
+	const linkedId = Number(itemParam);
 	const focused = useRef(false);
 
 	// Import/Discard both remove the row from this decision list (it becomes a Task, or is
@@ -67,10 +98,12 @@ export function Imports({
 	);
 
 	const refresh = useCallback(() => {
-		fetch("/imports")
-			.then((r) => r.json())
-			.then((data: ImportItem[]) => setItems((prev) => merge(prev, data)))
-			.catch(() => setItems([]));
+		fetchJson<ImportItem[]>("/imports")
+			.then((data) => {
+				setItems((prev) => merge(prev, data));
+				setFailed(false);
+			})
+			.catch(() => setFailed(true));
 	}, [merge]);
 
 	useEffect(() => {
@@ -114,11 +147,64 @@ export function Imports({
 			.finally(() => setScanning(false));
 	}, [onChange, refresh]);
 
-	if (!items) return <p>Loading…</p>;
-
-	const queryFiltered = items.filter((it) =>
+	const queryFiltered = (items ?? []).filter((it) =>
 		matchesQuery(`${it.name} ${it.matched ?? ""}`, query),
 	);
+	const shown =
+		typeFilter === "all"
+			? queryFiltered
+			: queryFiltered.filter((it) => itemType(it) === typeFilter);
+	// The order rows appear on screen (newest day first), which is the cursor's order.
+	const cursorRows = newestFirst(shown);
+	useAnnounceCount(
+		shown.length,
+		items?.length ?? 0,
+		limit == null && items != null && (query !== "" || typeFilter !== "all"),
+	);
+
+	const { rowProps, setSel } = useRowKeys({
+		count: limit == null ? cursorRows.length : 0,
+		enabled: limit == null,
+		actions: {
+			i: (i) => {
+				const it = cursorRows[i];
+				if (it && !it.missing && it.import_target !== "review")
+					act(it.id, "POST");
+			},
+		},
+	});
+	const linkedIndex = cursorRows.findIndex((it) => it.id === linkedId);
+	useEffect(() => {
+		if (linkedIndex >= 0) setSel(linkedIndex);
+	}, [linkedIndex, setSel]);
+
+	if (limit != null) {
+		if (!items)
+			return failed ? (
+				<ErrorState what="imports" onRetry={refresh} />
+			) : (
+				<Loading rows={2} />
+			);
+		const top = newestFirst(shown).slice(0, limit);
+		if (top.length === 0)
+			return (
+				<p className="state-inline">
+					{items.length === 0
+						? "Nothing waiting."
+						: `No matches for “${query}”.`}
+				</p>
+			);
+		return (
+			<ImportTable
+				rows={top}
+				linkedId={linkedId}
+				act={act}
+				refresh={refresh}
+				head={false}
+			/>
+		);
+	}
+
 	const counts: Record<ItemType, number> = {
 		music: 0,
 		tv: 0,
@@ -131,18 +217,11 @@ export function Imports({
 	const barTypes = TYPE_LABELS.filter(
 		([k]) => counts[k] > 0 || typeFilter === k,
 	);
-	const shown =
-		typeFilter === "all"
-			? queryFiltered
-			: queryFiltered.filter((it) => itemType(it) === typeFilter);
 
 	// Partition into discovery-day groups, newest first, so freshly-added drops are easy to find
 	// instead of scattering alphabetically. created_at is immutable, so this order never reshuffles.
-	const sorted = [...shown].sort((a, b) =>
-		(b.created_at ?? "").localeCompare(a.created_at ?? ""),
-	);
 	const groups: { key: string; label: string; rows: ImportItem[] }[] = [];
-	for (const it of sorted) {
+	for (const it of newestFirst(shown)) {
 		const key = it.created_at
 			? new Date(it.created_at).toDateString()
 			: "unknown";
@@ -151,129 +230,235 @@ export function Imports({
 		else groups.push({ key, label: dayLabel(it.created_at), rows: [it] });
 	}
 
-	const table = (rows: ImportItem[]) => (
-		<table className="mobile-card-table">
-			<colgroup>
-				<col className="c-source" />
-				<col />
-				<col className="c-matched" />
-				<col className="c-actions3" />
-			</colgroup>
+	const indexOf = new Map(cursorRows.map((it, i) => [it.id, i]));
+
+	const typeLabel = TYPE_LABELS.find(([k]) => k === typeFilter)?.[1];
+	let content: ReactNode;
+	if (!items)
+		content = failed ? (
+			<ErrorState what="imports" onRetry={refresh} />
+		) : (
+			<Loading rows={4} />
+		);
+	else if (items.length === 0)
+		content = <EmptyState title="Nothing waiting to import." />;
+	else if (queryFiltered.length === 0)
+		content = <NoMatches query={query} what="Import" />;
+	else if (shown.length === 0)
+		content = (
+			<EmptyState
+				title={`No ${typeLabel} items waiting.`}
+				action={
+					<button type="button" onClick={() => setKindParam(null)}>
+						Show all
+					</button>
+				}
+			/>
+		);
+	else
+		content = (
+			<>
+				<ImportHead />
+				{groups.map((g) => (
+					<section key={g.key} className="import-day">
+						<GroupHead title={g.label} count={g.rows.length} />
+						<ImportTable
+							rows={g.rows}
+							linkedId={linkedId}
+							act={act}
+							refresh={refresh}
+							head={false}
+							rowProps={(it) =>
+								rowProps(
+									indexOf.get(it.id) ?? -1,
+									it.id === linkedId ? "linked" : undefined,
+								)
+							}
+						/>
+					</section>
+				))}
+				<ListHints
+					items={[
+						["j/k", "move"],
+						["i", "import"],
+					]}
+				/>
+			</>
+		);
+
+	return (
+		<>
+			<PageHeader
+				title="Import"
+				count={
+					items
+						? shown.length === items.length
+							? items.length
+							: `${shown.length} of ${items.length}`
+						: undefined
+				}
+				filter={<FilterBox placeholder="Filter name or match" />}
+			>
+				{(present.length > 1 || typeFilter !== "all") && (
+					<Segmented
+						ariaLabel="Kind"
+						value={typeFilter}
+						onChange={(v) => setKindParam(v === "all" ? null : v)}
+						options={[
+							{ value: "all", label: "All", count: queryFiltered.length },
+							...barTypes.map(([k, label]) => ({
+								value: k,
+								label,
+								count: counts[k],
+							})),
+						]}
+					/>
+				)}
+				<button type="button" onClick={scan} disabled={scanning}>
+					{scanning ? "Scanning…" : "Scan watch folder"}
+				</button>
+			</PageHeader>
+			<PollWarning show={failed && items != null} />
+			{content}
+		</>
+	);
+}
+
+function newestFirst(list: ImportItem[]): ImportItem[] {
+	return [...list].sort((a, b) =>
+		(b.created_at ?? "").localeCompare(a.created_at ?? ""),
+	);
+}
+
+const COLS = (
+	<colgroup>
+		<col />
+		<col className="c-match" />
+		<col className="c-import-actions" />
+	</colgroup>
+);
+
+// Day groups each get their own table, so the visible column header sits once above them all;
+// each group's table keeps a screen-reader header.
+function ImportHead() {
+	return (
+		<table
+			className="rows tall no-cover import-table head-only"
+			aria-hidden="true"
+		>
+			{COLS}
+			<thead>
+				<tr>
+					<th>Name</th>
+					<th>Match</th>
+					<th>Type</th>
+				</tr>
+			</thead>
+		</table>
+	);
+}
+
+type RowProps = ReturnType<ReturnType<typeof useRowKeys>["rowProps"]>;
+
+function ImportTable({
+	rows,
+	linkedId,
+	act,
+	refresh,
+	head,
+	rowProps,
+}: {
+	rows: ImportItem[];
+	linkedId: number;
+	act: (id: number, method: "POST" | "DELETE") => void;
+	refresh: () => void;
+	head: boolean;
+	rowProps?: (it: ImportItem) => RowProps;
+}) {
+	return (
+		<table className="rows tall no-cover import-table">
+			{COLS}
+			<thead className={head ? undefined : "sr-thead"}>
+				<tr>
+					<th scope="col">Name</th>
+					<th scope="col">Match</th>
+					<th scope="col">Type</th>
+				</tr>
+			</thead>
 			<tbody>
 				{rows.map((it) => (
 					<tr
 						key={it.id}
 						id={`import-${it.id}`}
-						className={it.id === linkedId ? "linked" : undefined}
+						{...(rowProps?.(it) ?? {
+							className: it.id === linkedId ? "linked" : undefined,
+						})}
 					>
-						<td className="muted">{it.source}</td>
-						<td>
-							<div>{it.name}</div>
-							<div className="muted">
-								{labelKind(it.media_kind)}
-								{it.classification_detail
-									? ` · ${it.classification_detail}`
-									: ""}
-							</div>
-							{it.destination_path && (
-								<div className="muted">{it.destination_path}</div>
+						<td className="cell-primary">
+							{/* Lead with the human-readable match; the raw release name moves to the meta line. */}
+							{it.matched ?? it.name}
+							<span className="row-meta">
+								{it.matched && (
+									<>
+										<span className="raw-name">{it.name}</span>
+										{" · "}
+									</>
+								)}
+								<span className="src">{it.source}</span>
+								{it.classification_detail && <> · {it.classification_detail}</>}
+								{it.destination_path && (
+									<>
+										{" · "}
+										<span className="mono path">{it.destination_path}</span>
+									</>
+								)}
+							</span>
+						</td>
+						<td className="cell-secondary">
+							{!it.matched && <span className="muted">no match</span>}
+							{it.matched_owned && <StatusBadge tone="ok">owned</StatusBadge>}
+							{it.missing && (
+								<div className="missing-line">
+									<StatusBadge tone="danger">
+										file no longer in watch folder
+									</StatusBadge>
+								</div>
 							)}
 						</td>
-						<td>
-							{it.matched ?? <span className="muted">no match</span>}
-							{it.matched_owned && <span className="badge">owned</span>}
-						</td>
-						<td>
-							<div className="import-actions">
+						<td className="cell-actions">
+							<div className="row-actions">
 								<ImportReclassify
 									item={it}
 									onChange={refresh}
 									disabled={it.missing}
 								/>
-								{it.missing ? (
-									<>
-										<div className="import-status muted">
-											file no longer in watch folder
-										</div>
-										<div className="import-action-buttons">
+								<span className="import-slot">
+									{!it.missing &&
+										(it.import_target === "review" ? (
+											<StatusBadge tone="warn">needs review</StatusBadge>
+										) : (
 											<button
 												type="button"
-												onClick={() => act(it.id, "DELETE")}
+												className="btn-primary"
+												onClick={() => act(it.id, "POST")}
 											>
-												Discard
+												Import
+												{rowProps && <Kbd>i</Kbd>}
 											</button>
-										</div>
-									</>
-								) : it.import_target === "review" ? (
-									<>
-										<div className="import-status muted">needs review</div>
-										<div className="import-action-buttons">
-											<button
-												type="button"
-												onClick={() => act(it.id, "DELETE")}
-											>
-												Discard
-											</button>
-										</div>
-									</>
-								) : (
-									<div className="import-action-buttons">
-										<button type="button" onClick={() => act(it.id, "POST")}>
-											Import
-										</button>
-										<button type="button" onClick={() => act(it.id, "DELETE")}>
-											Discard
-										</button>
-									</div>
-								)}
+										))}
+								</span>
+								<button
+									type="button"
+									className="btn-quiet"
+									onClick={() => act(it.id, "DELETE")}
+								>
+									Discard
+								</button>
 							</div>
 						</td>
 					</tr>
 				))}
 			</tbody>
 		</table>
-	);
-
-	return (
-		<>
-			<div className="inline-actions">
-				<button type="button" onClick={scan} disabled={scanning}>
-					{scanning ? "Scanning…" : "Scan watch folder"}
-				</button>
-			</div>
-			{present.length > 1 && (
-				<div className="dashboard">
-					<button
-						type="button"
-						className={typeFilter === "all" ? "stat active" : "stat"}
-						onClick={() => setTypeFilter("all")}
-					>
-						<b>{queryFiltered.length}</b> all
-					</button>
-					{barTypes.map(([k, label]) => (
-						<button
-							key={k}
-							type="button"
-							className={typeFilter === k ? "stat active" : "stat"}
-							onClick={() => setTypeFilter(k)}
-						>
-							<b>{counts[k]}</b> {label}
-						</button>
-					))}
-				</div>
-			)}
-			{items.length === 0 && <p>Nothing waiting to import.</p>}
-			{items.length > 0 && shown.length === 0 && (
-				<p className="muted">Nothing to show for this filter.</p>
-			)}
-			{groups.map((g) => (
-				<section key={g.key}>
-					<h3 className="task-group">
-						{g.label} <span className="muted">({g.rows.length})</span>
-					</h3>
-					{table(g.rows)}
-				</section>
-			))}
-		</>
 	);
 }

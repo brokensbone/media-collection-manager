@@ -5,24 +5,36 @@ export function Cover({
 	id,
 	hasArt,
 	spotifyId,
+	size = 32,
 }: {
 	id: number;
 	hasArt: boolean;
 	spotifyId?: string | null;
+	size?: 24 | 32;
 }) {
+	const cls = size === 24 ? "cover cover-24" : "cover";
 	const img = hasArt ? (
-		<img className="cover" src={`/art/${id}`} alt="" loading="lazy" />
+		<img
+			className={cls}
+			src={`/art/${id}`}
+			alt=""
+			width={size}
+			height={size}
+			loading="lazy"
+		/>
 	) : (
-		<span className="cover cover-empty" />
+		<span className={`${cls} cover-empty`} />
 	);
 	return (
-		<td className="cover-cell">
+		<td className="cell-cover">
 			{spotifyId ? (
 				<a
+					className="cover-link"
 					href={`https://open.spotify.com/album/${spotifyId}`}
 					target="_blank"
 					rel="noopener noreferrer"
 					title="Open in Spotify"
+					aria-label="Open in Spotify"
 				>
 					{img}
 				</a>

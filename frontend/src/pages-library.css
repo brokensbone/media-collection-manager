@@ -1,0 +1,333 @@
+/* Owned, Dismissed and Crates. */
+
+/* ---------- Owned / Dismissed ---------- */
+.sort-control {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--s2);
+}
+.sort-label {
+	font-size: var(--fs-meta);
+	color: var(--muted);
+}
+.rows col.c-links {
+	width: 96px;
+}
+.rows col.c-state {
+	width: 110px;
+}
+
+/* The pills sit on an inner flex wrapper: a display:flex <td> drops out of the table box model. */
+.pill-row {
+	display: flex;
+	gap: var(--s1);
+	align-items: center;
+}
+.pill {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: var(--bg);
+	color: var(--muted);
+	font-size: 10px;
+	font-weight: 600;
+	line-height: 1;
+	letter-spacing: 0.02em;
+}
+.pill svg {
+	display: block;
+}
+.pill:hover {
+	text-decoration: none;
+	color: var(--accent);
+	border-color: var(--accent);
+}
+.pill-sp:hover {
+	color: #1db954; /* Spotify green */
+	border-color: #1db954;
+}
+.pill-mb:hover {
+	color: #ba478f; /* MusicBrainz magenta */
+	border-color: #ba478f;
+}
+
+@media (max-width: 719.98px) {
+	table.library-table tr {
+		grid-template-columns: 24px 1fr auto;
+		grid-template-areas:
+			"cover primary actions"
+			"cover secondary actions";
+		align-items: center;
+		column-gap: var(--s3);
+		padding: 6px 0;
+	}
+	table.library-table .cell-cover {
+		align-self: start;
+		padding-top: 2px;
+	}
+	table.library-table .cell-meta {
+		grid-area: secondary;
+		justify-self: end;
+	}
+	table.library-table .cell-actions {
+		margin-top: 0;
+	}
+	table.library-table .cell-secondary {
+		font-size: var(--fs-meta);
+		color: var(--muted);
+	}
+}
+
+/* ---------- Crates ---------- */
+.crumbs {
+	font-size: var(--fs-meta);
+	color: var(--muted);
+}
+.crumbs ol {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.crumbs li + li::before {
+	content: "›";
+	padding: 0 6px;
+	color: var(--muted);
+}
+.crumb-here {
+	color: var(--text);
+}
+
+.cap-meter {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--s1) var(--s3);
+	margin: calc(-1 * var(--s1)) 0 var(--s2);
+}
+.cap-bar {
+	width: 280px;
+	max-width: 100%;
+	height: 6px;
+	border-radius: 999px;
+	background: var(--surface-2);
+	overflow: hidden;
+}
+.cap-fill {
+	height: 100%;
+	border-radius: 999px;
+	background: var(--accent);
+}
+.cap-label {
+	font-size: var(--fs-meta);
+	color: var(--muted);
+	font-variant-numeric: tabular-nums;
+}
+.cap-meter.over .cap-fill {
+	background: var(--warn);
+}
+.cap-meter.over .cap-label {
+	color: var(--warn);
+}
+.crate-error {
+	margin: var(--s2) 0;
+	padding: var(--s2) var(--s3);
+	border-radius: var(--r);
+	background: var(--danger-soft);
+	color: var(--danger);
+	font-size: var(--fs-meta);
+}
+
+h2.crate-section {
+	margin: var(--s4) 0 var(--s2);
+}
+.crate-section-count {
+	margin-left: 4px;
+	font-variant-numeric: tabular-nums;
+}
+
+.subbox-bar {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--s2) var(--s4);
+}
+.chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--s2);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.chip-link {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--s2);
+	min-height: var(--ctl);
+	padding: 0 10px;
+	border: 1px solid var(--border);
+	border-radius: var(--r);
+	background: var(--surface);
+	color: var(--text);
+}
+.chip-link:hover {
+	text-decoration: none;
+	border-color: var(--accent);
+	color: var(--accent);
+}
+.chip-name {
+	font-weight: 500;
+}
+.chip-count {
+	font-size: var(--fs-meta);
+	color: var(--muted);
+	font-variant-numeric: tabular-nums;
+}
+.subbox-add {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--s1);
+}
+.subbox-add input {
+	width: 160px;
+}
+.suggest-split {
+	margin-left: auto;
+}
+
+.splits {
+	display: flex;
+	flex-direction: column;
+	gap: var(--s1);
+	margin: var(--s3) 0 0;
+	padding: 0;
+	list-style: none;
+}
+.split {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--s3);
+	padding: var(--s2) var(--s3);
+	border: 1px solid var(--border);
+	border-radius: var(--r);
+}
+.split-desc {
+	font-size: var(--fs-meta);
+	color: var(--muted);
+}
+.split-desc strong {
+	color: var(--text);
+}
+
+.move-bar {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--s2) var(--s3);
+	min-height: 46px;
+	padding: var(--s2) var(--s3);
+	border: 1px solid var(--border);
+	border-radius: var(--r);
+	background: var(--bg);
+}
+.move-bar.active {
+	background: var(--accent-soft);
+}
+.move-hint {
+	font-size: var(--fs-meta);
+	color: var(--muted);
+}
+@media (min-width: 720px) {
+	.move-bar {
+		position: sticky;
+		top: var(--header-h);
+		z-index: 6;
+		height: 46px;
+	}
+	/* The column header sticks under the bar. */
+	table.rows.crate-table.sticky-head thead th {
+		top: calc(var(--header-h) + 46px);
+	}
+}
+/* On a phone the bar only appears with a selection, pinned to the bottom so it stays in reach. */
+@media (max-width: 719.98px) {
+	.move-bar:not(.active) {
+		display: none;
+	}
+	.move-bar.active {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 30;
+		border-width: 1px 0 0;
+		border-radius: 0;
+		padding: var(--s2) var(--s4) calc(var(--s2) + env(safe-area-inset-bottom));
+	}
+	.crates.has-selection {
+		padding-bottom: 140px;
+	}
+}
+.move-count {
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+}
+.move-to,
+.move-new {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--s1);
+}
+.move-to {
+	gap: var(--s2);
+}
+
+.crate-table tbody tr {
+	cursor: pointer;
+}
+.rows td.cell-check {
+	padding-right: 0;
+}
+
+@media (max-width: 719.98px) {
+	.subbox-add {
+		flex: 1 0 100%;
+	}
+	.subbox-add input {
+		flex: 1;
+		width: auto;
+	}
+	.suggest-split {
+		margin-left: 0;
+	}
+	/* "[x] Artist — Title" flowing as one wrapped line, with the meta line under it. */
+	table.crate-table tr {
+		display: block;
+		position: relative;
+		padding: 6px 0 6px 40px;
+	}
+	table.crate-table td.cell-check {
+		position: absolute;
+		left: 10px;
+		top: 8px;
+	}
+	table.crate-table td.cell-primary,
+	table.crate-table td.cell-secondary {
+		display: inline;
+	}
+	table.crate-table td.cell-secondary::before {
+		content: " — ";
+		color: var(--muted);
+	}
+}
+/* Checked rows carry the tint; the keyboard cursor there is only the bar, so the two stay distinct. */
+.crate-table tbody tr.sel:not(.checked):not(:hover) td {
+	background: none;
+}
