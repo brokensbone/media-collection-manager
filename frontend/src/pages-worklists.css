@@ -1,0 +1,135 @@
+/* Releases, Decide and Acquire (including its mark-owned dialog). */
+
+/* ---------- Worklist rows ---------- */
+.worklist col.c-wl-actions {
+	width: 272px;
+}
+.worklist col.c-find {
+	width: 200px;
+}
+.acquire-table col.c-artist {
+	width: 17%;
+}
+.worklist col.c-acquire-actions {
+	width: 280px;
+}
+.worklist .cell-secondary .badge:first-of-type {
+	margin-left: 8px;
+}
+.worklist .row-actions button {
+	gap: 6px;
+}
+.worklist .btn-primary .kbd {
+	background: transparent;
+	border-color: currentColor;
+	color: inherit;
+	opacity: 0.85;
+}
+/* Kbd chips take their space on every row, so buttons don't shift as the selection moves. */
+.worklist .row-actions .kbd {
+	visibility: hidden;
+}
+.worklist tr.sel .row-actions .kbd {
+	visibility: visible;
+}
+
+/* ---------- Acquire ---------- */
+.find-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px 10px;
+}
+.find-links a,
+a.pending {
+	text-decoration: none;
+}
+.find-links a {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	white-space: nowrap;
+}
+.find-links a:hover,
+a.pending:hover {
+	text-decoration: underline;
+}
+.find-links svg {
+	opacity: 0.7;
+}
+.acquire-table .row-meta {
+	margin-top: 2px;
+}
+a.pending {
+	color: inherit;
+}
+a.pending:hover {
+	color: var(--text);
+}
+a.pending .status {
+	margin: 0 2px 0 0;
+}
+.owned-hint {
+	color: var(--warn);
+}
+
+/* ---------- Mark-owned dialog ---------- */
+.modal-search {
+	width: 100%;
+}
+.candidates {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	max-height: min(320px, 50vh);
+	overflow-y: auto;
+	margin: 0 calc(-1 * var(--s1));
+	padding: 0 var(--s1);
+}
+.candidates button.candidate {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--s2);
+	width: 100%;
+	height: auto;
+	padding: 6px 8px;
+	border-color: transparent;
+	text-align: left;
+	overflow-wrap: anywhere;
+}
+.candidates button.candidate:hover {
+	border-color: var(--border);
+}
+.candidates-note {
+	margin: var(--s2) 0;
+	color: var(--muted);
+	font-size: var(--fs-meta);
+}
+.modal-actions {
+	padding-top: var(--s3);
+	border-top: 1px solid var(--border);
+}
+
+@media (max-width: 719.98px) {
+	.worklist .row-actions .kbd {
+		display: none;
+	}
+	table.worklist tr {
+		grid-template-areas:
+			"cover primary"
+			"cover secondary"
+			"cover meta"
+			"actions actions";
+	}
+	.worklist .cell-cover {
+		align-self: start;
+	}
+	.worklist .cell-meta:not(:empty) {
+		margin-top: 2px;
+	}
+	/* Selection is a keyboard affordance; on a phone it would only pin a highlight on the first card. */
+	table.worklist tr.sel {
+		background: none;
+		box-shadow: none;
+	}
+}

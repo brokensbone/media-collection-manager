@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Releases } from "./Releases";
 
@@ -15,6 +21,7 @@ function mockApi(items: unknown) {
 afterEach(() => {
 	cleanup();
 	vi.unstubAllGlobals();
+	window.history.replaceState(null, "", "/");
 });
 
 describe("Releases", () => {
@@ -74,5 +81,73 @@ describe("Releases", () => {
 		await screen.findByText(/No new releases/);
 		const posted = fetchMock.mock.calls.find((c) => c[1]?.method === "POST");
 		expect(posted?.[0]).toBe("/albums/5/want");
+	});
+
+	it("shows an error with Retry when the load fails, not the empty sentence", async () => {
+		const fetchMock = vi.fn(() => Promise.reject(new Error("down")));
+		vi.stubGlobal("fetch", fetchMock);
+		render(<Releases />);
+		expect(await screen.findByText("Couldn’t load releases.")).toBeTruthy();
+		expect(screen.queryByText(/No new releases/)).toBeNull();
+		mockApi([{ id: 1, artist: "B", title: "Back", has_art: false }]);
+		fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+		expect(await screen.findByText("Back")).toBeTruthy();
+	});
+
+	it("shows the no-match state when the filter leaves nothing", async () => {
+		mockApi([{ id: 1, artist: "B", title: "Only", has_art: false }]);
+		render(<Releases query="zzz" />);
+		expect(await screen.findByText("No matches for “zzz”")).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Clear filter" })).toBeTruthy();
+	});
+
+	it("moves with j and saves, wants or dismisses the selected row by key", async () => {
+		const fetchMock = mockApi([
+			{ id: 1, artist: "A", title: "First", has_art: false },
+			{ id: 2, artist: "B", title: "Second", has_art: false },
+			{ id: 3, artist: "C", title: "Third", has_art: false },
+		]);
+		render(<Releases />);
+		await screen.findByText("First");
+		expect(
+			screen.getByText("First").closest("tr")?.getAttribute("aria-selected"),
+		).toBe("true");
+		fireEvent.keyDown(document.body, { key: "j" });
+		expect(
+			screen.getByText("Second").closest("tr")?.getAttribute("aria-selected"),
+		).toBe("true");
+		fireEvent.keyDown(document.body, { key: "w" });
+		await waitFor(() =>
+			expect(fetchMock).toHaveBeenCalledWith("/albums/2/want", {
+				method: "POST",
+			}),
+		);
+		fireEvent.keyDown(document.body, { key: "d" });
+		await waitFor(() =>
+			expect(fetchMock).toHaveBeenCalledWith("/albums/3/dismiss", {
+				method: "POST",
+			}),
+		);
+		fireEvent.keyDown(document.body, { key: "s" });
+		await waitFor(() =>
+			expect(fetchMock).toHaveBeenCalledWith("/albums/1/save", {
+				method: "POST",
+			}),
+		);
+	});
+
+	it("with a limit: no header, no keyboard, no selection", async () => {
+		const fetchMock = mockApi([
+			{ id: 1, artist: "A", title: "First", has_art: false },
+		]);
+		render(<Releases limit={5} />);
+		await screen.findByText("First");
+		expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+		expect(document.querySelector("thead")).toBeNull();
+		expect(document.querySelector("[aria-selected]")).toBeNull();
+		fireEvent.keyDown(document.body, { key: "s" });
+		expect(fetchMock.mock.calls.some((c) => c[1]?.method === "POST")).toBe(
+			false,
+		);
 	});
 });
