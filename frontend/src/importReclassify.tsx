@@ -20,6 +20,7 @@ export function ImportReclassify({
 }) {
 	return (
 		<select
+			className="kind-select"
 			aria-label={`Classify ${item.name}`}
 			value={kindValue(item)}
 			disabled={disabled}

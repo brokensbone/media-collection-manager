@@ -1,11 +1,37 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import "./pages-imports.css";
+import {
+	Fragment,
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
+import { fetchJson } from "./api";
+import { useHashParam } from "./hashState";
 import {
 	type ImportItem,
 	type ImportState,
 	labelKind,
 	whenLabel,
+	whenTitle,
 } from "./importItem";
 import { ImportReclassify } from "./importReclassify";
+import { shouldIgnoreKey } from "./keys";
+import {
+	EmptyState,
+	ErrorState,
+	FilterBox,
+	GroupHead,
+	IMPORT_STATE_TONE,
+	Loading,
+	NoMatches,
+	PageHeader,
+	PollWarning,
+	StatusBadge,
+	type Tone,
+	useAnnounceCount,
+} from "./ui";
 
 const STATUS: Record<ImportState, string> = {
 	detected: "",
@@ -18,12 +44,13 @@ const STATUS: Record<ImportState, string> = {
 
 // Status groups shown top-to-bottom in the Tasks view. Completed (imported/skipped) is last and,
 // in the default view, limited to the recent window server-side; the archive shows all of it.
-const GROUPS: { label: string; states: ImportState[] }[] = [
+const GROUPS: { label: string; states: ImportState[]; tone?: Tone }[] = [
 	{ label: "In progress", states: ["importing"] },
 	{ label: "Queued", states: ["queued"] },
-	{ label: "Failed", states: ["failed"] },
+	{ label: "Failed", states: ["failed"], tone: "danger" },
 	{ label: "Completed", states: ["imported", "skipped"] },
 ];
+const ACTIVE: ImportState[] = ["importing", "queued", "failed"];
 
 export function Tasks({
 	onChange,
@@ -37,44 +64,38 @@ export function Tasks({
 	limit?: number;
 }) {
 	const [items, setItems] = useState<ImportItem[] | null>(null);
+	const [failed, setFailed] = useState(false);
 	// The expanded failure log is mirrored in the URL (#tasks?log=42) so a specific failure is
 	// shareable/deep-linkable; the archive has no failed rows, so it never uses this.
-	const [openLog, setOpenLog] = useState<number | null>(() =>
-		archive ? null : logFromHash(),
-	);
+	const [logParam, setLogParam] = useHashParam("log");
+	const openLog = archive || !logParam ? null : Number(logParam);
+	const [itemParam] = useHashParam("item");
+	const linkedId = Number(itemParam);
 	const removed = useRef<Set<number>>(new Set());
-	const linkedId = Number(
-		new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("item"),
-	);
 	const focused = useRef(false);
 
 	const toggleLog = useCallback(
-		(id: number) => {
-			setOpenLog((cur) => {
-				const next = cur === id ? null : id;
-				if (!archive)
-					window.location.hash = next === null ? "tasks" : `tasks?log=${next}`;
-				return next;
-			});
-		},
-		[archive],
+		(id: number) => setLogParam(openLog === id ? null : String(id)),
+		[openLog, setLogParam],
 	);
 
-	// Follow the URL: a shared #tasks?log=42 link (or back/forward) opens that failure's log.
 	useEffect(() => {
-		if (archive) return;
-		const onHash = () => setOpenLog(logFromHash());
-		window.addEventListener("hashchange", onHash);
-		return () => window.removeEventListener("hashchange", onHash);
-	}, [archive]);
+		if (openLog == null) return;
+		function onKey(e: KeyboardEvent) {
+			if (e.key !== "Escape" || shouldIgnoreKey(e)) return;
+			setLogParam(null);
+		}
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [openLog, setLogParam]);
 
 	const refresh = useCallback(() => {
-		fetch(archive ? "/imports/archive" : "/imports/tasks")
-			.then((r) => r.json())
-			.then((data: ImportItem[]) =>
-				setItems(data.filter((it) => !removed.current.has(it.id))),
-			)
-			.catch(() => setItems([]));
+		fetchJson<ImportItem[]>(archive ? "/imports/archive" : "/imports/tasks")
+			.then((data) => {
+				setItems(data.filter((it) => !removed.current.has(it.id)));
+				setFailed(false);
+			})
+			.catch(() => setFailed(true));
 	}, [archive]);
 
 	// Poll the live Tasks view so queued → importing → completed updates on screen; the archive is
@@ -103,12 +124,13 @@ export function Tasks({
 	);
 
 	// Bring a deep-linked failure into view once its row has rendered.
+	const hasItems = items != null;
 	useEffect(() => {
-		if (openLog == null || !items) return;
+		if (openLog == null || !hasItems) return;
 		document
 			.getElementById(`task-${openLog}`)
 			?.scrollIntoView?.({ block: "center" });
-	}, [openLog, items]);
+	}, [openLog, hasItems]);
 
 	useEffect(() => {
 		if (
@@ -123,65 +145,211 @@ export function Tasks({
 			?.scrollIntoView?.({ block: "center" });
 	}, [items, linkedId]);
 
-	if (!items) return <p>Loading…</p>;
+	const shown = (items ?? []).filter((it) =>
+		`${it.name} ${it.matched ?? ""}`
+			.toLowerCase()
+			.includes(query.toLowerCase()),
+	);
+	useAnnounceCount(
+		shown.length,
+		items?.length ?? 0,
+		limit == null && items != null && query !== "",
+	);
 
-	const shown = (
-		query
-			? items.filter((it) =>
-					`${it.name} ${it.matched ?? ""}`
-						.toLowerCase()
-						.includes(query.toLowerCase()),
-				)
-			: items
-	).slice(0, limit);
+	const table = (list: ImportItem[], head = true) => (
+		<TaskTable
+			rows={list}
+			head={head}
+			linkedId={linkedId}
+			openLog={openLog}
+			toggleLog={toggleLog}
+			act={act}
+			refresh={refresh}
+		/>
+	);
 
-	const rows = (list: ImportItem[]) => (
-		<table className="mobile-card-table tasks-table">
+	const loadState = !items ? (
+		failed ? (
+			<ErrorState
+				what={archive ? "the archive" : "import tasks"}
+				onRetry={refresh}
+			/>
+		) : (
+			<Loading rows={limit != null ? 2 : 4} />
+		)
+	) : null;
+
+	if (limit != null) {
+		if (loadState) return loadState;
+		const active = shown
+			.filter((it) => ACTIVE.includes(it.state))
+			.sort((a, b) => ACTIVE.indexOf(a.state) - ACTIVE.indexOf(b.state))
+			.slice(0, limit);
+		if (active.length === 0)
+			return (
+				<p className="state-inline">
+					{query && items?.length
+						? `No matches for “${query}”.`
+						: "Nothing waiting."}
+				</p>
+			);
+		return table(active, false);
+	}
+
+	const count = items
+		? query
+			? `${shown.length} of ${items.length}`
+			: items.length
+		: undefined;
+	const header = archive ? (
+		<PageHeader
+			title="Completed archive"
+			count={count}
+			back={{ href: "#tasks", label: "Back to tasks" }}
+			filter={<FilterBox placeholder="Filter name or match" />}
+		/>
+	) : (
+		<PageHeader
+			title="Tasks"
+			count={count}
+			filter={<FilterBox placeholder="Filter name or match" />}
+		>
+			<a href="#archive" className="archive-link">
+				View completed archive →
+			</a>
+		</PageHeader>
+	);
+
+	let content: ReactNode = loadState;
+	if (!items) {
+		// loading or error, set above
+	} else if (items.length === 0)
+		content = (
+			<EmptyState
+				title={archive ? "No completed imports." : "No import tasks."}
+			/>
+		);
+	else if (shown.length === 0)
+		content = (
+			<NoMatches query={query} what={archive ? "the archive" : "Tasks"} />
+		);
+	else if (archive) content = table(shown);
+	else
+		content = GROUPS.map((g) => ({
+			...g,
+			rows: shown.filter((it) => g.states.includes(it.state)),
+		}))
+			.filter((g) => g.rows.length > 0)
+			.map((g, i) => (
+				<section key={g.label} className="task-group">
+					<GroupHead title={g.label} count={g.rows.length} tone={g.tone} />
+					{table(g.rows, i === 0)}
+				</section>
+			));
+
+	return (
+		<>
+			{header}
+			<PollWarning show={failed && items != null} />
+			{content}
+		</>
+	);
+}
+
+function TaskTable({
+	rows,
+	head,
+	linkedId,
+	openLog,
+	toggleLog,
+	act,
+	refresh,
+}: {
+	rows: ImportItem[];
+	head: boolean;
+	linkedId: number;
+	openLog: number | null;
+	toggleLog: (id: number) => void;
+	act: (id: number, method: "POST" | "DELETE") => void;
+	refresh: () => void;
+}) {
+	return (
+		<table className="rows tall no-cover tasks-table">
 			<colgroup>
-				<col className="c-source" />
 				<col />
 				<col className="c-when" />
 				<col className="c-task-actions" />
 			</colgroup>
+			{/* Status groups each get a table; only the first shows its header, the rest keep it for screen readers. */}
+			<thead className={head ? undefined : "sr-thead"}>
+				<tr>
+					<th scope="col">Name</th>
+					<th scope="col">When</th>
+					<th scope="col">Status</th>
+				</tr>
+			</thead>
 			<tbody>
-				{list.map((it) => (
+				{rows.map((it) => (
 					<Fragment key={it.id}>
 						<tr
 							id={`task-${it.id}`}
 							className={it.id === linkedId ? "linked" : undefined}
 						>
-							<td className="muted">{it.source}</td>
-							<td>
-								<div>{it.name}</div>
-								<div className="muted">
-									{labelKind(it.media_kind)}
+							<td className="cell-primary">
+								{it.name}
+								<span className="row-meta">
+									<span className="src">{it.source}</span>
+									{` · ${labelKind(it.media_kind)}`}
 									{it.matched ? ` · ${it.matched}` : ""}
-								</div>
-								{it.destination_path && (
-									<div className="muted">{it.destination_path}</div>
-								)}
+									{it.destination_path && (
+										<>
+											{" · "}
+											<span className="mono path">{it.destination_path}</span>
+										</>
+									)}
+								</span>
 							</td>
-							<td className="muted nowrap">{whenLabel(it.updated_at)}</td>
-							<td className="row-actions">
-								<div className="task-actions">
+							<td className="cell-meta nowrap" title={whenTitle(it.updated_at)}>
+								{whenLabel(it.updated_at)}
+							</td>
+							<td className="cell-actions">
+								<div className="row-actions task-actions">
+									<span className="task-status">
+										{STATUS[it.state] && (
+											<StatusBadge
+												tone={IMPORT_STATE_TONE[it.state]}
+												pulse={it.state === "importing"}
+											>
+												{STATUS[it.state]}
+											</StatusBadge>
+										)}
+									</span>
 									{it.state !== "imported" &&
 										it.state !== "skipped" &&
 										it.state !== "importing" && (
 											<ImportReclassify item={it} onChange={refresh} />
 										)}
-									<span className="muted">{STATUS[it.state]}</span>
 									{it.state === "failed" && (
 										<>
 											{it.error_detail && (
-												<button type="button" onClick={() => toggleLog(it.id)}>
+												<button
+													type="button"
+													aria-expanded={openLog === it.id}
+													onClick={() => toggleLog(it.id)}
+												>
 													{openLog === it.id ? "Hide log" : "Log"}
 												</button>
 											)}
-											<button type="button" onClick={() => act(it.id, "POST")}>
+											<button
+												type="button"
+												className="btn-primary"
+												onClick={() => act(it.id, "POST")}
+											>
 												Retry
 											</button>
 											<button
 												type="button"
+												className="btn-quiet"
 												onClick={() => act(it.id, "DELETE")}
 											>
 												Discard
@@ -192,8 +360,8 @@ export function Tasks({
 							</td>
 						</tr>
 						{openLog === it.id && it.error_detail && (
-							<tr>
-								<td colSpan={4}>
+							<tr className="log-row">
+								<td colSpan={3}>
 									<pre className="import-log">{it.error_detail}</pre>
 								</td>
 							</tr>
@@ -203,65 +371,4 @@ export function Tasks({
 			</tbody>
 		</table>
 	);
-
-	if (archive) {
-		return (
-			<>
-				<div className="inline-actions">
-					<button
-						type="button"
-						className="linklike"
-						onClick={() => setHash("tasks")}
-					>
-						← Back to tasks
-					</button>
-				</div>
-				{shown.length === 0 ? (
-					<p className="muted">No completed imports.</p>
-				) : (
-					rows(shown)
-				)}
-			</>
-		);
-	}
-
-	const groups = GROUPS.map((g) => ({
-		...g,
-		rows: shown.filter((it) => g.states.includes(it.state)),
-	})).filter((g) => g.rows.length > 0);
-
-	return (
-		<>
-			{groups.length === 0 && <p>No import tasks.</p>}
-			{groups.map((g) => (
-				<section key={g.label}>
-					<h3 className="task-group">
-						{g.label} <span className="muted">({g.rows.length})</span>
-					</h3>
-					{rows(g.rows)}
-				</section>
-			))}
-			<div className="inline-actions">
-				<button
-					type="button"
-					className="linklike"
-					onClick={() => setHash("archive")}
-				>
-					View completed archive →
-				</button>
-			</div>
-		</>
-	);
-}
-
-function setHash(h: string): void {
-	window.location.hash = h;
-}
-
-// The `log` param from a #tasks?log=42 URL, or null.
-function logFromHash(): number | null {
-	const query = window.location.hash.split("?")[1] ?? "";
-	const raw = new URLSearchParams(query).get("log");
-	const id = raw ? Number(raw) : Number.NaN;
-	return Number.isInteger(id) ? id : null;
 }

@@ -186,10 +186,10 @@ describe("Imports", () => {
 		]);
 		render(<Imports />);
 		await screen.findByText("A Song");
-		fireEvent.click(screen.getByRole("button", { name: /\bTV$/ }));
+		fireEvent.click(screen.getByRole("button", { name: /^TV\b/ }));
 		await waitFor(() => expect(screen.queryByText("A Song")).toBeNull());
 		expect(screen.getByText("The Show S01")).toBeTruthy();
-		fireEvent.click(screen.getByRole("button", { name: /\ball$/ }));
+		fireEvent.click(screen.getByRole("button", { name: /^All\b/ }));
 		await waitFor(() => expect(screen.getByText("A Song")).toBeTruthy());
 	});
 
@@ -210,7 +210,7 @@ describe("Imports", () => {
 		]);
 		render(<Imports />);
 		await screen.findByText("Clean Film");
-		fireEvent.click(screen.getByRole("button", { name: /\bReview$/ }));
+		fireEvent.click(screen.getByRole("button", { name: /^Review\b/ }));
 		await waitFor(() => expect(screen.queryByText("Clean Film")).toBeNull());
 		expect(screen.getByText("Mixed Pack")).toBeTruthy();
 	});
@@ -223,7 +223,7 @@ describe("Imports", () => {
 		render(<Imports />);
 		await screen.findByText("Newer Drop");
 		// two day-group headings, and the newer day's rows come first in document order
-		expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(2);
+		expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(2);
 		const body = document.body.textContent ?? "";
 		expect(body.indexOf("Newer Drop")).toBeLessThan(body.indexOf("Older Drop"));
 	});
@@ -235,6 +235,70 @@ describe("Imports", () => {
 		]);
 		render(<Imports />);
 		await screen.findByText("A Song");
-		expect(screen.queryByRole("button", { name: /Music$/ })).toBeNull();
+		expect(screen.queryByRole("button", { name: /^Music\b/ })).toBeNull();
+	});
+
+	it("keeps the kind filter in the URL", async () => {
+		window.location.hash = "#import?kind=tv";
+		mockApi([
+			item({ id: 1, name: "A Song" }),
+			item({
+				id: 2,
+				name: "The Show S01",
+				import_target: "tv",
+				media_kind: "tv",
+			}),
+		]);
+		render(<Imports />);
+		await screen.findByText("The Show S01");
+		expect(screen.queryByText("A Song")).toBeNull();
+		expect(
+			screen
+				.getByRole("button", { name: /^TV\b/ })
+				.getAttribute("aria-pressed"),
+		).toBe("true");
+		fireEvent.click(screen.getByRole("button", { name: /^All\b/ }));
+		expect(window.location.hash).toBe("#import");
+		await screen.findByText("A Song");
+	});
+
+	it("says when the filter matches nothing, distinct from an empty list", async () => {
+		mockApi([item({ id: 1, name: "A Song" })]);
+		render(<Imports query="zzz" />);
+		expect(await screen.findByText("No matches for “zzz”")).toBeTruthy();
+		expect(screen.queryByText("Nothing waiting to import.")).toBeNull();
+	});
+
+	it("shows an error with Retry when the list fails to load", async () => {
+		const fetchMock = vi.fn(() => Promise.reject(new Error("down")));
+		vi.stubGlobal("fetch", fetchMock);
+		render(<Imports />);
+		expect(await screen.findByText("Couldn’t load imports.")).toBeTruthy();
+		expect(screen.queryByText("Nothing waiting to import.")).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+		expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
+	});
+
+	it("with a limit shows the newest rows and no page controls", async () => {
+		mockApi([
+			item({ id: 1, name: "Old", created_at: "2026-07-01T09:00:00Z" }),
+			item({ id: 2, name: "Mid", created_at: "2026-07-02T09:00:00Z" }),
+			item({
+				id: 3,
+				name: "New",
+				import_target: "tv",
+				media_kind: "tv",
+				created_at: "2026-07-03T09:00:00Z",
+			}),
+		]);
+		render(<Imports limit={2} />);
+		await screen.findByText("New");
+		expect(screen.getByText("Mid")).toBeTruthy();
+		expect(screen.queryByText("Old")).toBeNull();
+		expect(screen.queryByRole("heading")).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: "Scan watch folder" }),
+		).toBeNull();
+		expect(screen.queryByRole("button", { name: /^All\b/ })).toBeNull();
 	});
 });

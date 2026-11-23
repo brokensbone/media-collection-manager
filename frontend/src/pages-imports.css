@@ -1,0 +1,114 @@
+/* Import, Tasks and the completed archive. */
+.rows col.c-matched {
+	width: 27%;
+}
+.rows col.c-import-actions {
+	width: 310px;
+}
+.rows.tasks-table col.c-when {
+	width: 96px;
+}
+.rows.tasks-table col.c-task-actions {
+	width: 420px;
+}
+/* Left-aligned with a fixed status slot, so selects and buttons line up down the column. */
+.import-table div.row-actions,
+.tasks-table div.row-actions {
+	justify-content: flex-start;
+}
+.import-slot {
+	display: inline-flex;
+	align-items: center;
+	flex: 0 0 auto;
+	min-width: 92px;
+}
+.task-status {
+	flex: 0 0 auto;
+	min-width: 64px;
+}
+.import-table .cell-secondary .status,
+.import-table .row-actions .status,
+.tasks-table .row-actions .status {
+	margin-left: 0;
+}
+.import-table .cell-secondary > .status {
+	margin-left: 6px;
+}
+.missing-line {
+	margin-top: 2px;
+}
+.row-meta .path {
+	font-size: var(--fs-micro);
+}
+select.kind-select {
+	width: 120px;
+	flex: 0 0 auto;
+}
+
+.import-day .group-head,
+.task-group .group-head {
+	margin-top: var(--s3);
+}
+.import-day:first-of-type .group-head,
+.task-group:first-of-type .group-head {
+	margin-top: 0;
+}
+.archive-link {
+	font-size: var(--fs-meta);
+}
+
+/* The expanded failure log under a failed row: the one nested scroller on the page. */
+.tasks-table tr.log-row td {
+	height: auto;
+	padding: 0 8px 8px;
+}
+.tasks-table tr.log-row:hover td {
+	background: none;
+}
+.import-log {
+	margin: 0;
+	padding: 8px 10px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--r);
+	color: var(--text);
+	font-family: var(--font-mono);
+	font-size: 12px;
+	line-height: 1.45;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	max-height: 320px;
+	overflow: auto;
+}
+
+@media (max-width: 719.98px) {
+	table.import-table tr {
+		grid-template-areas: "primary" "secondary" "actions";
+	}
+	/* The time sits beside the name so the actions get the full width and stay on one line. */
+	table.tasks-table tr {
+		grid-template-columns: 1fr auto;
+		grid-template-areas:
+			"primary meta"
+			"actions actions";
+		align-items: start;
+	}
+	.task-status,
+	.import-slot {
+		min-width: 0;
+	}
+	.tasks-table select.kind-select {
+		width: 100px;
+	}
+	.import-table .cell-secondary {
+		margin-top: 2px;
+		font-size: var(--fs-meta);
+	}
+	table.tasks-table tr.log-row {
+		display: block;
+		padding-top: 0;
+	}
+	.tasks-table tr.log-row td {
+		padding: 0;
+	}
+}
