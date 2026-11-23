@@ -1,3 +1,4 @@
+import "./pages-tools.css";
 import { useEffect, useState } from "react";
 
 type Status = {
@@ -8,6 +9,11 @@ type Status = {
 };
 
 const LOGIN_URL = "/auth/spotify/login";
+const COUNTDOWN_VISIBLE_DAYS = 14;
+
+function Dot({ tone }: { tone: "ok" | "warn" | "danger" }) {
+	return <span className={`spotify-dot dot-${tone}`} aria-hidden="true" />;
+}
 
 export function SpotifyStatus() {
 	const [status, setStatus] = useState<Status | null>(null);
@@ -19,20 +25,31 @@ export function SpotifyStatus() {
 			.catch(() => setStatus(null));
 	}, []);
 
-	if (!status) return <span>Spotify: …</span>;
+	if (!status) return <span className="spotify-status muted">Spotify: …</span>;
 
 	if (!status.connected) {
-		return <a href={LOGIN_URL}>Connect Spotify</a>;
+		return (
+			<a className="spotify-status" href={LOGIN_URL}>
+				<Dot tone="danger" />
+				Connect Spotify
+			</a>
+		);
 	}
 
 	const countdown =
 		status.reauth_in_days !== null
 			? ` · reauth in ${status.reauth_in_days}d`
 			: "";
+	const soon =
+		!status.reauth_due &&
+		status.reauth_in_days !== null &&
+		status.reauth_in_days <= COUNTDOWN_VISIBLE_DAYS;
 
 	return (
-		<span title={`Connected${countdown}`}>
+		<span className="spotify-status" title={`Connected${countdown}`}>
+			<Dot tone={status.reauth_due ? "warn" : "ok"} />
 			Spotify
+			{soon && <span className="muted">{countdown}</span>}
 			{status.reauth_due && (
 				<>
 					{" · "}

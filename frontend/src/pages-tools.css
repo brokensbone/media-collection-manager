@@ -1,0 +1,336 @@
+/* Radio, Transmission, Activity, Guide and the header's Spotify status. */
+
+/* ---------- Spotify status ---------- */
+.spotify-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+.spotify-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 999px;
+	flex: none;
+}
+.spotify-dot.dot-ok {
+	background: var(--ok);
+}
+.spotify-dot.dot-warn {
+	background: var(--warn);
+}
+.spotify-dot.dot-danger {
+	background: var(--danger);
+}
+
+/* ---------- Transmission ---------- */
+.tools-cards {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: var(--s4);
+}
+.tools-cards h2 {
+	margin: 0;
+}
+.card-hint {
+	margin: var(--s1) 0 var(--s3);
+	font-size: var(--fs-meta);
+	line-height: 16px;
+	color: var(--muted);
+}
+.checks {
+	display: grid;
+	gap: var(--s1);
+	margin-top: var(--s3);
+}
+.check-line {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: var(--s2);
+	min-width: 0;
+}
+.check-line .status {
+	margin-left: 0;
+}
+.check-line .muted {
+	font-size: var(--fs-meta);
+	overflow-wrap: anywhere;
+}
+.torrent-upload {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--s2);
+}
+.torrent-upload input[type="file"] {
+	min-width: 0;
+	max-width: 100%;
+	color: var(--muted);
+	font-size: var(--fs-meta);
+}
+.upload-status {
+	margin: var(--s2) 0 0;
+	overflow-wrap: anywhere;
+}
+.upload-status.tone-ok {
+	color: var(--ok);
+}
+.upload-status.tone-danger {
+	color: var(--danger);
+}
+.upload-note {
+	margin: var(--s2) 0 0;
+}
+.upload-results {
+	margin: var(--s1) 0 0;
+	padding-left: 20px;
+	overflow-wrap: anywhere;
+}
+.torrents col.c-kind {
+	width: 96px;
+}
+.torrents col.c-state {
+	width: 140px;
+}
+.torrents col.c-matched {
+	width: 28%;
+}
+.torrents .status {
+	margin-left: 0;
+}
+
+/* ---------- Activity ---------- */
+.activity col.c-time {
+	width: 84px;
+}
+.activity col.c-job {
+	width: 120px;
+}
+.activity .ev-time {
+	font-family: var(--font-mono);
+	font-size: var(--fs-meta);
+	color: var(--muted);
+	white-space: nowrap;
+}
+.ev-job {
+	display: inline-block;
+	padding: 0 6px;
+	border: 1px solid var(--border);
+	border-radius: var(--r);
+	background: var(--surface);
+	font-family: var(--font-mono);
+	font-size: var(--fs-micro);
+	line-height: 16px;
+	color: var(--muted);
+	white-space: nowrap;
+}
+.ev-message .status {
+	margin: 0 var(--s2) 0 0;
+}
+
+/* ---------- Radio ---------- */
+.radio .page-controls {
+	position: relative;
+}
+.radio-archive summary {
+	cursor: pointer;
+	color: var(--muted);
+	font-size: var(--fs-meta);
+	white-space: nowrap;
+}
+.radio-archive summary:hover {
+	color: var(--text);
+}
+.radio-archive-panel {
+	position: absolute;
+	z-index: 20;
+	top: calc(100% + var(--s1));
+	right: 0;
+	display: grid;
+	gap: var(--s2);
+	width: max-content;
+	max-width: calc(100vw - 2 * var(--s4));
+	padding: var(--s3);
+	border: 1px solid var(--border);
+	border-radius: var(--r);
+	background: var(--bg);
+	box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+}
+.radio-archive-month summary {
+	margin-bottom: var(--s1);
+}
+.radio-day {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--s2);
+	padding-bottom: var(--s2);
+	border-bottom: 1px solid var(--border);
+}
+.radio-day h2 {
+	margin: 0;
+}
+.radio-day-meta {
+	font-size: var(--fs-meta);
+	color: var(--muted);
+	font-variant-numeric: tabular-nums;
+}
+.radio-note {
+	margin: var(--s2) 0 0;
+	color: var(--muted);
+}
+.radio-timeline {
+	margin-top: var(--s4);
+}
+.radio-session {
+	display: grid;
+	grid-template-columns: 64px 1fr;
+	gap: var(--s3);
+	padding: var(--s3) 0;
+	border-bottom: 1px solid var(--border);
+}
+.radio-session:last-child {
+	border-bottom: 0;
+}
+.radio-time {
+	font-family: var(--font-mono);
+	font-size: var(--fs-meta);
+	line-height: 20px;
+	color: var(--muted);
+	font-variant-numeric: tabular-nums;
+}
+.radio-session-content {
+	min-width: 0;
+}
+.radio-session-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0 var(--s2);
+}
+.radio-session-meta {
+	font-size: var(--fs-meta);
+	color: var(--muted);
+}
+.radio-session-content .radio-note {
+	margin-top: 2px;
+}
+.radio-items {
+	margin: var(--s2) 0 0;
+	padding: 0;
+	list-style: none;
+}
+.radio-items > li {
+	display: grid;
+	grid-template-columns: 24px 1fr 56px;
+	gap: var(--s2);
+	padding: 2px 0;
+}
+.radio-num,
+.radio-dur {
+	font-size: var(--fs-meta);
+	color: var(--muted);
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+	line-height: 20px;
+}
+.radio-item-name {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.radio-artist {
+	font-weight: 600;
+}
+.radio-tracks {
+	display: block;
+	font-size: var(--fs-meta);
+	line-height: 16px;
+	color: var(--muted);
+}
+
+/* ---------- Guide ---------- */
+.guide {
+	max-width: 68ch;
+	line-height: 22px;
+}
+.guide p {
+	margin: 0 0 var(--s3);
+}
+.guide ul {
+	margin: 0 0 var(--s3);
+	padding-left: 20px;
+}
+.guide li {
+	margin: var(--s1) 0;
+}
+.funnel-steps {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--s1) 6px;
+}
+.funnel .badge {
+	margin-left: 0;
+}
+.funnel-arrow {
+	color: var(--muted);
+}
+
+@media (max-width: 719.98px) {
+	.tools-cards {
+		grid-template-columns: 1fr;
+		gap: var(--s3);
+	}
+	table.torrents tr {
+		grid-template-columns: auto auto 1fr;
+		grid-template-areas:
+			"primary primary primary"
+			"kind state matched";
+		column-gap: var(--s2);
+		row-gap: var(--s1);
+		align-items: center;
+	}
+	table.torrents .cell-kind {
+		grid-area: kind;
+		font-size: var(--fs-meta);
+	}
+	table.torrents .cell-kind::after {
+		content: " ·";
+	}
+	table.torrents .cell-state {
+		grid-area: state;
+	}
+	table.torrents .cell-matched {
+		grid-area: matched;
+		min-width: 0;
+		font-size: var(--fs-meta);
+	}
+
+	table.activity tr {
+		grid-template-columns: auto 1fr;
+		grid-template-areas:
+			"time job"
+			"msg msg";
+		column-gap: var(--s2);
+		row-gap: 2px;
+	}
+	table.activity .ev-time {
+		grid-area: time;
+	}
+	table.activity .ev-job-cell {
+		grid-area: job;
+	}
+	table.activity .ev-message {
+		grid-area: msg;
+	}
+
+	.radio-session {
+		grid-template-columns: 1fr;
+		gap: var(--s1);
+	}
+	.radio-archive-panel {
+		right: auto;
+		left: 0;
+	}
+}

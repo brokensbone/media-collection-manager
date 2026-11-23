@@ -1,4 +1,21 @@
-import { useCallback, useEffect, useState } from "react";
+import "./pages-tools.css";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { fetchJson } from "./api";
+import { matchesQuery } from "./filter";
+import { useQuery } from "./hashState";
+import {
+	EmptyState,
+	ErrorState,
+	FilterBox,
+	GroupHead,
+	IMPORT_STATE_TONE,
+	Loading,
+	NoMatches,
+	PageHeader,
+	StatusBadge,
+	type Tone,
+	useAnnounceCount,
+} from "./ui";
 
 type Torrent = {
 	id: number;
@@ -21,21 +38,36 @@ type UploadResult = {
 	already_present: boolean;
 };
 
+const STATE_LABEL: Record<string, string> = {
+	importing: "importing…",
+	imported: "imported ✓",
+};
+
+function stateTone(state: string): Tone {
+	return (IMPORT_STATE_TONE as Record<string, Tone>)[state] ?? "muted";
+}
+
 export function Transmission() {
+	const query = useQuery();
 	const [torrents, setTorrents] = useState<Torrent[] | null>(null);
+	const [loadFailed, setLoadFailed] = useState(false);
 	const [report, setReport] = useState<TestReport | null>(null);
 	const [testing, setTesting] = useState(false);
 	const [torrentFiles, setTorrentFiles] = useState<File[]>([]);
 	const [uploading, setUploading] = useState(false);
-	const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+	const [uploadStatus, setUploadStatus] = useState<{
+		ok: boolean;
+		text: string;
+	} | null>(null);
 	const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
 
-	useEffect(() => {
-		fetch("/transmission/torrents")
-			.then((r) => r.json())
+	const loadTorrents = useCallback(() => {
+		setLoadFailed(false);
+		fetchJson<Torrent[]>("/transmission/torrents")
 			.then(setTorrents)
-			.catch(() => setTorrents([]));
+			.catch(() => setLoadFailed(true));
 	}, []);
+	useEffect(loadTorrents, [loadTorrents]);
 
 	const runTest = useCallback(() => {
 		setTesting(true);
@@ -64,119 +96,180 @@ export function Transmission() {
 				results?: UploadResult[];
 			};
 			if (!response.ok) throw new Error(body.detail ?? "Upload failed.");
-			setUploadStatus(body.detail ?? "Torrents added to Transmission.");
+			setUploadStatus({
+				ok: true,
+				text: body.detail ?? "Torrents added to Transmission.",
+			});
 			setUploadResults(
 				(body.results ?? []).filter((result) => result.already_present),
 			);
 			setTorrentFiles([]);
 		} catch (error) {
-			setUploadStatus(
-				error instanceof Error ? error.message : "Upload failed.",
-			);
+			setUploadStatus({
+				ok: false,
+				text: error instanceof Error ? error.message : "Upload failed.",
+			});
 		} finally {
 			setUploading(false);
 		}
 	}, [torrentFiles]);
 
+	const shown = (torrents ?? []).filter((t) =>
+		matchesQuery(`${t.name} ${t.matched ?? ""}`, query),
+	);
+	useAnnounceCount(
+		shown.length,
+		torrents?.length ?? 0,
+		!!query && torrents !== null,
+	);
+
+	let list: ReactNode;
+	if (torrents === null)
+		list = loadFailed ? (
+			<ErrorState what="torrents" onRetry={loadTorrents} />
+		) : (
+			<Loading />
+		);
+	else if (torrents.length === 0)
+		list = (
+			<EmptyState
+				title="No torrents seen yet"
+				hint="Connect Transmission and the poller will fill this in."
+			/>
+		);
+	else if (shown.length === 0)
+		list = <NoMatches query={query} what="torrents" />;
+	else
+		list = (
+			<table className="rows tall no-cover torrents">
+				<colgroup>
+					<col />
+					<col className="c-kind" />
+					<col className="c-state" />
+					<col className="c-matched" />
+				</colgroup>
+				<thead>
+					<tr>
+						<th scope="col">Name</th>
+						<th scope="col">Kind</th>
+						<th scope="col">State</th>
+						<th scope="col">Matched</th>
+					</tr>
+				</thead>
+				<tbody>
+					{shown.map((t) => (
+						<tr key={t.id}>
+							<td className="cell-primary">
+								{t.name}
+								{(t.classification_detail || t.destination_path) && (
+									<span className="row-meta">
+										{t.classification_detail}
+										{t.classification_detail && t.destination_path && " · "}
+										{t.destination_path && (
+											<span className="mono">{t.destination_path}</span>
+										)}
+									</span>
+								)}
+							</td>
+							<td className="cell-kind muted">{kind(t)}</td>
+							<td className="cell-state">
+								<StatusBadge
+									tone={stateTone(t.state)}
+									pulse={t.state === "importing"}
+								>
+									{STATE_LABEL[t.state] ?? t.state}
+								</StatusBadge>
+							</td>
+							<td className="cell-matched">
+								{t.matched ?? <span className="muted">—</span>}
+							</td>
+						</tr>
+					))}
+				</tbody>
+			</table>
+		);
+
 	return (
 		<>
-			<section>
-				<h2>Connection</h2>
-				<p className="muted">
-					Check the app can reach Transmission's RPC API and SSH to the seedbox.
-				</p>
-				<button type="button" onClick={runTest} disabled={testing}>
-					{testing ? "Testing…" : "Test connection"}
-				</button>
-				{report && (
-					<div className="checks">
-						<CheckLine label="API" check={report.api} />
-						<CheckLine label="SSH" check={report.ssh} />
-					</div>
-				)}
-			</section>
-
-			<section>
-				<h2>Add torrent</h2>
-				<p className="muted">
-					Upload one or more .torrent files to start their downloads in
-					Transmission.
-				</p>
-				<div className="torrent-upload">
-					<input
-						aria-label="Upload a .torrent file"
-						type="file"
-						multiple
-						onChange={(event) =>
-							setTorrentFiles(Array.from(event.target.files ?? []))
-						}
-					/>
-					<button
-						type="button"
-						onClick={uploadTorrent}
-						disabled={torrentFiles.length === 0 || uploading}
-					>
-						{uploading ? "Adding…" : "Start download"}
-					</button>
-				</div>
-				{uploadStatus && <p className="upload-status">{uploadStatus}</p>}
-				{uploadResults.length > 0 && (
-					<>
-						<p>Already in Transmission — check for import:</p>
-						<ul className="upload-results">
-							{uploadResults.map((result) => (
-								<li key={result.position}>{result.name || result.filename}</li>
-							))}
-						</ul>
-					</>
-				)}
-			</section>
-
-			<section>
-				<h2>Torrents seen</h2>
-				{!torrents ? (
-					<p>Loading…</p>
-				) : torrents.length === 0 ? (
-					<p className="muted">
-						No torrents seen yet — connect Transmission and the poller will fill
-						this in.
+			<PageHeader
+				title="Transmission"
+				filter={<FilterBox placeholder="Filter name or match" />}
+			/>
+			<div className="tools-cards">
+				<section className="card">
+					<h2>Connection</h2>
+					<p className="card-hint">
+						Check the app can reach Transmission's RPC API and SSH to the
+						seedbox.
 					</p>
-				) : (
-					<table>
-						<colgroup>
-							<col />
-							<col className="c-kind" />
-							<col />
-							<col className="c-state" />
-							<col className="c-matched" />
-						</colgroup>
-						<thead>
-							<tr>
-								<th>name</th>
-								<th>kind</th>
-								<th>destination</th>
-								<th>state</th>
-								<th>matched</th>
-							</tr>
-						</thead>
-						<tbody>
-							{torrents.map((t) => (
-								<tr key={t.id}>
-									<td>
-										<div>{t.name}</div>
-										{t.classification_detail && (
-											<div className="muted">{t.classification_detail}</div>
-										)}
-									</td>
-									<td className="muted">{kind(t)}</td>
-									<td className="muted">{t.destination_path ?? "—"}</td>
-									<td className="muted">{t.state}</td>
-									<td>{t.matched ?? <span className="muted">—</span>}</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				)}
+					<button type="button" onClick={runTest} disabled={testing}>
+						{testing ? "Testing…" : "Test connection"}
+					</button>
+					{report && (
+						<div className="checks">
+							<CheckLine label="API" check={report.api} />
+							<CheckLine label="SSH" check={report.ssh} />
+						</div>
+					)}
+				</section>
+
+				<section className="card">
+					<h2>Add torrent</h2>
+					<p className="card-hint">
+						Upload one or more .torrent files to start their downloads in
+						Transmission.
+					</p>
+					<div className="torrent-upload">
+						<input
+							aria-label="Upload a .torrent file"
+							type="file"
+							multiple
+							onChange={(event) =>
+								setTorrentFiles(Array.from(event.target.files ?? []))
+							}
+						/>
+						<button
+							type="button"
+							className="btn-primary"
+							onClick={uploadTorrent}
+							disabled={torrentFiles.length === 0 || uploading}
+						>
+							{uploading ? "Adding…" : "Start download"}
+						</button>
+					</div>
+					{uploadStatus && (
+						<p
+							className={`upload-status ${uploadStatus.ok ? "tone-ok" : "tone-danger"}`}
+						>
+							{uploadStatus.text}
+						</p>
+					)}
+					{uploadResults.length > 0 && (
+						<>
+							<p className="upload-note">
+								Already in Transmission — check for import:
+							</p>
+							<ul className="upload-results">
+								{uploadResults.map((result) => (
+									<li key={result.position}>
+										{result.name || result.filename}
+									</li>
+								))}
+							</ul>
+						</>
+					)}
+				</section>
+			</div>
+
+			<section className="torrents-section">
+				<GroupHead title="Torrents seen" count={torrents?.length}>
+					{query && torrents && (
+						<span className="muted">
+							{shown.length} of {torrents.length} shown
+						</span>
+					)}
+				</GroupHead>
+				{list}
 			</section>
 		</>
 	);
@@ -194,8 +287,11 @@ function kind(torrent: Torrent): string {
 
 function CheckLine({ label, check }: { label: string; check: Check }) {
 	return (
-		<div>
-			<strong>{label}:</strong> {check.ok ? "✓ ok" : "✗ failed"}{" "}
+		<div className="check-line">
+			<strong>{label}</strong>
+			<StatusBadge tone={check.ok ? "ok" : "danger"}>
+				{check.ok ? "✓ ok" : "✗ failed"}
+			</StatusBadge>
 			<span className="muted">{check.detail}</span>
 		</div>
 	);

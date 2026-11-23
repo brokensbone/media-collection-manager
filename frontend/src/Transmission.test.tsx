@@ -134,4 +134,54 @@ describe("Transmission", () => {
 		expect(options.body).toBeInstanceOf(FormData);
 		expect((options.body as FormData).getAll("files")).toHaveLength(2);
 	});
+
+	it("filters torrents by name or match and shows state as a badge", async () => {
+		window.location.hash = "#transmission";
+		mockApi([
+			{
+				id: 1,
+				name: "An Album",
+				media_kind: "music",
+				import_target: "beets",
+				classification_detail: null,
+				destination_path: null,
+				state: "imported",
+				matched: "X — Y",
+				has_audio: true,
+			},
+			{
+				id: 2,
+				name: "A Movie",
+				media_kind: "film",
+				import_target: "film",
+				classification_detail: null,
+				destination_path: null,
+				state: "failed",
+				matched: null,
+				has_audio: false,
+			},
+		]);
+		render(<Transmission />);
+		expect((await screen.findByText("imported ✓")).className).toContain(
+			"status-ok",
+		);
+		expect(screen.getByText("failed").className).toContain("status-danger");
+		fireEvent.change(screen.getByRole("searchbox", { name: "Filter" }), {
+			target: { value: "movie" },
+		});
+		await waitFor(() => expect(screen.queryByText("An Album")).toBeNull());
+		expect(screen.getByText("A Movie")).toBeTruthy();
+		expect(window.location.hash).toBe("#transmission?q=movie");
+		window.location.hash = "";
+	});
+
+	it("shows an error with Retry when the torrent list fails to load", async () => {
+		const fetchMock = vi.fn(() => Promise.resolve({ ok: false, status: 500 }));
+		vi.stubGlobal("fetch", fetchMock);
+		render(<Transmission />);
+		expect(await screen.findByText("Couldn’t load torrents.")).toBeTruthy();
+		expect(screen.queryByText(/No torrents seen yet/)).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
 });

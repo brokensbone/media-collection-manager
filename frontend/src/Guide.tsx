@@ -1,7 +1,13 @@
+import "./pages-tools.css";
+import { Fragment } from "react";
+import { PageHeader } from "./ui";
+
+const FUNNEL = ["saved", "decide", "wanted", "acquire", "owned"];
+
 export function Guide() {
 	return (
 		<div className="guide">
-			<h1>How mcm works</h1>
+			<PageHeader title="How mcm works" />
 			<p>
 				mcm is a smart want-list for music. It watches the albums you save on
 				Spotify, checks them against what you already own in your beets library,
@@ -11,7 +17,17 @@ export function Guide() {
 			</p>
 
 			<h2>The loop</h2>
-			<p className="funnel">saved → decide → wanted → acquire → owned</p>
+			<p className="funnel">
+				<span className="sr-only">{FUNNEL.join(" → ")}</span>
+				<span className="funnel-steps" aria-hidden="true">
+					{FUNNEL.map((step, i) => (
+						<Fragment key={step}>
+							{i > 0 && <span className="funnel-arrow">→</span>}
+							<span className="badge">{step}</span>
+						</Fragment>
+					))}
+				</span>
+			</p>
 			<p>
 				An album you save on Spotify lands in <strong>saved</strong>. Once
 				you've had a chance to live with it, it surfaces in{" "}

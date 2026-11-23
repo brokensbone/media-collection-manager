@@ -52,4 +52,17 @@ describe("SpotifyStatus", () => {
 		const link = await screen.findByRole("link", { name: "Reconnect" });
 		expect(link.getAttribute("href")).toBe("/auth/spotify/login");
 	});
+
+	it("shows the countdown when reauth is two weeks away or less", async () => {
+		mockStatus({
+			connected: true,
+			authorized_at: "2026-01-01T00:00:00Z",
+			reauth_in_days: 9,
+			reauth_due: false,
+		});
+		render(<SpotifyStatus />);
+		const el = await screen.findByText("Spotify");
+		expect(el.getAttribute("title")).toBe("Connected · reauth in 9d");
+		expect(el.textContent).toContain("reauth in 9d");
+	});
 });
