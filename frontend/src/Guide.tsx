@@ -7,7 +7,7 @@ const FUNNEL = ["saved", "decide", "wanted", "acquire", "owned"];
 export function Guide() {
 	return (
 		<div className="guide">
-			<PageHeader title="How mcm works" />
+			<PageHeader title="Guide" />
 			<p>
 				mcm is a smart want-list for music. It watches the albums you save on
 				Spotify, checks them against what you already own in your beets library,

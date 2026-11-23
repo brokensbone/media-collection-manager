@@ -97,7 +97,7 @@ export function Releases({
 	else
 		body = (
 			<>
-				<table className="rows worklist">
+				<table className={full ? "rows worklist sticky-head" : "rows worklist"}>
 					<colgroup>
 						<col className="c-cover" />
 						<col className="c-artist" />

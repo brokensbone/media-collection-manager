@@ -136,7 +136,7 @@ export function Library({
 		title.toLowerCase(),
 		load,
 	) ?? (
-		<table className="rows compact library-table">
+		<table className="rows compact library-table sticky-head">
 			<colgroup>
 				<col className="c-cover" />
 				<col className="c-artist" />

@@ -15,6 +15,8 @@ import { Overview } from "./Overview";
 import { Owned } from "./Owned";
 import { Radio } from "./Radio";
 import { Releases } from "./Releases";
+import { Shortcuts } from "./Shortcuts";
+import { useScrollMemory } from "./scrollMemory";
 import { Tasks } from "./Tasks";
 import { Transmission } from "./Transmission";
 import { LiveRegion, usePageTitleOverride } from "./ui";
@@ -62,7 +64,8 @@ function pageTitle(view: View, counts: Dash | null): string {
 }
 
 export default function App() {
-	const path = parseHash(useHash()).path;
+	const hash = useHash();
+	const path = parseHash(hash).path;
 	const { view, radioDate } = route(path);
 	const query = useQuery();
 	// Any worklist action bumps this; the count/browse views refetch when it changes.
@@ -70,6 +73,8 @@ export default function App() {
 	const bump = useCallback(() => setRefresh((n) => n + 1), []);
 	const counts = useDashboard(refresh);
 	const titleOverride = usePageTitleOverride();
+
+	useScrollMemory(hash, path);
 
 	const known = view !== "all" || path === "all";
 	useEffect(() => {
@@ -137,6 +142,7 @@ export default function App() {
 				{pages[view]()}
 			</main>
 			<LiveRegion />
+			<Shortcuts />
 		</>
 	);
 }

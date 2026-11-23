@@ -56,7 +56,7 @@ export function Overview({
 				const n = counts?.[s.key];
 				return (
 					<section key={s.key} className="overview-section">
-						<GroupHead title={s.title} count={n}>
+						<GroupHead title={s.title} count={n} href={`#${s.key}`}>
 							{n != null && n > 0 && <a href={`#${s.key}`}>See all {n} →</a>}
 						</GroupHead>
 						{n === 0 ? (

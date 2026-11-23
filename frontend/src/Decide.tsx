@@ -129,7 +129,7 @@ export function Decide({
 	else
 		body = (
 			<>
-				<table className="rows worklist">
+				<table className={full ? "rows worklist sticky-head" : "rows worklist"}>
 					<colgroup>
 						<col className="c-cover" />
 						<col className="c-artist" />
@@ -222,9 +222,9 @@ export function Decide({
 				count={
 					items == null
 						? undefined
-						: query
-							? `${shown.length} of ${scoped.length}`
-							: items.length
+						: shown.length === items.length
+							? items.length
+							: `${shown.length} of ${items.length}`
 				}
 				filter={<FilterBox />}
 			>

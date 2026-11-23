@@ -5,71 +5,50 @@
 	width: 272px;
 }
 .worklist col.c-find {
-	width: 200px;
+	width: 270px;
 }
 .acquire-table col.c-artist {
 	width: 17%;
 }
 .worklist col.c-acquire-actions {
-	width: 280px;
+	width: 268px;
 }
 .worklist .cell-secondary .badge:first-of-type {
 	margin-left: 8px;
 }
-.worklist .row-actions button {
-	gap: 6px;
-}
-.worklist .btn-primary .kbd {
-	background: transparent;
-	border-color: currentColor;
-	color: inherit;
-	opacity: 0.85;
-}
-/* Kbd chips take their space on every row, so buttons don't shift as the selection moves. */
-.worklist .row-actions .kbd {
-	visibility: hidden;
-}
-.worklist tr.sel .row-actions .kbd {
-	visibility: visible;
-}
 
 /* ---------- Acquire ---------- */
+/* Finding the album is the usual next step, so the find links are the row's main buttons. */
 .find-links {
 	display: flex;
-	flex-wrap: wrap;
-	gap: 2px 10px;
-}
-.find-links a,
-a.pending {
-	text-decoration: none;
-}
-.find-links a {
-	display: inline-flex;
-	align-items: center;
-	gap: 3px;
-	white-space: nowrap;
-}
-.find-links a:hover,
-a.pending:hover {
-	text-decoration: underline;
+	gap: 4px;
 }
 .find-links svg {
 	opacity: 0.7;
+}
+.find-links .kbd {
+	visibility: hidden;
+	margin-left: 2px;
+}
+tr.sel .find-links .kbd {
+	visibility: visible;
 }
 .acquire-table .row-meta {
 	margin-top: 2px;
 }
 a.pending {
 	color: inherit;
+	text-decoration: none;
 }
 a.pending:hover {
 	color: var(--text);
+	text-decoration: underline;
 }
 a.pending .status {
 	margin: 0 2px 0 0;
 }
-.owned-hint {
-	color: var(--warn);
+.acquire-table .row-meta > .status:first-child {
+	margin-left: 0;
 }
 
 /* ---------- Mark-owned dialog ---------- */
@@ -111,7 +90,7 @@ a.pending .status {
 }
 
 @media (max-width: 719.98px) {
-	.worklist .row-actions .kbd {
+	.find-links .kbd {
 		display: none;
 	}
 	table.worklist tr {
@@ -126,10 +105,5 @@ a.pending .status {
 	}
 	.worklist .cell-meta:not(:empty) {
 		margin-top: 2px;
-	}
-	/* Selection is a keyboard affordance; on a phone it would only pin a highlight on the first card. */
-	table.worklist tr.sel {
-		background: none;
-		box-shadow: none;
 	}
 }

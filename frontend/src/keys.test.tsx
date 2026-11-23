@@ -31,7 +31,10 @@ describe("useRowKeys", () => {
 			className: "sel",
 			"aria-selected": true,
 		});
-		expect(result.current.rowProps(0)).toEqual({});
+		const other = result.current.rowProps(0);
+		expect(other.className).toBeUndefined();
+		act(() => other.onPointerDown?.());
+		expect(result.current.sel).toBe(0);
 	});
 
 	it("ignores keys when disabled, with modifiers, or while typing", () => {

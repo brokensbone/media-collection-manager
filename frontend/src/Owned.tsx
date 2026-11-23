@@ -48,7 +48,7 @@ export function Owned({
 		"owned albums",
 		load,
 	) ?? (
-		<table className="rows compact library-table owned-table">
+		<table className="rows compact library-table owned-table sticky-head">
 			<colgroup>
 				<col className="c-cover" />
 				<col className="c-artist" />

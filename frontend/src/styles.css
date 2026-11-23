@@ -30,7 +30,7 @@
 	--border: #e1e4e8;
 	--border-strong: #8c95a1;
 	--accent: #1a5fd0;
-	--accent-soft: #e8f0fe;
+	--accent-soft: #dfe9fc;
 	--on-accent: #ffffff;
 	--ok: #156f33;
 	--ok-soft: #e6f4ea;
@@ -53,7 +53,7 @@
 		--border: #2a3038;
 		--border-strong: #6b7480;
 		--accent: #6ea8ff;
-		--accent-soft: #13233d;
+		--accent-soft: #172c4c;
 		--on-accent: #0d0f12;
 		--ok: #4cc26a;
 		--ok-soft: #12261a;
@@ -162,7 +162,8 @@ button:hover {
 	background: var(--surface);
 }
 button:disabled {
-	opacity: 0.5;
+	border-color: var(--border);
+	color: var(--muted);
 	cursor: default;
 }
 button:disabled:hover {
@@ -178,8 +179,13 @@ button:disabled:hover {
 	background: var(--accent);
 	filter: brightness(1.08);
 }
+/* A faded filled button fails contrast; a disabled primary looks like any disabled button. */
+.btn-primary:disabled,
 .btn-primary:disabled:hover {
-	background: var(--accent);
+	background: var(--surface);
+	border-color: var(--border);
+	color: var(--muted);
+	font-weight: 500;
 	filter: none;
 }
 .btn-quiet {
@@ -194,6 +200,23 @@ button:disabled:hover {
 .btn-quiet:disabled:hover {
 	background: transparent;
 	color: var(--muted);
+}
+/* A link that looks like a default button (e.g. Acquire's find links). */
+a.btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	min-height: var(--ctl);
+	padding: 3px 8px;
+	border: 1px solid var(--border-strong);
+	border-radius: var(--r);
+	background: var(--bg);
+	color: var(--text);
+	white-space: nowrap;
+}
+a.btn:hover {
+	background: var(--surface);
+	text-decoration: none;
 }
 .linklike {
 	display: inline;
@@ -220,6 +243,10 @@ select {
 	border-radius: var(--r);
 	background: var(--bg);
 	color: var(--text);
+}
+::placeholder {
+	color: var(--muted);
+	opacity: 1;
 }
 input[type="checkbox"],
 input[type="radio"] {
@@ -614,8 +641,25 @@ table.rows.compact td {
 	font-weight: 400;
 	color: var(--muted);
 }
+/* Keeps a keyboard-selected row clear of the sticky header, group head and column header. */
+table.rows tbody tr {
+	scroll-margin-top: calc(var(--header-h) + 64px);
+	scroll-margin-bottom: 16px;
+}
+@media (min-width: 720px) {
+	table.rows.sticky-head thead th {
+		position: sticky;
+		top: var(--header-h);
+		z-index: 4;
+		background: var(--bg);
+		box-shadow: inset 0 -1px 0 var(--border);
+	}
+}
 tbody tr:hover td {
 	background: var(--surface);
+}
+tbody tr.checked td {
+	background: var(--accent-soft);
 }
 tbody tr.sel td,
 tbody tr.linked td {
@@ -634,6 +678,9 @@ div.row-actions {
 	align-items: center;
 	justify-content: flex-end;
 	gap: 4px;
+}
+.row-actions button {
+	gap: 6px;
 }
 @media (max-width: 719.98px) {
 	table.rows,
@@ -694,8 +741,14 @@ div.row-actions {
 	tbody tr.linked td:first-child {
 		box-shadow: none;
 	}
+	/* The keyboard cursor means nothing on a phone; it would only pin a highlight on the first card. */
+	table.rows tr.sel:not(.linked) > td {
+		background: transparent;
+	}
+	table.rows .row-actions .kbd {
+		display: none;
+	}
 	/* Shadows paint the highlight into the gutter, so the card's content does not move. */
-	table.rows tr.sel,
 	table.rows tr.linked {
 		background: var(--accent-soft);
 		box-shadow:
@@ -703,8 +756,14 @@ div.row-actions {
 			-8px 0 0 var(--accent),
 			8px 0 0 var(--accent-soft);
 	}
+	table.rows tr.checked {
+		background: var(--accent-soft);
+		box-shadow:
+			-8px 0 0 var(--accent-soft),
+			8px 0 0 var(--accent-soft);
+	}
 	/* The row carries the highlight on cards; a cell background would cover its inset bar. */
-	table.rows tr:is(.sel, .linked, :hover) > td {
+	table.rows tr:is(.sel, .linked, .checked, :hover) > td {
 		background: transparent;
 	}
 }
@@ -824,6 +883,19 @@ div.row-actions {
 	font-weight: 500;
 	color: var(--muted);
 	background: var(--bg);
+}
+/* Kbd chips take their space on every row, so buttons don't shift as the selection moves. */
+.row-actions .kbd {
+	visibility: hidden;
+}
+tr.sel .row-actions .kbd {
+	visibility: visible;
+}
+.row-actions .btn-primary .kbd {
+	background: transparent;
+	border-color: currentColor;
+	color: inherit;
+	opacity: 0.85;
 }
 .list-hints {
 	display: flex;
@@ -957,45 +1029,82 @@ dialog.modal::backdrop {
 	}
 }
 
+/* ---------- Narrow desktop shell ---------- */
+/* Below ~1280px the header no longer fits on one row: shorten it, and if it still wraps, let the
+   tools group start the second row on the left instead of floating alone on the right. */
+@media (min-width: 720px) and (max-width: 1279.98px) {
+	.app-header-inner {
+		column-gap: var(--s2);
+	}
+	.main-nav {
+		column-gap: var(--s2);
+	}
+	.nav-library {
+		padding-left: var(--s2);
+	}
+	.nav-group {
+		column-gap: 6px;
+	}
+	.nav-link {
+		font-size: 13px;
+	}
+	.nav-tools {
+		margin-left: 0;
+		padding-left: var(--s2);
+		border-left: 1px solid var(--border);
+	}
+	.chip-label {
+		display: none;
+	}
+}
+
 /* ---------- Mobile shell ---------- */
 @media (max-width: 719.98px) {
-	.app-header {
-		position: static;
-	}
+	/* One sticky strip: brand and status, then the nav as a single sideways-scrolling row. */
 	.app-header-inner {
-		padding: var(--s2) var(--s4);
-		row-gap: var(--s1);
+		padding: 0 0 0 var(--s4);
+		row-gap: 0;
 	}
 	.brand,
 	.header-status {
-		min-height: 28px;
+		min-height: 36px;
 	}
-	/* Groups flow inline so a short group shares a line with the next instead of taking its own. */
+	.header-status {
+		padding-right: var(--s4);
+	}
 	.main-nav {
 		order: 3;
 		flex: 1 0 100%;
-		display: block;
+		flex-wrap: nowrap;
+		column-gap: 14px;
+		margin-left: calc(-1 * var(--s4));
+		padding: 0 var(--s4);
+		overflow-x: auto;
+		scrollbar-width: none;
+		overscroll-behavior-x: contain;
+	}
+	.main-nav::-webkit-scrollbar {
+		display: none;
 	}
 	.nav-group {
-		display: inline;
-	}
-	.nav-group li {
-		display: inline-block;
-		margin-right: 14px;
+		flex-wrap: nowrap;
+		column-gap: 14px;
 	}
 	.nav-library {
-		padding-left: 0;
-		border-left: 0;
+		padding-left: 14px;
+	}
+	.nav-tools {
+		margin-left: 0;
+		padding: 0 var(--s4) 0 14px;
+		border-left: 1px solid var(--border);
 	}
 	.nav-link {
-		padding: 6px 0;
+		padding: 8px 0 10px;
 		font-size: 13px;
 	}
+	/* Inside the scroller the bar would be clipped at -1px. */
 	.nav-link[aria-current="page"]::after {
-		bottom: 2px;
-	}
-	.header-status {
-		order: 2;
+		bottom: 0;
 	}
 	.chip-label {
 		display: none;
@@ -1005,4 +1114,50 @@ dialog.modal::backdrop {
 		flex: 1 0 100%;
 		width: auto;
 	}
+	/* Below 16px, iOS Safari zooms the page when a field takes focus. */
+	input:not([type]),
+	input[type="text"],
+	input[type="search"],
+	input[type="number"],
+	select,
+	textarea {
+		font-size: 16px;
+	}
+}
+
+/* ---------- Shortcuts dialog ---------- */
+.shortcuts {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	gap: var(--s3) var(--s5);
+	overflow-y: auto;
+}
+.shortcuts h3 {
+	margin-bottom: var(--s1);
+	font-size: var(--fs-meta);
+}
+.shortcuts dl {
+	margin: 0;
+}
+.shortcut-row {
+	display: flex;
+	align-items: center;
+	gap: var(--s2);
+	min-height: 24px;
+	font-size: var(--fs-meta);
+}
+.shortcut-row dt {
+	display: inline-flex;
+	gap: 3px;
+	min-width: 44px;
+}
+.shortcut-row dd {
+	margin: 0;
+	color: var(--muted);
+}
+.group-head h2 a {
+	color: inherit;
+}
+.group-head h2 a:hover {
+	color: var(--text);
 }

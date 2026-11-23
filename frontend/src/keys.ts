@@ -27,16 +27,18 @@ type RowProps = {
 	className?: string;
 	"aria-selected"?: true;
 	ref?: (el: HTMLTableRowElement | null) => void;
+	onPointerDown?: () => void;
 };
 
 export function useRowKeys(opts: {
 	count: number;
 	enabled?: boolean;
-	actions?: Record<string, (index: number) => void>;
+	// An action returning false leaves the key to the browser (e.g. space on a focused button).
+	actions?: Record<string, (index: number) => unknown>;
 }): {
 	sel: number;
 	setSel: (i: number) => void;
-	rowProps: (i: number) => RowProps;
+	rowProps: (i: number, className?: string) => RowProps;
 } {
 	const { count, enabled = true } = opts;
 	const [rawSel, setSel] = useState(0);
@@ -60,8 +62,7 @@ export function useRowKeys(opts: {
 				setSel(Math.max(sel - 1, 0));
 			} else {
 				const action = actions.current?.[key];
-				if (!action) return;
-				action(sel);
+				if (!action || action(sel) === false) return;
 			}
 			e.preventDefault();
 		}
@@ -80,10 +81,22 @@ export function useRowKeys(opts: {
 		rowEl.current = el;
 	}, []);
 
+	// A click moves the cursor too, so mouse and keyboard agree on the current row.
 	const rowProps = useCallback(
-		(i: number): RowProps =>
-			i === sel ? { className: "sel", "aria-selected": true, ref: setRow } : {},
-		[sel, setRow],
+		(i: number, className?: string): RowProps => {
+			if (!enabled) return className ? { className } : {};
+			if (i !== sel) {
+				const props: RowProps = { onPointerDown: () => setSel(i) };
+				if (className) props.className = className;
+				return props;
+			}
+			return {
+				className: className ? `${className} sel` : "sel",
+				"aria-selected": true,
+				ref: setRow,
+			};
+		},
+		[sel, setRow, enabled],
 	);
 
 	return { sel, setSel, rowProps };

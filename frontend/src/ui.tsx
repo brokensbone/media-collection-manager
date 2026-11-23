@@ -70,16 +70,18 @@ export function GroupHead({
 	title,
 	count,
 	tone,
+	href,
 	children,
 }: {
 	title: string;
 	count?: number;
 	tone?: Tone;
+	href?: string;
 	children?: ReactNode;
 }) {
 	return (
 		<div className="group-head">
-			<h2>{title}</h2>
+			<h2>{href ? <a href={href}>{title}</a> : title}</h2>
 			{count != null && (
 				<span className={tone ? `group-count tone-${tone}` : "group-count"}>
 					{count}

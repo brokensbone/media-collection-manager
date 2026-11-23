@@ -4,6 +4,7 @@ import {
 	render,
 	screen,
 	waitFor,
+	within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -44,18 +45,14 @@ describe("App", () => {
 		stubFetch();
 		render(<App />);
 		fireEvent.click(screen.getByRole("link", { name: "Guide" }));
-		expect(
-			await screen.findByRole("heading", { name: "How mcm works" }),
-		).toBeTruthy();
+		expect(await screen.findByRole("heading", { name: "Guide" })).toBeTruthy();
 		// the nav never relabels: Guide is still there, now marked current
 		expect(
 			screen.getByRole("link", { name: "Guide" }).getAttribute("aria-current"),
 		).toBe("page");
 		fireEvent.click(screen.getByRole("link", { name: "Overview" }));
 		await waitFor(() =>
-			expect(
-				screen.queryByRole("heading", { name: "How mcm works" }),
-			).toBeNull(),
+			expect(screen.queryByRole("heading", { name: "Guide" })).toBeNull(),
 		);
 	});
 
@@ -311,7 +308,12 @@ describe("App", () => {
 		).toBeTruthy();
 		expect(screen.getByRole("heading", { name: "Acquire" })).toBeTruthy();
 		// click the Decide nav link → only Decide remains
-		fireEvent.click(screen.getByRole("link", { name: /Decide/ }));
+		fireEvent.click(
+			within(screen.getByRole("navigation", { name: "Main" })).getByRole(
+				"link",
+				{ name: /Decide/ },
+			),
+		);
 		await waitFor(() =>
 			expect(screen.queryByRole("heading", { name: "Releases" })).toBeNull(),
 		);

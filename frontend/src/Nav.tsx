@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import type { Counts, Dash } from "./Dashboard";
 import { SpotifyStatus } from "./SpotifyStatus";
 
@@ -106,6 +106,21 @@ export function Nav({
 		return () => ro.disconnect();
 	}, []);
 
+	// On a phone the nav is one sideways-scrolling row; keep the current item in it.
+	const nav = useRef<HTMLElement>(null);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: current is the trigger; the DOM carries it
+	useEffect(() => {
+		const el = nav.current;
+		const link = el?.querySelector<HTMLElement>('[aria-current="page"]');
+		if (!el || !link || el.scrollWidth <= el.clientWidth) return;
+		const left = link.offsetLeft - el.offsetLeft;
+		if (
+			left < el.scrollLeft ||
+			left + link.offsetWidth > el.scrollLeft + el.clientWidth
+		)
+			el.scrollLeft = left - 16;
+	}, [current]);
+
 	const total = counts ? counts.resolved + counts.unresolved : 0;
 
 	return (
@@ -114,7 +129,7 @@ export function Nav({
 				<a className="brand" href="#all">
 					mcm
 				</a>
-				<nav className="main-nav" aria-label="Main">
+				<nav className="main-nav" aria-label="Main" ref={nav}>
 					<Group
 						className="nav-funnel"
 						items={FUNNEL}

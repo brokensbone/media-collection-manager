@@ -49,8 +49,10 @@ export function Modal({
 				if (e.target === e.currentTarget) onClose();
 			}}
 			onKeyDown={(e) => {
-				if (e.key === "Escape" && typeof ref.current?.showModal !== "function")
-					onClose();
+				// A search field would swallow the first Esc to clear itself; Esc always closes.
+				if (e.key !== "Escape") return;
+				e.preventDefault();
+				onClose();
 			}}
 		>
 			<div className="modal-body">
