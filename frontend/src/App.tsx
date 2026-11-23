@@ -1,8 +1,4 @@
 import "./styles.css";
-import "./legacy-worklists.css";
-import "./legacy-imports.css";
-import "./legacy-library.css";
-import "./legacy-tools.css";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { Acquire } from "./Acquire";
 import { Activity } from "./Activity";
@@ -21,34 +17,26 @@ import { Radio } from "./Radio";
 import { Releases } from "./Releases";
 import { Tasks } from "./Tasks";
 import { Transmission } from "./Transmission";
-import { FilterBox, LiveRegion, PageHeader, usePageTitleOverride } from "./ui";
+import { LiveRegion, usePageTitleOverride } from "./ui";
 
 type View = NavKey | "archive";
 
-// Views whose component renders its own PageHeader. A page group adds its views here when it
-// migrates; every other view gets the temporary header below.
-const MIGRATED = new Set<View>(["all"]);
-
-// Temporary headers for views that have not migrated yet. null = the view already renders its
-// own h1 (Guide, Radio), so a second one would only duplicate it.
-const TEMP_HEADER: Record<View, { title: string; filter: boolean } | null> = {
-	all: { title: "Overview", filter: true },
-	releases: { title: "Releases", filter: true },
-	decide: { title: "Decide", filter: true },
-	acquire: { title: "Acquire", filter: true },
-	import: { title: "Import", filter: true },
-	tasks: { title: "Tasks", filter: true },
-	archive: { title: "Completed archive", filter: true },
-	owned: { title: "Owned", filter: true },
-	dismissed: { title: "Dismissed", filter: true },
-	crates: { title: "Crates", filter: false },
-	radio: null,
-	transmission: { title: "Transmission", filter: false },
-	activity: { title: "Activity", filter: false },
-	guide: null,
-};
-
-const VIEWS = new Set<string>(Object.keys(TEMP_HEADER));
+const VIEWS = new Set<string>([
+	"all",
+	"releases",
+	"decide",
+	"acquire",
+	"import",
+	"tasks",
+	"archive",
+	"owned",
+	"dismissed",
+	"crates",
+	"radio",
+	"transmission",
+	"activity",
+	"guide",
+]);
 const WORKLISTS = new Set<View>([
 	"releases",
 	"decide",
@@ -65,22 +53,10 @@ function route(path: string): { view: View; radioDate: string | null } {
 	return { view: "all", radioDate: null };
 }
 
-function formatDay(date: string): string {
-	return new Date(`${date}T00:00:00`).toLocaleDateString("en-GB", {
-		weekday: "short",
-		day: "numeric",
-		month: "short",
-	});
-}
-
-function pageTitle(
-	view: View,
-	radioDate: string | null,
-	counts: Dash | null,
-): string {
+// Pages that know a better title (Radio's day, a crate's name) override this with usePageTitle.
+function pageTitle(view: View, counts: Dash | null): string {
 	if (view === "archive") return "Completed archive · Tasks";
 	const label = NAV_LABELS[view];
-	if (view === "radio" && radioDate) return `${label} ${formatDay(radioDate)}`;
 	const n = WORKLISTS.has(view) ? counts?.[view as keyof Dash] : undefined;
 	return n ? `${label} (${n})` : label;
 }
@@ -101,8 +77,8 @@ export default function App() {
 	}, [known]);
 
 	useEffect(() => {
-		document.title = `${titleOverride ?? pageTitle(view, radioDate, counts)} · mcm`;
-	}, [view, radioDate, counts, titleOverride]);
+		document.title = `${titleOverride ?? pageTitle(view, counts)} · mcm`;
+	}, [view, counts, titleOverride]);
 
 	useEffect(() => {
 		function onKey(e: KeyboardEvent) {
@@ -142,8 +118,6 @@ export default function App() {
 		guide: () => <Guide />,
 	};
 
-	const temp = MIGRATED.has(view) ? null : TEMP_HEADER[view];
-
 	return (
 		<>
 			{/* biome-ignore lint/a11y/useValidAnchor: a plain #main href would replace the route in the hash */}
@@ -160,12 +134,6 @@ export default function App() {
 			</a>
 			<Nav counts={counts} current={view === "archive" ? "tasks" : view} />
 			<main id="main" className="app" tabIndex={-1}>
-				{temp && (
-					<PageHeader
-						title={temp.title}
-						filter={temp.filter ? <FilterBox /> : undefined}
-					/>
-				)}
 				{pages[view]()}
 			</main>
 			<LiveRegion />

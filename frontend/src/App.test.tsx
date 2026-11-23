@@ -91,7 +91,7 @@ describe("App", () => {
 
 		render(<App />);
 		expect(
-			await screen.findByRole("heading", { name: "2026-09-22" }),
+			await screen.findByRole("heading", { name: "Tue 22 Sep 2026" }),
 		).toBeTruthy();
 		expect(fetch).toHaveBeenCalledWith("/radio/schedules/2026-09-22");
 	});
@@ -125,12 +125,12 @@ describe("App", () => {
 		);
 
 		const page = render(<App />);
-		fireEvent.click(await screen.findByRole("link", { name: "2026-09-22" }));
+		fireEvent.click(await screen.findByRole("link", { name: "Tue 22 Sep" }));
 		await waitFor(() => expect(window.location.hash).toBe("#radio/2026-09-22"));
 		page.unmount();
 		render(<App />);
 		expect(
-			await screen.findByRole("heading", { name: "2026-09-22" }),
+			await screen.findByRole("heading", { name: "Tue 22 Sep 2026" }),
 		).toBeTruthy();
 	});
 
