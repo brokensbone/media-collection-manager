@@ -38,4 +38,26 @@ describe("Library", () => {
 		render(<Library />);
 		expect(await screen.findByText(/Nothing here/)).toBeTruthy();
 	});
+
+	it("titles the dismissed view and shows its count", async () => {
+		mockAlbums([
+			{ id: 1, artist: "A", title: "Gone", state: "dismissed", owned: false },
+		]);
+		render(<Library state="dismissed" />);
+		expect(
+			await screen.findByRole("heading", { level: 1, name: "Dismissed" }),
+		).toBeTruthy();
+		expect(screen.getByText("Gone")).toBeTruthy();
+		expect(screen.queryByText("dismissed")).toBeNull(); // state column only in mixed lists
+	});
+
+	it("shows an error state with Retry when the load fails", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => Promise.reject(new Error("down"))),
+		);
+		render(<Library state="dismissed" />);
+		expect(await screen.findByText(/Couldn’t load dismissed/)).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+	});
 });

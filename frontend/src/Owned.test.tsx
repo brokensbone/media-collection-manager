@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Owned } from "./Owned";
 
@@ -145,4 +145,55 @@ describe("Owned", () => {
 			"linked",
 		);
 	});
+
+	it("sorts by artist by default and by title with ?sort=title", async () => {
+		mockOwned([album("b1", "Zed", "Alpha"), album("b2", "Abba", "Omega")]);
+		const { container } = render(<Owned />);
+		await screen.findByText("Alpha");
+		const firstArtist = () =>
+			container.querySelector("tbody tr .cell-primary")?.textContent;
+		expect(firstArtist()).toBe("Abba");
+		fireEvent.click(screen.getByRole("button", { name: "Title" }));
+		expect(window.location.hash).toContain("sort=title");
+		expect(firstArtist()).toBe("Zed");
+		expect(
+			screen
+				.getByRole("button", { name: "Title" })
+				.getAttribute("aria-pressed"),
+		).toBe("true");
+	});
+
+	it("shows N of M in the header and a no-match state when filtered", async () => {
+		mockOwned([album("b1", "Zed", "Alpha"), album("b2", "Abba", "Omega")]);
+		const { rerender } = render(<Owned query="zed" />);
+		await screen.findByText("Alpha");
+		expect(screen.getByText("1 of 2")).toBeTruthy();
+		rerender(<Owned query="nothing" />);
+		expect(screen.getByText(/No matches for/)).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Clear filter" })).toBeTruthy();
+	});
+
+	it("shows an error state with Retry when the load fails", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => Promise.resolve({ ok: false, status: 500 })),
+		);
+		render(<Owned />);
+		expect(await screen.findByText(/Couldn’t load owned albums/)).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+		expect(screen.queryByText(/Nothing here/)).toBeNull();
+	});
 });
+
+function album(beets_id: string, artist: string, title: string) {
+	return {
+		beets_id,
+		artist,
+		title,
+		album_id: null,
+		has_art: false,
+		on_spotify: false,
+		spotify_id: null,
+		mb_releasegroup_id: null,
+	};
+}

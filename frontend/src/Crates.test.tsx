@@ -155,4 +155,104 @@ describe("Crates", () => {
 			await screen.findByText("No clean split found — file by hand."),
 		).toBeTruthy();
 	});
+
+	it("shows an error state with Retry instead of loading forever", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => Promise.resolve({ ok: false, status: 500 })),
+		);
+		render(<Crates />);
+		expect(await screen.findByText(/Couldn’t load this crate/)).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+	});
+
+	it("labels the capacity meter", async () => {
+		mockCrates(boxView());
+		render(<Crates />);
+		const meter = await screen.findByRole("meter", { name: "Loose records" });
+		expect(meter.getAttribute("aria-valuenow")).toBe("1");
+		expect(meter.getAttribute("aria-valuemax")).toBe("50");
+	});
+
+	it("links sub-boxes and shows the breadcrumb only below the root", async () => {
+		mockCrates(
+			boxView({
+				id: 2,
+				name: "Electronic",
+				parent_id: 1,
+				breadcrumb: [
+					{ id: 1, name: "Collection" },
+					{ id: 2, name: "Electronic" },
+				],
+				children: [{ id: 3, name: "Ambient", loose_count: 1, total_count: 6 }],
+			}),
+		);
+		render(<Crates />);
+		expect(
+			await screen.findByRole("heading", { level: 1, name: "Electronic" }),
+		).toBeTruthy();
+		expect(
+			screen.getByRole("link", { name: "Collection" }).getAttribute("href"),
+		).toBe("#crates");
+		expect(
+			screen.getByRole("link", { name: /Ambient/ }).getAttribute("href"),
+		).toBe("#crates?box=3");
+	});
+
+	it("toggles a record by clicking its row, and selects all with the header box", async () => {
+		mockCrates(
+			boxView({
+				records: [
+					{
+						beets_id: "b1",
+						artist: "Burial",
+						title: "Untrue",
+						year: 2007,
+						media: "CD",
+					},
+					{
+						beets_id: "b2",
+						artist: "Four Tet",
+						title: "Rounds",
+						year: 2003,
+						media: "CD",
+					},
+				],
+			}),
+		);
+		render(<Crates />);
+		fireEvent.click(await screen.findByText("Rounds"));
+		expect(screen.getByText("1 selected")).toBeTruthy();
+		fireEvent.click(screen.getByLabelText("Select all loose records"));
+		expect(screen.getByText("2 selected")).toBeTruthy();
+		fireEvent.click(screen.getByLabelText("Select all loose records"));
+		expect(screen.queryByText(/selected$/)).toBeNull();
+	});
+
+	it("filters the loose records with ?q= and keeps the box", async () => {
+		window.location.hash = "#crates?box=1&q=four";
+		mockCrates(
+			boxView({
+				records: [
+					{
+						beets_id: "b1",
+						artist: "Burial",
+						title: "Untrue",
+						year: 2007,
+						media: "CD",
+					},
+					{
+						beets_id: "b2",
+						artist: "Four Tet",
+						title: "Rounds",
+						year: 2003,
+						media: "CD",
+					},
+				],
+			}),
+		);
+		render(<Crates />);
+		expect(await screen.findByText("Rounds")).toBeTruthy();
+		expect(screen.queryByText("Burial")).toBeNull();
+	});
 });
