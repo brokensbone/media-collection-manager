@@ -1,8 +1,7 @@
 /* Design tokens and shared primitives. Pages add only layout specific to them. */
 :root {
 	color-scheme: light dark;
-	--font-sans:
-		-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+	--font-sans: "Inter Variable", Inter, system-ui, sans-serif;
 	--font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
 	--fs-title: 20px;
