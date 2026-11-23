@@ -36,15 +36,19 @@ export function PageHeader({
 	children,
 	filter,
 	back,
+	above,
 }: {
 	title: string;
 	count?: number | string;
 	children?: ReactNode;
 	filter?: ReactNode;
 	back?: { href: string; label: string };
+	// A full-width line above the title, e.g. a breadcrumb.
+	above?: ReactNode;
 }) {
 	return (
 		<header className="page-header">
+			{above && <div className="page-above">{above}</div>}
 			<div className="page-title-group">
 				{back && (
 					<a className="page-back" href={back.href}>

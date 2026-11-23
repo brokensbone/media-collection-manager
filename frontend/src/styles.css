@@ -300,7 +300,7 @@ input[type="file"]::file-selector-button:hover {
 .nav-group {
 	display: flex;
 	flex-wrap: wrap;
-	column-gap: 10px;
+	column-gap: 8px;
 	row-gap: 0;
 	margin: 0;
 	padding: 0;
@@ -342,6 +342,7 @@ input[type="file"]::file-selector-button:hover {
 }
 .nav-count {
 	font-size: var(--fs-meta);
+	line-height: 1;
 	font-variant-numeric: tabular-nums;
 	color: var(--muted);
 	font-weight: 400;
@@ -391,6 +392,10 @@ input[type="file"]::file-selector-button:hover {
 	min-height: 48px;
 	padding-top: var(--s2);
 	margin-bottom: var(--s3);
+}
+.page-above {
+	flex: 1 0 100%;
+	margin-bottom: calc(-1 * var(--s1));
 }
 .page-title-group {
 	display: flex;
@@ -492,114 +497,6 @@ input[type="file"]::file-selector-button:hover {
 	}
 }
 
-/* legacy-shared: delete in round 2 */
-td > button + button {
-	margin-left: 4px;
-}
-td {
-	padding: 6px 8px;
-	border-bottom: 1px solid var(--border);
-	overflow-wrap: anywhere; /* long unbroken names/paths wrap inside their fixed column */
-	vertical-align: middle; /* center cell content against tall cells (covers) so highlighted
-                             rows read as one clean band rather than baseline-offset content */
-}
-/* Shared column widths so the funnel tables line up with each other (§8e). The title/name column
-   carries no width and soaks up the remaining pane; everything else is pinned. */
-col.c-cover {
-	width: 44px;
-}
-col.c-artist {
-	width: 200px;
-}
-col.c-actions3 {
-	width: 212px;
-} /* three buttons: Save/Want/Dismiss, Keep/Drop/Snooze, Retry/Discard */
-col.c-actions1 {
-	width: 150px;
-}
-col.c-aux {
-	width: 120px;
-}
-/* Full "DD/MM/YYYY, HH:MM:SS" timestamp (nowrap) — needs ~165px or it overflows its cell. */
-col.c-when {
-	width: 172px;
-}
-col.c-source {
-	width: 112px;
-}
-col.c-matched {
-	width: 260px;
-}
-col.c-task-actions {
-	width: 340px;
-}
-col.c-link {
-	width: 100px;
-}
-col.c-why {
-	width: 220px;
-}
-col.c-kind {
-	width: 72px;
-}
-col.c-state {
-	width: 96px;
-}
-.filter {
-	width: 100%;
-	box-sizing: border-box;
-	margin: 4px 0 8px;
-	padding: 6px 8px;
-	background: var(--bg);
-	color: var(--text);
-	border: 1px solid var(--border);
-	border-radius: 0;
-	font: inherit;
-}
-@media (max-width: 820px) {
-	.mobile-card-table {
-		table-layout: auto;
-	}
-	.mobile-card-table colgroup,
-	.mobile-card-table thead {
-		display: none;
-	}
-	.mobile-card-table tbody {
-		display: grid;
-		gap: 12px;
-	}
-	.mobile-card-table tr {
-		display: block;
-		border: 1px solid var(--border);
-		background: var(--bg);
-	}
-	.mobile-card-table td {
-		display: block;
-		width: auto;
-		padding: 8px 10px;
-		border-bottom: none;
-		overflow-wrap: anywhere;
-		vertical-align: top;
-	}
-	.mobile-card-table td + td {
-		border-top: 1px solid var(--border);
-	}
-	.mobile-card-table .cover-cell {
-		padding-right: 10px;
-		padding-bottom: 0;
-	}
-	.mobile-card-table .row-actions,
-	.mobile-card-table .links {
-		white-space: normal;
-	}
-	.mobile-card-table .row-actions button {
-		margin-bottom: 4px;
-	}
-	.mobile-card-table .pill-row {
-		flex-wrap: wrap;
-	}
-}
-
 /* ---------- Rows ---------- */
 table {
 	width: 100%;
@@ -634,6 +531,23 @@ table.rows.compact td {
 	height: 32px;
 	padding: 2px 8px;
 }
+/* Two-line rows: a name with a meta line under it (Import, Tasks, Transmission). */
+@media (min-width: 720px) {
+	table.rows.tall td {
+		height: 48px;
+	}
+}
+/* Grouped lists show one visible header row; later tables keep theirs for screen readers. */
+.rows thead.sr-thead th {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	border: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
 .rows col.c-cover {
 	width: 40px;
 }
@@ -664,20 +578,27 @@ table.rows.compact td {
 .rows td.cell-cover {
 	padding-right: 0;
 }
-.rows .cover {
+.cover {
 	display: block;
 	width: 32px;
 	height: 32px;
 	border-radius: var(--r);
 	object-fit: cover;
 }
-.rows.compact .cover {
+.cover-24 {
 	width: 24px;
 	height: 24px;
 }
-.rows .cover-empty {
+.cover-empty {
 	background: var(--surface-2);
-	border: 0;
+}
+.cover-link {
+	display: block;
+	width: fit-content;
+	border-radius: var(--r);
+}
+.cover-link:hover .cover {
+	opacity: 0.8;
 }
 .cell-primary {
 	font-weight: 600;
@@ -723,7 +644,7 @@ div.row-actions {
 	table.rows colgroup {
 		display: none;
 	}
-	table.rows tr {
+	:where(table.rows) tr {
 		display: grid;
 		grid-template-columns: 40px 1fr;
 		column-gap: 12px;
@@ -735,7 +656,7 @@ div.row-actions {
 		padding: 8px 0;
 		border-bottom: 1px solid var(--border);
 	}
-	table.rows.no-cover tr {
+	:where(table.rows.no-cover) tr {
 		grid-template-columns: 1fr;
 		grid-template-areas: "primary" "secondary" "meta" "actions";
 	}
@@ -773,10 +694,18 @@ div.row-actions {
 	tbody tr.linked td:first-child {
 		box-shadow: none;
 	}
+	/* Shadows paint the highlight into the gutter, so the card's content does not move. */
 	table.rows tr.sel,
 	table.rows tr.linked {
 		background: var(--accent-soft);
-		box-shadow: inset 3px 0 0 var(--accent);
+		box-shadow:
+			-5px 0 0 var(--accent-soft),
+			-8px 0 0 var(--accent),
+			8px 0 0 var(--accent-soft);
+	}
+	/* The row carries the highlight on cards; a cell background would cover its inset bar. */
+	table.rows tr:is(.sel, .linked, :hover) > td {
+		background: transparent;
 	}
 }
 
@@ -975,12 +904,17 @@ div.row-actions {
 }
 
 /* ---------- Dialog ---------- */
-/* :modal matches only a dialog opened with showModal(), so the legacy open-attribute modal is untouched. */
+/* The padding sits on .modal-body: a click on the dialog's own padding would count as a backdrop click. */
+dialog.modal {
+	padding: 0;
+	overflow: hidden;
+}
 dialog.modal:modal {
-	width: min(560px, calc(100vw - 32px));
-	max-height: calc(100vh - 20vh);
+	display: flex;
+	flex-direction: column;
+	width: min(520px, calc(100vw - 32px));
+	max-height: 80vh;
 	margin: 10vh auto auto;
-	padding: var(--s4);
 	border: 1px solid var(--border);
 	border-radius: var(--r);
 	background: var(--bg);
@@ -989,9 +923,37 @@ dialog.modal:modal {
 dialog.modal::backdrop {
 	background: rgb(0 0 0 / 0.5);
 }
+.modal-body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--s3);
+	min-height: 0;
+	padding: var(--s4);
+}
+.modal-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--s3);
+}
+.modal-head h2 {
+	margin: 0;
+	font-size: var(--fs-body);
+	line-height: 20px;
+	font-weight: 600;
+	text-transform: none;
+	letter-spacing: 0;
+	color: var(--text);
+	overflow-wrap: anywhere;
+}
+.modal-close {
+	flex: none;
+	padding: 0 6px;
+}
 @media (max-width: 719.98px) {
 	dialog.modal:modal {
 		margin-top: var(--s4);
+		max-height: calc(100vh - 32px);
 	}
 }
 
@@ -1008,21 +970,22 @@ dialog.modal::backdrop {
 	.header-status {
 		min-height: 28px;
 	}
+	/* Groups flow inline so a short group shares a line with the next instead of taking its own. */
 	.main-nav {
 		order: 3;
 		flex: 1 0 100%;
-		column-gap: 14px;
-		row-gap: 0;
+		display: block;
+	}
+	.nav-group {
+		display: inline;
+	}
+	.nav-group li {
+		display: inline-block;
+		margin-right: 14px;
 	}
 	.nav-library {
 		padding-left: 0;
 		border-left: 0;
-	}
-	.nav-tools {
-		margin-left: 0;
-	}
-	.nav-group {
-		gap: 0 14px;
 	}
 	.nav-link {
 		padding: 6px 0;
