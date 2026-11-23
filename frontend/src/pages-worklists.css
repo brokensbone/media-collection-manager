@@ -107,3 +107,34 @@ a.pending .status {
 		margin-top: 2px;
 	}
 }
+
+/* Between phone and wide desktop the fixed action columns would crush artist and title, so they
+   narrow and their buttons wrap instead. */
+@media (min-width: 720px) and (max-width: 1099.98px) {
+	.worklist .row-actions .kbd,
+	.worklist .find-links .kbd {
+		display: none;
+	}
+	.worklist col.c-wl-actions {
+		width: 196px;
+	}
+	.worklist col.c-meta {
+		width: 96px;
+	}
+	.acquire-table col.c-artist {
+		width: 24%;
+	}
+	.worklist col.c-find {
+		width: 150px;
+	}
+	.find-links {
+		flex-wrap: wrap;
+	}
+	.worklist col.c-acquire-actions {
+		width: 132px;
+	}
+	.acquire-table .row-actions {
+		flex-direction: column;
+		align-items: stretch;
+	}
+}
