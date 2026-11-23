@@ -82,9 +82,10 @@ describe("Acquire", () => {
 	it("flags a possibly-owned want with its hint", async () => {
 		mockApi([item({ possibly_owned: true, owned_hint: "A — T1 (Deluxe)" })]);
 		render(<Acquire />);
-		expect(
-			await screen.findByText(/possibly owned: A — T1 \(Deluxe\)/),
-		).toBeTruthy();
+		const badge = await screen.findByText("possibly owned");
+		expect(badge.parentElement?.textContent).toBe(
+			"possibly owned: A — T1 (Deluxe)",
+		);
 	});
 
 	it("links a matched pending download to its Import row", async () => {

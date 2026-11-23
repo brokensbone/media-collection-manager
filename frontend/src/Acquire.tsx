@@ -10,12 +10,15 @@ import { fetchJson } from "./api";
 import { Cover } from "./Cover";
 import { matchesQuery } from "./filter";
 import { ExternalIcon } from "./icons";
+import { useRowKeys } from "./keys";
 import { Modal } from "./Modal";
 import {
 	Badge,
 	EmptyState,
 	ErrorState,
 	FilterBox,
+	Kbd,
+	ListHints,
 	Loading,
 	NoMatches,
 	PageHeader,
@@ -82,11 +85,20 @@ const PENDING: Record<
 	failed: { label: "Import failed", tone: "danger" },
 };
 
-function FindLink({ href, children }: { href: string; children: string }) {
+function FindLink({
+	href,
+	children,
+	hint,
+}: {
+	href: string;
+	children: string;
+	hint?: ReactNode;
+}) {
 	return (
-		<a href={href} target="_blank" rel="noreferrer">
+		<a className="btn" href={href} target="_blank" rel="noreferrer">
 			{children}
 			<ExternalIcon size={12} />
+			{hint}
 		</a>
 	);
 }
@@ -182,6 +194,14 @@ export function Acquire({
 		items?.length ?? 0,
 		full && items != null && query !== "",
 	);
+	const { rowProps } = useRowKeys({
+		count: shown.length,
+		enabled: full && !owning,
+		actions: {
+			b: (i) => window.open(shown[i].bandcamp_url, "_blank", "noreferrer"),
+			m: (i) => openOwn(shown[i]),
+		},
+	});
 
 	let body: ReactNode;
 	if (!items)
@@ -210,105 +230,125 @@ export function Acquire({
 		);
 	else
 		body = (
-			<table className="rows worklist acquire-table">
-				<colgroup>
-					<col className="c-cover" />
-					<col className="c-artist" />
-					<col />
-					<col className="c-find" />
-					<col className="c-acquire-actions" />
-				</colgroup>
-				{full && (
-					<thead>
-						<tr>
-							<th scope="col">
-								<span className="sr-only">Cover</span>
-							</th>
-							<th scope="col">Artist</th>
-							<th scope="col">Title</th>
-							<th scope="col">Find</th>
-							<th scope="col">
-								<span className="sr-only">Actions</span>
-							</th>
-						</tr>
-					</thead>
-				)}
-				<tbody>
-					{shown.map((it) => (
-						<tr key={it.id}>
-							<Cover id={it.id} hasArt={it.has_art} spotifyId={it.spotify_id} />
-							<td className="cell-primary">{it.artist}</td>
-							<td className="cell-secondary">
-								{it.title}
-								{it.album_type && <Badge>{it.album_type}</Badge>}
-								{it.possibly_owned && (
-									<span className="row-meta owned-hint">
-										possibly owned: {it.owned_hint}
-									</span>
-								)}
-								{it.pending_imports?.map((pending) => {
-									const p = PENDING[pending.state];
-									return (
-										<span key={pending.id} className="row-meta">
-											<a
-												className="pending"
-												href={`#${pending.state === "detected" ? "import" : "tasks"}?item=${pending.id}`}
-											>
-												<StatusBadge tone={p.tone} pulse={p.pulse}>
-													{p.label}
-												</StatusBadge>
-												<span className="sr-only">:</span> {pending.name}
-											</a>
+			<>
+				<table
+					className={`rows worklist acquire-table${full ? " sticky-head" : ""}`}
+				>
+					<colgroup>
+						<col className="c-cover" />
+						<col className="c-artist" />
+						<col />
+						<col className="c-find" />
+						<col className="c-acquire-actions" />
+					</colgroup>
+					{full && (
+						<thead>
+							<tr>
+								<th scope="col">
+									<span className="sr-only">Cover</span>
+								</th>
+								<th scope="col">Artist</th>
+								<th scope="col">Title</th>
+								<th scope="col">Find</th>
+								<th scope="col">
+									<span className="sr-only">Actions</span>
+								</th>
+							</tr>
+						</thead>
+					)}
+					<tbody>
+						{shown.map((it, i) => (
+							<tr key={it.id} {...rowProps(i)}>
+								<Cover
+									id={it.id}
+									hasArt={it.has_art}
+									spotifyId={it.spotify_id}
+								/>
+								<td className="cell-primary">{it.artist}</td>
+								<td className="cell-secondary">
+									{it.title}
+									{it.album_type && <Badge>{it.album_type}</Badge>}
+									{it.possibly_owned && (
+										<span className="row-meta">
+											<StatusBadge tone="warn">possibly owned</StatusBadge>
+											<span className="sr-only">:</span> {it.owned_hint}
 										</span>
-									);
-								})}
-							</td>
-							<td className="cell-meta">
-								<div className="find-links">
-									<FindLink href={it.bandcamp_url}>Bandcamp</FindLink>
-									<FindLink
-										href={trackerSearch(
-											"https://redacted.sh/torrents.php",
-											it.artist,
-											it.title,
-										)}
-									>
-										Red
-									</FindLink>
-									<FindLink
-										href={trackerSearch(
-											"https://orpheus.network/torrents.php",
-											it.artist,
-											it.title,
-											ORPHEUS_PARAMS,
-										)}
-									>
-										Ops
-									</FindLink>
-								</div>
-							</td>
-							<td className="cell-actions">
-								<div className="row-actions">
-									<button
-										type="button"
-										className="btn-primary"
-										onClick={() => openOwn(it)}
-									>
-										Mark owned…
-									</button>
-									<button
-										type="button"
-										className="btn-quiet"
-										onClick={() => returnToSaved(it.id)}
-									>
-										Back to saved
-									</button>
-								</div>
-							</td>
-						</tr>
-					))}
-				</tbody>
-			</table>
+									)}
+									{it.pending_imports?.map((pending) => {
+										const p = PENDING[pending.state];
+										return (
+											<span key={pending.id} className="row-meta">
+												<a
+													className="pending"
+													href={`#${pending.state === "detected" ? "import" : "tasks"}?item=${pending.id}`}
+												>
+													<StatusBadge tone={p.tone} pulse={p.pulse}>
+														{p.label}
+													</StatusBadge>
+													<span className="sr-only">:</span> {pending.name}
+												</a>
+											</span>
+										);
+									})}
+								</td>
+								<td className="cell-meta">
+									<div className="find-links">
+										<FindLink
+											href={it.bandcamp_url}
+											hint={full && <Kbd>b</Kbd>}
+										>
+											Bandcamp
+										</FindLink>
+										<FindLink
+											href={trackerSearch(
+												"https://redacted.sh/torrents.php",
+												it.artist,
+												it.title,
+											)}
+										>
+											Red
+										</FindLink>
+										<FindLink
+											href={trackerSearch(
+												"https://orpheus.network/torrents.php",
+												it.artist,
+												it.title,
+												ORPHEUS_PARAMS,
+											)}
+										>
+											Ops
+										</FindLink>
+									</div>
+								</td>
+								<td className="cell-actions">
+									<div className="row-actions">
+										<button type="button" onClick={() => openOwn(it)}>
+											Mark owned…
+											{full && <Kbd>m</Kbd>}
+										</button>
+										<button
+											type="button"
+											className="btn-quiet"
+											onClick={() => returnToSaved(it.id)}
+										>
+											Back to saved
+										</button>
+									</div>
+								</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+				{full && (
+					<ListHints
+						items={[
+							["j/k", "move"],
+							["b", "open Bandcamp"],
+							["m", "mark owned…"],
+						]}
+					/>
+				)}
+			</>
 		);
 
 	return (
