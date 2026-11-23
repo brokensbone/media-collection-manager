@@ -23,10 +23,17 @@
 }
 
 /* ---------- Transmission ---------- */
+.transmission-page {
+	display: flex;
+	flex-direction: column;
+}
 .tools-cards {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
 	gap: var(--s4);
+}
+.tools-cards .card {
+	padding: var(--s3);
 }
 .tools-cards h2 {
 	margin: 0;
@@ -91,9 +98,6 @@
 }
 .torrents col.c-state {
 	width: 140px;
-}
-.torrents col.c-matched {
-	width: 28%;
 }
 .torrents .status {
 	margin-left: 0;
@@ -278,15 +282,18 @@
 }
 
 @media (max-width: 719.98px) {
+	/* On a phone the list comes first; the setup cards are occasional tools. */
 	.tools-cards {
+		order: 2;
 		grid-template-columns: 1fr;
 		gap: var(--s3);
+		margin-top: var(--s5);
 	}
 	table.torrents tr {
-		grid-template-columns: auto auto 1fr;
+		grid-template-columns: auto 1fr;
 		grid-template-areas:
-			"primary primary primary"
-			"kind state matched";
+			"primary primary"
+			"kind state";
 		column-gap: var(--s2);
 		row-gap: var(--s1);
 		align-items: center;
@@ -300,11 +307,6 @@
 	}
 	table.torrents .cell-state {
 		grid-area: state;
-	}
-	table.torrents .cell-matched {
-		grid-area: matched;
-		min-width: 0;
-		font-size: var(--fs-meta);
 	}
 
 	table.activity tr {
@@ -332,5 +334,11 @@
 	.radio-archive-panel {
 		right: auto;
 		left: 0;
+	}
+}
+
+@media (min-width: 720px) {
+	.torrents-section table.rows.sticky-head thead th {
+		top: calc(var(--header-h) + 28px);
 	}
 }

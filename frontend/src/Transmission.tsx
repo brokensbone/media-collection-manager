@@ -141,28 +141,31 @@ export function Transmission() {
 		list = <NoMatches query={query} what="torrents" />;
 	else
 		list = (
-			<table className="rows tall no-cover torrents">
+			<table className="rows tall no-cover torrents sticky-head">
 				<colgroup>
 					<col />
 					<col className="c-kind" />
 					<col className="c-state" />
-					<col className="c-matched" />
 				</colgroup>
 				<thead>
 					<tr>
 						<th scope="col">Name</th>
 						<th scope="col">Kind</th>
 						<th scope="col">State</th>
-						<th scope="col">Matched</th>
 					</tr>
 				</thead>
 				<tbody>
 					{shown.map((t) => (
 						<tr key={t.id}>
 							<td className="cell-primary">
-								{t.name}
-								{(t.classification_detail || t.destination_path) && (
+								{/* Lead with the human-readable match; the raw torrent name moves to the meta line. */}
+								{t.matched ?? t.name}
+								{(t.matched ||
+									t.classification_detail ||
+									t.destination_path) && (
 									<span className="row-meta">
+										{t.matched && <span className="raw-name">{t.name}</span>}
+										{t.matched && t.classification_detail && " · "}
 										{t.classification_detail}
 										{t.classification_detail && t.destination_path && " · "}
 										{t.destination_path && (
@@ -180,9 +183,6 @@ export function Transmission() {
 									{STATE_LABEL[t.state] ?? t.state}
 								</StatusBadge>
 							</td>
-							<td className="cell-matched">
-								{t.matched ?? <span className="muted">—</span>}
-							</td>
 						</tr>
 					))}
 				</tbody>
@@ -195,82 +195,84 @@ export function Transmission() {
 				title="Transmission"
 				filter={<FilterBox placeholder="Filter name or match" />}
 			/>
-			<div className="tools-cards">
-				<section className="card">
-					<h2>Connection</h2>
-					<p className="card-hint">
-						Check the app can reach Transmission's RPC API and SSH to the
-						seedbox.
-					</p>
-					<button type="button" onClick={runTest} disabled={testing}>
-						{testing ? "Testing…" : "Test connection"}
-					</button>
-					{report && (
-						<div className="checks">
-							<CheckLine label="API" check={report.api} />
-							<CheckLine label="SSH" check={report.ssh} />
-						</div>
-					)}
-				</section>
-
-				<section className="card">
-					<h2>Add torrent</h2>
-					<p className="card-hint">
-						Upload one or more .torrent files to start their downloads in
-						Transmission.
-					</p>
-					<div className="torrent-upload">
-						<input
-							aria-label="Upload a .torrent file"
-							type="file"
-							multiple
-							onChange={(event) =>
-								setTorrentFiles(Array.from(event.target.files ?? []))
-							}
-						/>
-						<button
-							type="button"
-							className="btn-primary"
-							onClick={uploadTorrent}
-							disabled={torrentFiles.length === 0 || uploading}
-						>
-							{uploading ? "Adding…" : "Start download"}
-						</button>
-					</div>
-					{uploadStatus && (
-						<p
-							className={`upload-status ${uploadStatus.ok ? "tone-ok" : "tone-danger"}`}
-						>
-							{uploadStatus.text}
+			<div className="transmission-page">
+				<div className="tools-cards">
+					<section className="card">
+						<h2>Connection</h2>
+						<p className="card-hint">
+							Check the app can reach Transmission's RPC API and SSH to the
+							seedbox.
 						</p>
-					)}
-					{uploadResults.length > 0 && (
-						<>
-							<p className="upload-note">
-								Already in Transmission — check for import:
+						<button type="button" onClick={runTest} disabled={testing}>
+							{testing ? "Testing…" : "Test connection"}
+						</button>
+						{report && (
+							<div className="checks">
+								<CheckLine label="API" check={report.api} />
+								<CheckLine label="SSH" check={report.ssh} />
+							</div>
+						)}
+					</section>
+
+					<section className="card">
+						<h2>Add torrent</h2>
+						<p className="card-hint">
+							Upload one or more .torrent files to start their downloads in
+							Transmission.
+						</p>
+						<div className="torrent-upload">
+							<input
+								aria-label="Upload a .torrent file"
+								type="file"
+								multiple
+								onChange={(event) =>
+									setTorrentFiles(Array.from(event.target.files ?? []))
+								}
+							/>
+							<button
+								type="button"
+								className="btn-primary"
+								onClick={uploadTorrent}
+								disabled={torrentFiles.length === 0 || uploading}
+							>
+								{uploading ? "Adding…" : "Start download"}
+							</button>
+						</div>
+						{uploadStatus && (
+							<p
+								className={`upload-status ${uploadStatus.ok ? "tone-ok" : "tone-danger"}`}
+							>
+								{uploadStatus.text}
 							</p>
-							<ul className="upload-results">
-								{uploadResults.map((result) => (
-									<li key={result.position}>
-										{result.name || result.filename}
-									</li>
-								))}
-							</ul>
-						</>
-					)}
+						)}
+						{uploadResults.length > 0 && (
+							<>
+								<p className="upload-note">
+									Already in Transmission — check for import:
+								</p>
+								<ul className="upload-results">
+									{uploadResults.map((result) => (
+										<li key={result.position}>
+											{result.name || result.filename}
+										</li>
+									))}
+								</ul>
+							</>
+						)}
+					</section>
+				</div>
+
+				<section className="torrents-section">
+					<GroupHead title="Torrents seen" count={torrents?.length}>
+						{query && torrents && (
+							<span className="muted">
+								{shown.length} of {torrents.length} shown
+							</span>
+						)}
+					</GroupHead>
+					{list}
 				</section>
 			</div>
-
-			<section className="torrents-section">
-				<GroupHead title="Torrents seen" count={torrents?.length}>
-					{query && torrents && (
-						<span className="muted">
-							{shown.length} of {torrents.length} shown
-						</span>
-					)}
-				</GroupHead>
-				{list}
-			</section>
 		</>
 	);
 }
