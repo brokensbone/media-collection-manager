@@ -7,10 +7,14 @@ export function Modal({
 	title,
 	onClose,
 	children,
+	footer,
+	className,
 }: {
 	title: string;
 	onClose: () => void;
 	children: ReactNode;
+	footer?: ReactNode;
+	className?: string;
 }) {
 	const ref = useRef<HTMLDialogElement>(null);
 	const titleId = useId();
@@ -38,7 +42,7 @@ export function Modal({
 	return (
 		<dialog
 			ref={ref}
-			className="modal"
+			className={className ? `modal ${className}` : "modal"}
 			aria-labelledby={titleId}
 			onCancel={(e) => {
 				// Let React unmount the dialog rather than the browser closing it under us.
@@ -69,6 +73,7 @@ export function Modal({
 					</button>
 				</div>
 				{children}
+				{footer && <div className="modal-footer">{footer}</div>}
 			</div>
 		</dialog>
 	);

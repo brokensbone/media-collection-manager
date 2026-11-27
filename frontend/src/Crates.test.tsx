@@ -312,7 +312,7 @@ it("opens autofile from a row without selecting it and reloads after acceptance"
 		(screen.getByLabelText("Select Burial — Untrue") as HTMLInputElement)
 			.checked,
 	).toBe(false);
-	fireEvent.click(screen.getByRole("button", { name: "Accept move" }));
+	fireEvent.click(screen.getByRole("button", { name: "File in Electronic" }));
 	await screen.findByText("Nothing loose here.");
 	expect(screen.queryByRole("dialog")).toBeNull();
 	expect(accepted).toBe(true);

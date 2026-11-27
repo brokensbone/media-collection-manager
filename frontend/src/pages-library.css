@@ -332,22 +332,59 @@ h2.crate-section {
 	background: none;
 }
 
+/* Keep the header and decision buttons in view while expanded evidence scrolls. */
+.autofile-modal .modal-body {
+	padding: 0;
+	gap: 0;
+	max-height: inherit;
+	overflow: hidden;
+}
+.autofile-modal .modal-head {
+	padding: var(--s4);
+	flex: none;
+	border-bottom: 1px solid var(--border);
+}
+.autofile-scroll {
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	padding: var(--s4);
+	display: flex;
+	flex-direction: column;
+	gap: var(--s3);
+}
+.autofile-scroll p,
+.autofile-scroll ol,
+.autofile-scroll ul {
+	margin-block: 0;
+}
+.autofile-scroll details p,
+.autofile-scroll details ul {
+	margin-block: var(--s2);
+}
 .autofile-destination {
-	font-weight: 600;
+	display: flex;
+	flex-direction: column;
+	gap: var(--s1);
 	overflow-wrap: anywhere;
 }
 .autofile-steps {
 	display: grid;
-	gap: 0.75rem;
+	gap: var(--s3);
 	padding-left: 1.5rem;
 }
 .autofile-steps details {
-	font-size: 0.875rem;
+	font-size: var(--fs-body);
+}
+.autofile-modal .modal-footer {
+	flex: none;
+	border-top: 1px solid var(--border);
+	padding: var(--s3) var(--s4);
 }
 .autofile-actions {
 	display: flex;
-	gap: 0.75rem;
-	margin-top: 1.5rem;
+	gap: var(--s2);
+	flex-wrap: wrap;
 }
 .crate-table .c-action {
 	width: 6rem;
