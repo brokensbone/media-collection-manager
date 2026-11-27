@@ -94,6 +94,8 @@ class BoxRepo:
         if not beets_ids:
             return
         with self._sf() as session:
+            # Coordinate manual filing with autofile acceptance's destination capacity check.
+            session.scalar(select(Box).where(Box.id == box_id).with_for_update())
             session.execute(
                 pg_insert(RecordBox)
                 .values([{"beets_id": bid, "box_id": box_id} for bid in beets_ids])

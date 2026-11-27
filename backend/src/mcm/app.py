@@ -10,6 +10,7 @@ from .db import make_engine, make_session_factory
 from .factories import (
     build_acquire_service,
     build_auth_service,
+    build_autofile_service,
     build_crate_service,
     build_decide_service,
     build_library_assist_service,
@@ -56,6 +57,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.radio_catalogue_service = RadioCatalogueService(session_factory)
     app.state.radio_schedule_service = RadioScheduleService(session_factory)
     app.state.navidrome_sync_service = NavidromeSyncService(session_factory)
+    app.state.autofile_service = build_autofile_service(settings, session_factory)
     app.state.crate_service = build_crate_service(settings, session_factory)
     app.state.releases_service = build_releases_service(settings, session_factory)
     app.state.imports_service = ImportsService(

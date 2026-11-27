@@ -158,3 +158,45 @@ takes Python dependencies from nixpkgs plus the overrides in `flake.nix`, and it
 build fails if one is older than a minimum in `pyproject.toml`. So Dependabot leaves
 those minimums alone; raise one by hand, together with the override that satisfies
 it, then run `uv lock`. CI uses `uv sync --locked`, so a stale lockfile fails.
+
+## Crate autofile
+
+Each album row in Crates has an **Autofile** button. It opens a suggestion modal;
+**Accept move** files the album, and **Dismiss** leaves it in place. The modal shows
+probabilities at each level, alternative choices and any sourced album description.
+A low probability is flagged for review; no automatic probability threshold has been
+calibrated yet. Acquisition-time autofiling is not enabled in this iteration.
+
+`AutofileService.suggest(beets_id, trigger="manual")` is the reusable entry point.
+It snapshots the hierarchy and owned catalogue, enriches album metadata with a
+best-effort Bandcamp lookup, and asks Jev one independent Choice question per
+branching node in a single request. Code follows the selected path from the root.
+Bandcamp discovery uses search results or a conventional artist/album URL candidate;
+the returned page must match both artist and title before its description/tags are
+used. Missing descriptions are recorded explicitly and routing uses catalogue context.
+There is no web-search agent or generated album summary in the runtime path.
+
+Configure `MCM_TYPESAFE_API_KEY`; `MCM_AUTOFILE_MODEL` defaults to `jev-1.14.0`.
+`MCM_CRATE_SOFT_CAP` (default 50) is enforced as a destination limit for autofile.
+The API does not create crates automatically. Apply migrations before starting it.
+
+The `autofile_run` table retains each attempt independently of the rolling activity
+feed: trigger, album/source snapshot, prompt version, model, exact request/response,
+evidence URLs/text/timestamps, route probabilities, error, and final accept/dismiss
+outcome and timestamps. The request is saved before calling Jev. Runs left `running`
+after an API process interruption remain visible in history. Start a fresh attempt
+to retry; an old run never moves anything on its own.
+
+API:
+
+- `POST /crates/autofile` with `{"beets_id":"792"}` creates and returns a saved suggestion.
+- `GET /crates/autofile?beets_id=792` returns the latest 50 attempts, newest first.
+- `GET /crates/autofile/{run_id}` retrieves a complete attempt.
+- `POST /crates/autofile/{run_id}/accept` atomically moves the album and marks it accepted.
+- `POST /crates/autofile/{run_id}/dismiss` records dismissal without moving anything.
+
+Acceptance rechecks membership, album identity, the hierarchy, leaf status and capacity.
+Stale suggestions return 409 and require a fresh run. Repeating a completed accept or
+dismiss is harmless. Each start, suggestion, failure, acceptance and dismissal also
+appears in Activity with its durable run ID. A future worker can call the same service
+with a different trigger and retrieve its history through these endpoints.

@@ -331,3 +331,24 @@ h2.crate-section {
 .crate-table tbody tr.sel:not(.checked):not(:hover) td {
 	background: none;
 }
+
+.autofile-destination {
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+.autofile-steps {
+	display: grid;
+	gap: 0.75rem;
+	padding-left: 1.5rem;
+}
+.autofile-steps details {
+	font-size: 0.875rem;
+}
+.autofile-actions {
+	display: flex;
+	gap: 0.75rem;
+	margin-top: 1.5rem;
+}
+.crate-table .c-action {
+	width: 6rem;
+}

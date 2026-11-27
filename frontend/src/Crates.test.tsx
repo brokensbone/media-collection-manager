@@ -274,3 +274,46 @@ describe("Crates", () => {
 		expect(screen.queryByText("Burial")).toBeNull();
 	});
 });
+
+it("opens autofile from a row without selecting it and reloads after acceptance", async () => {
+	let accepted = false;
+	const fetchMock = vi.fn(async (url: string, opts?: RequestInit) => {
+		if (url === "/crates/autofile/7/accept") {
+			accepted = true;
+			return { ok: true, json: async () => ({ status: "accepted" }) };
+		}
+		if (url === "/crates/autofile" && opts?.method === "POST") {
+			return {
+				ok: true,
+				json: async () => ({
+					id: 7,
+					status: "suggested",
+					model: "jev-1.14.0",
+					error: null,
+					evidence: {},
+					result: { destination: "Collection / Electronic", steps: [] },
+				}),
+			};
+		}
+		return {
+			ok: true,
+			json: async () =>
+				boxView(accepted ? { records: [], loose_count: 0 } : {}),
+		};
+	});
+	vi.stubGlobal("fetch", fetchMock);
+	render(<Crates />);
+	fireEvent.click(
+		await screen.findByRole("button", { name: "Autofile Burial — Untrue" }),
+	);
+	await screen.findByRole("dialog", { name: "Autofile" });
+	await screen.findByText("Collection / Electronic");
+	expect(
+		(screen.getByLabelText("Select Burial — Untrue") as HTMLInputElement)
+			.checked,
+	).toBe(false);
+	fireEvent.click(screen.getByRole("button", { name: "Accept move" }));
+	await screen.findByText("Nothing loose here.");
+	expect(screen.queryByRole("dialog")).toBeNull();
+	expect(accepted).toBe(true);
+});
