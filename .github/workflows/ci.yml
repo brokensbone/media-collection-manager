@@ -44,5 +44,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
+      # Main builds populate a trusted cache; PRs restore it without publishing
+      # their own store paths into the shared cache.
+      - name: Restore Nix store cache
+        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
+        with:
+          primary-key: nix-store-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'flake.nix', 'backend/uv.lock', 'frontend/package-lock.json') }}
+          restore-prefixes-first-match: nix-store-${{ runner.os }}-${{ runner.arch }}-
+          save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
       - run: nix fmt -- --check flake.nix
       - run: nix build .#default
