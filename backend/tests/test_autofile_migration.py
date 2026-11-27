@@ -1,5 +1,7 @@
 """Verify the durable audit schema against PostgreSQL's actual migration path."""
 
+import logging
+
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
@@ -13,6 +15,7 @@ from mcm.models import Base
 def test_autofile_migration_round_trip(monkeypatch):
     with PostgresContainer("postgres:16", driver="psycopg") as pg:
         monkeypatch.setenv("MCM_DATABASE_URL", pg.get_connection_url())
+        application_log = logging.getLogger("mcm.adapters.beets")
         config = Config("alembic.ini")
         command.upgrade(config, "head")
         engine = create_engine(pg.get_connection_url())
@@ -33,5 +36,6 @@ def test_autofile_migration_round_trip(monkeypatch):
             assert "autofile_run" not in inspect(engine).get_table_names()
             command.upgrade(config, "head")
             assert "autofile_run" in inspect(engine).get_table_names()
+            assert not application_log.disabled
         finally:
             engine.dispose()
