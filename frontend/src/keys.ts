@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 
 export function isTypingTarget(target: EventTarget | null): boolean {
 	if (!(target instanceof HTMLElement)) return false;
@@ -49,7 +55,9 @@ export function useRowKeys(opts: {
 	// Scroll only after a keyboard move, not on first render or when rows change under the cursor.
 	const moved = useRef(false);
 
-	useEffect(() => {
+	// Install shortcuts as soon as the rows are committed, before a user can
+	// interact with the newly visible list.
+	useLayoutEffect(() => {
 		if (!enabled) return;
 		function onKey(e: KeyboardEvent) {
 			if (count === 0 || shouldIgnoreKey(e)) return;
