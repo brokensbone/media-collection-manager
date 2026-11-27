@@ -8,7 +8,8 @@ from mcm.models import Base
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # Migrations can run in-process; keep application loggers available to their caller.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 database_url = Settings().database_url

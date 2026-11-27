@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from enum import StrEnum
+from typing import Any
 
 from sqlalchemy import (
     JSON,
@@ -410,3 +411,27 @@ class TelegramWorklistOffer(Base):
     resource_id: Mapped[str]
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AutofileRun(Base):
+    """Durable decision history, independent of the pruned activity feed and beets refreshes."""
+
+    __tablename__ = "autofile_run"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    beets_id: Mapped[str] = mapped_column(index=True)
+    trigger: Mapped[str] = mapped_column(default="manual")
+    status: Mapped[str] = mapped_column(default="running", index=True)
+    source_box_id: Mapped[int]
+    destination_box_id: Mapped[int | None] = mapped_column(default=None)
+    prompt_version: Mapped[str]
+    model: Mapped[str]
+    album: Mapped[dict[str, Any]] = mapped_column(JSON)
+    evidence: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    request: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    response: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    result: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    error: Mapped[str | None] = mapped_column(default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)

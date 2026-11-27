@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     # Crates (§2): soft cap on a box's loose (direct) record count — a UI nudge to split, never
     # a hard gate. Tunable.
     crate_soft_cap: int = 50
+    autofile_model: str = "jev-1.14.0"
 
     # Telegram worklist. The worker uses long polling only when both values are set: no inbound
     # HTTP endpoint is exposed. `telegram_worklist_chat_ids` is a comma-separated allow-list of

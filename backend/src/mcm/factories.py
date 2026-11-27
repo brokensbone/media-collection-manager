@@ -1,8 +1,11 @@
 from sqlalchemy.orm import Session, sessionmaker
 
 from .acquire import AcquireService
+from .adapters.album_description import BandcampDescriptions
 from .adapters.album_repo import AlbumRepo
 from .adapters.art_fetcher import fetch_image
+from .adapters.autofile_jev import JevCrateJudge
+from .adapters.autofile_repo import AutofileRepo
 from .adapters.beets import BeetsClient
 from .adapters.beets_cache import BeetsCatalogCache
 from .adapters.box_repo import BoxRepo
@@ -21,6 +24,7 @@ from .adapters.typesafe_release_group_judge import TypeSafeReleaseGroupJudge
 from .alerts import AlertsService
 from .artist_watch import ArtistWatchService
 from .auth_service import AuthService
+from .autofile import AutofileService
 from .config import Settings
 from .crates import CrateService
 from .decide import DecideService
@@ -369,4 +373,19 @@ def build_releases_service(
         repo=AlbumRepo(session_factory),
         tokens=build_auth_service(settings, session_factory),
         clock=SystemClock(),
+    )
+
+
+def build_autofile_service(
+    settings: Settings, session_factory: sessionmaker[Session]
+) -> AutofileService:
+    return AutofileService(
+        repo=AutofileRepo(session_factory),
+        boxes=BoxRepo(session_factory),
+        library=build_library_assist_service(settings, session_factory),
+        judge=JevCrateJudge(settings.typesafe_api_key),
+        descriptions=BandcampDescriptions(),
+        events=WorkerEventLog(session_factory),
+        model=settings.autofile_model,
+        cap=settings.crate_soft_cap,
     )

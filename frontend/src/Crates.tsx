@@ -7,6 +7,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { AutofileModal } from "./AutofileModal";
 import { fetchJson } from "./api";
 import { matchesQuery } from "./filter";
 import { setHashParams, useHashParam, useQuery } from "./hashState";
@@ -79,6 +80,7 @@ export function Crates() {
 	const boxId = boxParam ? Number(boxParam) : null;
 	const query = useQuery();
 	const [view, setView] = useState<BoxView | null>(null);
+	const [autofile, setAutofile] = useState<BoxRecord | null>(null);
 	const [failed, setFailed] = useState(false);
 	const [selected, setSelected] = useState<Set<string>>(new Set());
 	const [error, setError] = useState<string | null>(null);
@@ -313,6 +315,7 @@ export function Crates() {
 					<col className="c-artist" />
 					<col />
 					<col className="c-meta" />
+					<col className="c-action" />
 				</colgroup>
 				<thead>
 					<tr>
@@ -328,6 +331,7 @@ export function Crates() {
 						<th scope="col">Artist</th>
 						<th scope="col">Title</th>
 						<th scope="col">Year · media</th>
+						<th scope="col">File</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -353,6 +357,16 @@ export function Crates() {
 								<td className="cell-secondary">{r.title}</td>
 								<td className="cell-meta">
 									{[r.year, r.media].filter(Boolean).join(" · ")}
+								</td>
+								<td>
+									<button
+										type="button"
+										className="btn-quiet"
+										aria-label={`Autofile ${r.artist} — ${r.title}`}
+										onClick={() => setAutofile(r)}
+									>
+										Autofile
+									</button>
 								</td>
 							</tr>
 						);
@@ -541,6 +555,14 @@ export function Crates() {
 			)}
 
 			{loose}
+			{autofile && (
+				<AutofileModal
+					key={autofile.beets_id}
+					album={autofile}
+					onClose={() => setAutofile(null)}
+					onAccepted={load}
+				/>
+			)}
 			{shown.length > 0 && (
 				<ListHints
 					items={[

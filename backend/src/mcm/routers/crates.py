@@ -3,7 +3,9 @@ from collections.abc import Callable
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from ..adapters.autofile_repo import AutofileConflict, RunView
 from ..adapters.box_repo import BoxRow
+from ..autofile import AutofileService
 from ..crates import BoxNotEmpty, BoxView, CrateError, CrateService, SplitCandidate
 
 router = APIRouter(tags=["crates"])
@@ -40,7 +42,7 @@ def _guard[T](fn: Callable[[], T]) -> T:
     """Turn crate-domain errors into HTTP: a blocked delete is 409, anything else a bad request."""
     try:
         return fn()
-    except BoxNotEmpty as e:
+    except (BoxNotEmpty, AutofileConflict) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     except CrateError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -98,3 +100,37 @@ def split_suggestions(box_id: int, request: Request) -> list[SplitCandidate]:
 @router.post("/crates/box/{box_id}/split")
 def apply_split(box_id: int, body: SplitBody, request: Request) -> BoxView:
     return _guard(lambda: _service(request).apply_split(box_id, body.facet))
+
+
+class AutofileBody(BaseModel):
+    beets_id: str
+
+
+def _autofile(request: Request) -> AutofileService:
+    return request.app.state.autofile_service  # type: ignore[no-any-return]
+
+
+@router.post("/crates/autofile")
+def autofile(body: AutofileBody, request: Request) -> RunView:
+    return _guard(lambda: _autofile(request).suggest(body.beets_id))
+
+
+@router.get("/crates/autofile")
+def autofile_history(beets_id: str, request: Request) -> list[RunView]:
+    # Reads are not emitted to the activity feed: the durable run is the audit source.
+    return _autofile(request).repo.history(beets_id)
+
+
+@router.get("/crates/autofile/{run_id}")
+def autofile_result(run_id: int, request: Request) -> RunView:
+    return _guard(lambda: _autofile(request).repo.get(run_id))
+
+
+@router.post("/crates/autofile/{run_id}/accept")
+def accept_autofile(run_id: int, request: Request) -> RunView:
+    return _guard(lambda: _autofile(request).accept(run_id))
+
+
+@router.post("/crates/autofile/{run_id}/dismiss")
+def dismiss_autofile(run_id: int, request: Request) -> RunView:
+    return _guard(lambda: _autofile(request).dismiss(run_id))
