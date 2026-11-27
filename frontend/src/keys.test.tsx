@@ -1,10 +1,33 @@
-import { act, cleanup, fireEvent, renderHook } from "@testing-library/react";
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	renderHook,
+} from "@testing-library/react";
+import { useLayoutEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isTypingTarget, useRowKeys } from "./keys";
 
 afterEach(cleanup);
 
 describe("useRowKeys", () => {
+	it("accepts shortcuts as soon as a list is committed", () => {
+		const keep = vi.fn();
+		function List() {
+			useRowKeys({ count: 1, actions: { y: keep } });
+			return <div>Ready</div>;
+		}
+		function Parent() {
+			useLayoutEffect(() => {
+				fireEvent.keyDown(document.body, { key: "y" });
+			}, []);
+			return <List />;
+		}
+		render(<Parent />);
+		expect(keep).toHaveBeenCalledWith(0);
+	});
+
 	it("moves with j/k and arrows, clamped, and runs actions on the selection", () => {
 		const keep = vi.fn();
 		const { result } = renderHook(() =>
