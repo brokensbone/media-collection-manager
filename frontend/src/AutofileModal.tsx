@@ -99,92 +99,111 @@ export function AutofileModal({
 	return (
 		<Modal
 			title="Autofile"
+			className="autofile-modal"
+			footer={
+				<div className="autofile-actions">
+					{run?.status === "suggested" && run.result.destination && (
+						<button
+							type="button"
+							disabled={busy}
+							onClick={() => void resolve("accept")}
+						>
+							File in {run.result.destination.split(" / ").at(-1)}
+						</button>
+					)}
+					<button
+						type="button"
+						className="btn-quiet"
+						disabled={busy}
+						onClick={() => void resolve("dismiss")}
+					>
+						{run ? "Dismiss" : "Close"}
+					</button>
+				</div>
+			}
 			onClose={() => {
 				if (!busy) void resolve("dismiss");
 			}}
 		>
-			<p>
-				<strong>{album.artist}</strong> — {album.title}
-			</p>
-			{!run && !error && <p role="status">Finding a crate…</p>}
-			{error && <p role="alert">{error}</p>}
-			{run && (
-				<>
-					{run.error && <p role="alert">{run.error}</p>}
-					{run.result.destination && (
-						<p className="autofile-destination">{run.result.destination}</p>
-					)}
-					{run.result.reason && <p>{run.result.reason}</p>}
-					{run.result.needs_review && (
-						<p>
-							The route is uncertain. Review the alternatives before accepting.
+			<div className="autofile-scroll">
+				<p>
+					<strong>{album.artist}</strong> — {album.title}
+				</p>
+				{!run && !error && <p role="status">Finding a crate…</p>}
+				{error && <p role="alert">{error}</p>}
+				{run && (
+					<>
+						{run.error && <p role="alert">{run.error}</p>}
+						{run.result.destination && (
+							<div className="autofile-destination">
+								<span className="cell-meta">Suggested crate</span>
+								<strong>{run.result.destination.split(" / ").at(-1)}</strong>
+								<span className="cell-meta">{run.result.destination}</span>
+							</div>
+						)}
+						{run.status === "review" && !run.result.destination ? (
+							<p>
+								<strong>No destination suggested.</strong> The album will stay
+								in its current crate.
+							</p>
+						) : run.result.reason ? (
+							<p>{run.result.reason}</p>
+						) : null}
+						{run.status === "suggested" && run.result.needs_review && (
+							<p>
+								Low-confidence suggestion. Check the alternatives below, then
+								file in the suggested crate or dismiss.
+							</p>
+						)}
+						{run.result.steps.length > 0 && (
+							<ol className="autofile-steps">
+								{run.result.steps.map((step) => (
+									<li key={step.node_id}>
+										<div>
+											<strong>{choiceName(step.choice)}</strong>{" "}
+											<span className="cell-meta">
+												{percentage(step.probability)}
+											</span>
+										</div>
+										<details>
+											<summary>Show alternatives</summary>
+											<ul>
+												{step.alternatives.map((option) => (
+													<li key={option.choice}>
+														{choiceName(option.choice)}:{" "}
+														{percentage(option.probability)}
+													</li>
+												))}
+											</ul>
+										</details>
+									</li>
+								))}
+							</ol>
+						)}
+						{run.result.destination_count != null && (
+							<p>
+								Destination: {run.result.destination_count} albums · limit{" "}
+								{run.result.capacity}
+							</p>
+						)}
+						{run.evidence.notice && (
+							<p className="cell-meta">{run.evidence.notice}</p>
+						)}
+						{(run.evidence.sources ?? []).map((source) => (
+							<details key={source.url}>
+								<summary>Album description</summary>
+								<p>{source.description}</p>
+								{source.tags.length > 0 && <p>{source.tags.join(" · ")}</p>}
+								<a href={source.url} target="_blank" rel="noreferrer">
+									Source
+								</a>
+							</details>
+						))}
+						<p className="cell-meta">
+							Saved result #{run.id} · {run.model}
 						</p>
-					)}
-					{run.result.steps.length > 0 && (
-						<ol className="autofile-steps">
-							{run.result.steps.map((step) => (
-								<li key={step.node_id}>
-									<div>
-										<strong>{choiceName(step.choice)}</strong>{" "}
-										<span className="cell-meta">
-											{percentage(step.probability)}
-										</span>
-									</div>
-									<details>
-										<summary>Alternatives in {step.node}</summary>
-										<ul>
-											{step.alternatives.map((option) => (
-												<li key={option.choice}>
-													{choiceName(option.choice)}:{" "}
-													{percentage(option.probability)}
-												</li>
-											))}
-										</ul>
-									</details>
-								</li>
-							))}
-						</ol>
-					)}
-					{run.result.destination_count != null && (
-						<p>
-							Destination: {run.result.destination_count} albums · limit{" "}
-							{run.result.capacity}
-						</p>
-					)}
-					{run.evidence.notice && (
-						<p className="cell-meta">{run.evidence.notice}</p>
-					)}
-					{(run.evidence.sources ?? []).map((source) => (
-						<details key={source.url}>
-							<summary>Album description</summary>
-							<p>{source.description}</p>
-							{source.tags.length > 0 && <p>{source.tags.join(" · ")}</p>}
-							<a href={source.url} target="_blank" rel="noreferrer">
-								Source
-							</a>
-						</details>
-					))}
-					<p className="cell-meta">
-						Saved result #{run.id} · {run.model}
-					</p>
-				</>
-			)}
-			<div className="autofile-actions">
-				<button
-					type="button"
-					disabled={run?.status !== "suggested" || busy}
-					onClick={() => void resolve("accept")}
-				>
-					Accept move
-				</button>
-				<button
-					type="button"
-					className="btn-quiet"
-					disabled={busy}
-					onClick={() => void resolve("dismiss")}
-				>
-					{run ? "Dismiss" : "Close"}
-				</button>
+					</>
+				)}
 			</div>
 		</Modal>
 	);

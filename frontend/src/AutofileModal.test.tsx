@@ -76,7 +76,7 @@ describe("Autofile modal", () => {
 		await screen.findByText("Collection / Reggae & Dub / Dub");
 		expect(screen.getByText("85%")).toBeTruthy();
 		expect(fetch).toHaveBeenCalledTimes(1);
-		fireEvent.click(screen.getByRole("button", { name: "Accept move" }));
+		fireEvent.click(screen.getByRole("button", { name: "File in Dub" }));
 		await waitFor(() => expect(onAccepted).toHaveBeenCalledTimes(1));
 		expect(fetch.mock.calls[1][0]).toBe("/crates/autofile/12/accept");
 		expect(onClose).toHaveBeenCalledTimes(1);
@@ -116,30 +116,87 @@ describe("Autofile modal", () => {
 			<AutofileModal album={album} onClose={onClose} onAccepted={vi.fn()} />,
 		);
 		await screen.findByText("85%");
-		fireEvent.click(screen.getByRole("button", { name: "Accept move" }));
+		fireEvent.click(screen.getByRole("button", { name: "File in Dub" }));
 		expect((await screen.findByRole("alert")).textContent).toContain(
 			"The album moved",
 		);
 		expect(onClose).not.toHaveBeenCalled();
 	});
-	it("disables acceptance when no fit was found or the provider failed", async () => {
+
+	it("offers only dismissal when the route has no destination", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn().mockResolvedValue(
 				response({
 					...suggestion,
 					status: "review",
-					result: { steps: [], reason: "No suitable child crate was found." },
+					result: {
+						steps: [],
+						reason: "No suitable child crate was found.",
+						needs_review: true,
+					},
 				}),
 			),
 		);
 		render(
 			<AutofileModal album={album} onClose={vi.fn()} onAccepted={vi.fn()} />,
 		);
-		await screen.findByText("No suitable child crate was found.");
+		await screen.findByText("No destination suggested.");
 		expect(
-			(screen.getByRole("button", { name: "Accept move" }) as HTMLButtonElement)
-				.disabled,
-		).toBe(true);
+			screen.getByText(/The album will stay in its current crate/),
+		).toBeTruthy();
+		expect(
+			screen.queryByRole("button", { name: /File in|Accept move/ }),
+		).toBeNull();
+		expect(screen.queryByText(/Low-confidence suggestion/)).toBeNull();
+		expect(screen.getByRole("button", { name: "Dismiss" })).toBeTruthy();
+	});
+	it("does not offer filing into a destination blocked for review", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockResolvedValue(
+				response({
+					...suggestion,
+					status: "review",
+					result: {
+						...suggestion.result,
+						reason: "The suggested crate is full.",
+					},
+				}),
+			),
+		);
+		render(
+			<AutofileModal album={album} onClose={vi.fn()} onAccepted={vi.fn()} />,
+		);
+		await screen.findByText("The suggested crate is full.");
+		expect(
+			screen.queryByRole("button", { name: /File in|Accept move/ }),
+		).toBeNull();
+	});
+
+	it("lets the user accept an uncertain suggestion after inspecting alternatives", async () => {
+		const fetch = vi
+			.fn()
+			.mockResolvedValueOnce(
+				response({
+					...suggestion,
+					result: { ...suggestion.result, needs_review: true },
+				}),
+			)
+			.mockResolvedValue(response({ status: "accepted" }));
+		vi.stubGlobal("fetch", fetch);
+		const onAccepted = vi.fn();
+		render(
+			<AutofileModal album={album} onClose={vi.fn()} onAccepted={onAccepted} />,
+		);
+		await screen.findByText(/Low-confidence suggestion/);
+		fireEvent.click(screen.getByText("Show alternatives"));
+		expect(screen.getByText("Electronic: 10%")).toBeTruthy();
+		const accept = screen.getByRole("button", {
+			name: "File in Dub",
+		}) as HTMLButtonElement;
+		expect(accept.disabled).toBe(false);
+		fireEvent.click(accept);
+		await waitFor(() => expect(onAccepted).toHaveBeenCalledOnce());
 	});
 });
