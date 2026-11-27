@@ -1,7 +1,8 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 from sqlalchemy.orm import Session, sessionmaker
 
 from mcm.adapters.beets import BeetsAlbum, BeetsTrack
@@ -144,8 +145,69 @@ def test_radio_schedule_is_path_free_and_expands_album_contents(
     assert "path" not in str(body)
     summary = client.get("/radio/schedules").json()[0]
     assert summary["schedule_date"] == "2026-09-21"
+    assert summary["session_count"] == 2
+    assert summary["duration_seconds"] == 780
     assert "state" not in summary
     assert "state" not in body
+
+
+def test_schedule_summaries_match_details_with_missing_tracks_in_one_query(
+    clean_album_tables: sessionmaker[Session],
+) -> None:
+    cache = BeetsCatalogCache(clean_album_tables)
+    album = BeetsAlbum("1", "Artist", "Album", None)
+    first = BeetsTrack("1", "11", 1, 1, "One", 100, "one.flac")
+    second = BeetsTrack("1", "12", 1, 2, "Two", 250, "two.flac")
+    cache.replace([album], [first, second])
+    service = RadioScheduleService(clean_album_tables)
+    plan = ScheduleInput(
+        note="Test",
+        sessions=[
+            ScheduleSessionInput(
+                "track_hour",
+                "Tracks",
+                "09:00",
+                None,
+                [
+                    ScheduleItemInput("track", None, "11"),
+                    ScheduleItemInput("track", None, "12"),
+                ],
+            ),
+            ScheduleSessionInput(
+                "album_session",
+                "Albums",
+                "10:00",
+                None,
+                [
+                    ScheduleItemInput("album", "1", None),
+                    ScheduleItemInput("album", "1", None),
+                ],
+            ),
+        ],
+    )
+    for day in (date(2026, 11, 1), date(2026, 11, 2)):
+        service.replace(day, plan)
+    # A catalogue refresh can make an individual selected track unavailable.
+    cache.replace([album], [first])
+    with clean_album_tables() as session:
+        engine = session.get_bind()
+    queries: list[str] = []
+
+    def count_queries(*args: object) -> None:
+        queries.append(str(args[2]))
+
+    event.listen(engine, "before_cursor_execute", count_queries)
+    try:
+        summaries = service.list_schedules()
+    finally:
+        event.remove(engine, "before_cursor_execute", count_queries)
+    assert len(queries) == 1
+    assert [s.schedule_date for s in summaries] == [date(2026, 11, 2), date(2026, 11, 1)]
+    for summary in summaries:
+        detail = service.get(summary.schedule_date)
+        assert detail is not None
+        assert summary.duration_seconds == detail.duration_seconds == 300
+        assert summary.session_count == len(detail.sessions) == 2
 
 
 def test_radio_schedule_rejects_an_unavailable_selection(

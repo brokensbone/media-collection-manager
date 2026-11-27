@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import date
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import case, delete, distinct, func, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from .models import (
@@ -87,10 +87,49 @@ class RadioScheduleService:
 
     def list_schedules(self) -> list[ScheduleSummary]:
         with self._sf() as session:
-            schedules = session.scalars(
-                select(RadioSchedule).order_by(RadioSchedule.schedule_date.desc())
+            album_durations = (
+                select(
+                    BeetsTrackCache.beets_id.label("beets_id"),
+                    func.sum(BeetsTrackCache.duration_seconds).label("duration"),
+                )
+                .group_by(BeetsTrackCache.beets_id)
+                .subquery()
+            )
+            duration = case(
+                (RadioScheduleItem.kind == "track", BeetsTrackCache.duration_seconds),
+                (RadioScheduleItem.kind == "album", album_durations.c.duration),
+                else_=None,
+            )
+            rows = session.execute(
+                select(
+                    RadioSchedule.schedule_date,
+                    RadioSchedule.note,
+                    func.count(distinct(RadioScheduleSession.id)),
+                    func.coalesce(func.sum(duration), 0.0),
+                )
+                .outerjoin(
+                    RadioScheduleSession, RadioScheduleSession.schedule_id == RadioSchedule.id
+                )
+                .outerjoin(
+                    RadioScheduleItem, RadioScheduleItem.session_id == RadioScheduleSession.id
+                )
+                .outerjoin(
+                    BeetsTrackCache,
+                    (RadioScheduleItem.kind == "track")
+                    & (RadioScheduleItem.item_id == BeetsTrackCache.item_id),
+                )
+                .outerjoin(
+                    album_durations,
+                    (RadioScheduleItem.kind == "album")
+                    & (RadioScheduleItem.beets_id == album_durations.c.beets_id),
+                )
+                .group_by(RadioSchedule.id, RadioSchedule.schedule_date, RadioSchedule.note)
+                .order_by(RadioSchedule.schedule_date.desc())
             ).all()
-            return [self._summary(session, schedule) for schedule in schedules]
+            return [
+                ScheduleSummary(day, note, count, float(seconds))
+                for day, note, count, seconds in rows
+            ]
 
     def get(self, schedule_date: date) -> ScheduleView | None:
         with self._sf() as session:
@@ -223,15 +262,6 @@ class RadioScheduleService:
                             raise ScheduleError(f"unknown playable track {item.item_id}")
                     elif not item.beets_id or session.get(BeetsAlbumCache, item.beets_id) is None:
                         raise ScheduleError(f"unknown playable album {item.beets_id}")
-
-    def _summary(self, session: Session, schedule: RadioSchedule) -> ScheduleSummary:
-        view = self._view(session, schedule)
-        return ScheduleSummary(
-            schedule_date=view.schedule_date,
-            note=view.note,
-            session_count=len(view.sessions),
-            duration_seconds=view.duration_seconds,
-        )
 
     def _view(self, session: Session, schedule: RadioSchedule) -> ScheduleView:
         sessions = session.scalars(
