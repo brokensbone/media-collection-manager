@@ -11,20 +11,22 @@ import { isTypingTarget, useRowKeys } from "./keys";
 
 afterEach(cleanup);
 
+function ImmediateList({ keep }: { keep: (index: number) => void }) {
+	useRowKeys({ count: 1, actions: { y: keep } });
+	return <div>Ready</div>;
+}
+
+function ImmediateParent({ keep }: { keep: (index: number) => void }) {
+	useLayoutEffect(() => {
+		fireEvent.keyDown(document.body, { key: "y" });
+	}, []);
+	return <ImmediateList keep={keep} />;
+}
+
 describe("useRowKeys", () => {
 	it("accepts shortcuts as soon as a list is committed", () => {
 		const keep = vi.fn();
-		function List() {
-			useRowKeys({ count: 1, actions: { y: keep } });
-			return <div>Ready</div>;
-		}
-		function Parent() {
-			useLayoutEffect(() => {
-				fireEvent.keyDown(document.body, { key: "y" });
-			}, []);
-			return <List />;
-		}
-		render(<Parent />);
+		render(<ImmediateParent keep={keep} />);
 		expect(keep).toHaveBeenCalledWith(0);
 	});
 
